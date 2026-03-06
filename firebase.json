@@ -1,0 +1,38 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "mylmazos",
+          "appId": "1:163654752472:android:c805174cf78c2d1f789fad",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "mylmazos",
+          "configurations": {
+            "android": "1:163654752472:android:c805174cf78c2d1f789fad",
+            "web": "1:163654752472:web:c83c1b20412dfbfd789fad",
+            "windows": "1:163654752472:web:881bfd1bb5df3fbc789fad"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+  
+}

@@ -68,6 +68,10 @@
     .aside-divider{height:1px;background:var(--border);margin:8px 0}
     .aside-league{padding-left:28px;font-size:12px;color:var(--text2)}
     .aside-league.active{color:var(--accent);font-weight:600;border-left-color:var(--accent)}
+    .aside-round{padding-left:44px;font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px}
+    .aside-round:hover{background:var(--surf2)}
+    .aside-round.active{color:var(--accent);font-weight:600;border-left-color:var(--accent)}
+    .aside-round .rdot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
 
     /* ── Main ────────────────────────────────────────────────────────────── */
     main{flex:1;padding:24px 28px;overflow-x:hidden;min-width:0}
@@ -127,6 +131,24 @@
     .tag-hist{font-size:10px;color:var(--text3);margin-left:5px}
 
     .empty-row td{text-align:center!important;padding:32px;color:var(--text3);font-size:13px}
+
+    /* ── Winrate bar (sequential fill in a track) ────────────────────────── */
+    .wr-cell{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+    .wr-track{position:relative;width:74px;height:7px;border-radius:4px;background:var(--surf2);overflow:hidden;flex-shrink:0}
+    .wr-fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+    .wr-num{font-variant-numeric:tabular-nums;font-weight:700;min-width:44px;text-align:right}
+    .wr-hi{color:var(--accent)}   /* ≥ 60% */
+    .wr-mid{color:var(--text)}    /* 40–60 */
+    .wr-lo{color:var(--danger)}   /* < 40% */
+    /* small subtitle above a group of tables */
+    .subhead{font-size:13px;font-weight:700;margin:22px 0 10px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+    .subhead:first-child{margin-top:0}
+    .race-pill{display:inline-block;font-size:11px;font-weight:600;color:var(--gold);background:rgba(245,166,35,.1);padding:1px 8px;border-radius:20px}
+    .card-type{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em}
+    details > summary{transition:color .12s}
+    details > summary > span:first-child{display:inline-block;transition:transform .15s}
+    details[open] > summary > span:first-child{transform:rotate(90deg)}
+    details > summary::-webkit-details-marker{display:none}
 
     /* ── Spinner ─────────────────────────────────────────────────────────── */
     .sp{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
@@ -198,30 +220,16 @@
       <div class="stat-cards">
         <div class="sc"><div class="sc-label">Jugadores</div><div class="sc-value a" id="lsc-players">—</div></div>
         <div class="sc"><div class="sc-label">Fechas jugadas</div><div class="sc-value" id="lsc-rounds">—</div></div>
-        <div class="sc"><div class="sc-label">Líder general</div><div class="sc-value g" id="lsc-leader-gen">—</div></div>
         <div class="sc"><div class="sc-label">Líder liga</div><div class="sc-value g" id="lsc-leader-cur">—</div></div>
       </div>
 
       <div class="tabs">
-        <button class="tab-btn active" data-tab="general">Tabla General</button>
-        <button class="tab-btn" data-tab="actual">Liga Actual</button>
-        <button class="tab-btn" data-tab="jugadores">Jugadores</button>
-        <button class="tab-btn" data-tab="fechas">Fechas</button>
+        <button class="tab-btn active" data-tab="actual">Tabla de la liga</button>
+        <button class="tab-btn" data-tab="mazos">Mazos</button>
+        <button class="tab-btn" data-tab="cartas">Cartas</button>
       </div>
 
-      <div class="tab-panel active" id="tab-general">
-        <div class="tw">
-          <table>
-            <thead><tr>
-              <th>#</th><th>Jugador</th><th>Pts</th><th>J</th><th>G</th><th>P</th><th>E</th>
-              <th>Dif.F</th><th>Dif.C</th><th>Dif</th><th>%Pts</th><th>%Vict</th>
-            </tr></thead>
-            <tbody id="tbody-general"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="tab-panel" id="tab-actual">
+      <div class="tab-panel active" id="tab-actual">
         <div class="tw">
           <table>
             <thead><tr>
@@ -232,21 +240,107 @@
           </table>
         </div>
       </div>
-      <!-- Tab: Jugadores -->
-      <div class="tab-panel" id="tab-jugadores">
+      <!-- Tab: Mazos -->
+      <div class="tab-panel" id="tab-mazos">
+        <div class="stat-cards">
+          <div class="sc"><div class="sc-label">Arquetipos</div><div class="sc-value a" id="msc-arch">—</div></div>
+          <div class="sc"><div class="sc-label">Mejor winrate (raza)</div><div class="sc-value g" id="msc-bestrace">—</div></div>
+          <div class="sc"><div class="sc-label">Más jugada (raza)</div><div class="sc-value g" id="msc-popular">—</div></div>
+          <div class="sc"><div class="sc-label">Duelos con mazo</div><div class="sc-value" id="msc-duels">—</div></div>
+        </div>
+
+        <div class="subhead">Por arquetipo (raza)</div>
         <div class="tw">
           <table>
-            <thead><tr><th>#</th><th>Jugador</th></tr></thead>
-            <tbody id="tbody-jugadores"></tbody>
+            <thead><tr>
+              <th>#</th><th>Raza</th><th>Duelos</th><th>G</th><th>P</th><th>E</th>
+              <th>Pts</th><th>Jgs F</th><th>Jgs C</th><th>Winrate</th>
+            </tr></thead>
+            <tbody id="tbody-arch"></tbody>
+          </table>
+        </div>
+
+        <div class="subhead">Por jugador + mazo</div>
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Jugador · Raza</th><th>Duelos</th><th>G</th><th>P</th><th>E</th>
+              <th>Pts</th><th>Jgs F</th><th>Jgs C</th><th>Winrate</th>
+            </tr></thead>
+            <tbody id="tbody-pdeck"></tbody>
           </table>
         </div>
       </div>
 
-      <!-- Tab: Fechas -->
-      <div class="tab-panel" id="tab-fechas">
-        <div id="fechas-content" style="display:flex;flex-direction:column;gap:14px"></div>
+      <!-- Tab: Cartas -->
+      <div class="tab-panel" id="tab-cartas">
+        <div class="stat-cards">
+          <div class="sc"><div class="sc-label">Cartas distintas</div><div class="sc-value a" id="csc-total">—</div></div>
+          <div class="sc"><div class="sc-label">Más ganadora</div><div class="sc-value g" id="csc-best">—</div></div>
+          <div class="sc"><div class="sc-label">Más jugada</div><div class="sc-value g" id="csc-popular">—</div></div>
+          <div class="sc"><div class="sc-label">Más perdedora</div><div class="sc-value g" id="csc-worst">—</div></div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Mín. duelos</span>
+          <input type="range" id="cards-min" min="1" max="20" value="3" style="accent-color:var(--accent)">
+          <span id="cards-min-val" style="font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent)">3</span>
+        </div>
+
+        <div class="subhead">Top 10 cartas</div>
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Carta</th><th>Duelos</th><th>G</th><th>P</th><th>E</th>
+              <th>Copias</th><th>Winrate</th>
+            </tr></thead>
+            <tbody id="tbody-cards"></tbody>
+          </table>
+        </div>
+
+        <div class="subhead">Qué tipo de mazo gana — por estilo</div>
+        <div style="font-size:11px;color:var(--text3);margin:-4px 0 10px">Agrupado por estilo (Removal, Control, Agro…). Un mazo "tiene" un estilo si al menos una de sus cartas aporta una característica de ese grupo.</div>
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Estilo</th><th>Duelos</th><th>G</th><th>P</th><th>Winrate</th>
+            </tr></thead>
+            <tbody id="tbody-grps"></tbody>
+          </table>
+        </div>
+
+        <details style="margin-top:16px">
+          <summary style="cursor:pointer;font-size:12px;color:var(--text2);font-weight:600;padding:6px 0">Ver detalle por característica individual</summary>
+          <div class="tw" style="margin-top:8px">
+            <table>
+              <thead><tr>
+                <th>#</th><th>Característica</th><th>Duelos</th><th>G</th><th>P</th><th>Winrate</th>
+              </tr></thead>
+              <tbody id="tbody-feats"></tbody>
+            </table>
+          </div>
+        </details>
       </div>
 
+    </div>
+
+    <!-- Modal Ver mazo -->
+    <div id="deck-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);backdrop-filter:blur(2px)">
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(1320px,97vw);max-height:92vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surf2)">
+          <span id="dm-title" style="font-family:'Arial Narrow',sans-serif;font-size:17px;font-weight:700">Mazo</span>
+          <span id="dm-sub" style="font-size:11px;color:var(--text2)"></span>
+          <button id="dm-close" style="margin-left:auto;color:var(--text2);font-size:20px;line-height:1;padding:2px 8px">✕</button>
+        </div>
+        <div id="dm-body" style="padding:14px 16px;overflow-y:auto"></div>
+      </div>
+    </div>
+
+    <!-- Round (fecha) view -->
+    <div class="section" id="sec-round">
+      <div class="page-title" id="r-title">—</div>
+      <div class="page-meta" id="r-meta">—</div>
+      <div id="round-content" style="display:flex;flex-direction:column;gap:14px"></div>
     </div>
   </main>
 </div>
@@ -292,6 +386,71 @@
   let activeLeagueId = null;
   let unsubLeague    = null;
 
+  // Catálogo de cartas (para cruzar características por cardId). Se carga 1 vez.
+  let cardCatalog = null;        // { byId:{}, byName:{} }
+  let cardCatalogPromise = null;
+  function loadCardCatalog() {
+    if (cardCatalogPromise) return cardCatalogPromise;
+    cardCatalogPromise = Promise.all([
+      db.collection('cards').get(),
+      db.collection('card_custom_features').get().catch(() => ({ forEach(){} })),
+    ]).then(([cardsSnap, featSnap]) => {
+      // característica normalizada → grupo (Removal, Control, Agro…)
+      const featGroup = {};
+      featSnap.forEach(d => {
+        const m = d.data();
+        const g = (m.group || '').trim();
+        if (!g) return;
+        if (m.name)       featGroup[normFeat(m.name)] = g;
+        if (m.normalized) featGroup[normFeat(m.normalized)] = g;
+      });
+      const byId = {}, byName = {};
+      cardsSnap.forEach(d => {
+        const c = d.data();
+        const feats = readFeatures(c.caracteristicasRaw);
+        const entry = { tipo: c.tipo || '', coste: c.coste ?? null,
+                        fuerza: c.fuerza ?? null, feats, img: pickImg(c) };
+        byId[d.id] = entry;
+        if (c.nombre) byName[String(c.nombre).toLowerCase()] = entry;
+      });
+      cardCatalog = { byId, byName, featGroup };
+      return cardCatalog;
+    }).catch(() => { cardCatalog = { byId:{}, byName:{}, featGroup:{} }; return cardCatalog; });
+    return cardCatalogPromise;
+  }
+  function pickImg(c) {
+    return driveImg((c.officialImageUrl || c.imageUrl || '').trim()) || null;
+  }
+  // Convierte URLs de Google Drive al endpoint de imagen directa (lh3), más
+  // estable para hotlink que uc?export=view. Otras URLs pasan sin tocar.
+  function driveImg(url) {
+    if (!url) return null;
+    const m = url.match(/[?&]id=([\w-]+)/) || url.match(/\/d\/([\w-]+)/);
+    if (m) return 'https://lh3.googleusercontent.com/d/' + m[1] + '=w480';
+    return url;
+  }
+  // caracteristicasRaw admite lista, mapa {k:true} o CSV — igual que en la app.
+  function readFeatures(any) {
+    const out = [];
+    if (!any) return out;
+    if (Array.isArray(any)) any.forEach(x => out.push(String(x)));
+    else if (typeof any === 'object') Object.entries(any).forEach(([k,v]) => { if (v === true) out.push(k); });
+    else if (typeof any === 'string') any.split(',').forEach(p => out.push(p.trim()));
+    return out.map(s => s.trim()).filter(Boolean);
+  }
+  // Normalización de característica igual a la app (tildes, guiones, espacios).
+  function normFeat(s) {
+    return String(s).trim().toLowerCase()
+      .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
+      .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n')
+      .replace(/[_-]/g,' ').replace(/\s+/g,' ');
+  }
+  // Grupo de una característica (o 'Otros' si no está mapeada).
+  function groupOfFeat(f) {
+    const cat = cardCatalog || {};
+    return (cat.featGroup || {})[normFeat(f)] || 'Otros';
+  }
+
   // ── Sidebar ────────────────────────────────────────────────────────────────
   async function loadSidebar() {
     const teamsSnap = await db.collection('teams').get();
@@ -317,7 +476,7 @@
       inner.appendChild(teamEl);
 
       const teamLeagues = leaguesSnap.docs.filter(d => d.data().teamId === tDoc.id);
-      teamLeagues.forEach(lDoc => {
+      for (const lDoc of teamLeagues) {
         const lData = lDoc.data();
         const lName = lData.name ?? lDoc.id;
         const season = lData.season ? ` · ${lData.season}` : '';
@@ -331,7 +490,25 @@
           selectLeague(lDoc.id, lName, tDoc.id);
         });
         inner.appendChild(leagueEl);
-      });
+
+        // Fechas de la liga como sub-items
+        const roundsSnap = await db.collection('leagues').doc(lDoc.id).collection('rounds').orderBy('createdAt').get();
+        roundsSnap.docs.forEach((rDoc, ri) => {
+          const rData = rDoc.data();
+          const finished = (rData.matches ?? []).some(m => m.winnerId);
+          const roundEl = document.createElement('div');
+          roundEl.className = 'aside-item aside-round';
+          roundEl.dataset.roundId  = rDoc.id;
+          roundEl.dataset.leagueId = lDoc.id;
+          const rName = rData.name ? esc(rData.name) : `Fecha ${ri+1}`;
+          roundEl.innerHTML = `<div class="rdot" style="background:${finished?'var(--accent)':'var(--gold)'}"></div><span>${rName}</span>`;
+          roundEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectRound(lDoc.id, lName, tDoc.id, rDoc.id, ri);
+          });
+          inner.appendChild(roundEl);
+        });
+      }
 
       const divEl = document.createElement('div');
       divEl.className = 'aside-divider';
@@ -380,7 +557,6 @@
 
     document.getElementById('l-title').textContent = leagueName;
     document.getElementById('l-meta').textContent  = 'Cargando…';
-    setLoading('tbody-general', 12);
     setLoading('tbody-actual', 12);
 
     async function refresh() {
@@ -428,110 +604,660 @@
       });
       actualRows.sort((a,b) => b.winPct-a.winPct || b.pts-a.pts || b.diff-a.diff);
 
-      // ── Tabla General (seeds del team + fechas de esta liga + extras) ──────
-      // Usar historicalSeeds (activos) + historicalExtra (anteriores) + curStats
-      const seeds  = (lData.historicalSeeds ?? []);
-      const extras = (lData.historicalExtra ?? []);
-      const genMap = {};
-
-      seeds.forEach(s => {
-        if (!s.playerId) return;
-        genMap[s.playerId] = {
-          name: activePlayers[s.playerId] ?? s.playerName ?? s.playerId,
-          won: s.matchesWon??0, lost: s.matchesLost??0, draw: s.matchesDraw??0,
-          favor: s.gamesFavor??0, against: s.gamesAgainst??0,
-          isActive: true,
-        };
-      });
-      Object.entries(activePlayers).forEach(([pid,name]) => {
-        if (!genMap[pid]) genMap[pid] = {name,won:0,lost:0,draw:0,favor:0,against:0,isActive:true};
-      });
-      Object.entries(curStats).forEach(([pid,s]) => {
-        if (genMap[pid]) {
-          genMap[pid].won+=s.won; genMap[pid].lost+=s.lost; genMap[pid].draw+=s.draw;
-          genMap[pid].favor+=s.favor; genMap[pid].against+=s.against;
-        }
-      });
-      extras.forEach((s,i) => {
-        const key = `ext_${i}_${s.playerName}`;
-        genMap[key] = {
-          name: s.playerName ?? '?',
-          won: s.matchesWon??0, lost: s.matchesLost??0, draw: s.matchesDraw??0,
-          favor: s.gamesFavor??0, against: s.gamesAgainst??0,
-          isActive: false,
-        };
-      });
-
-      const generalRows = Object.entries(genMap).map(([pid,d]) =>
-        buildRow(pid, d.name, d, !d.isActive)
-      );
-      generalRows.sort((a,b) => b.winPct-a.winPct || b.pts-a.pts || b.diff-a.diff);
-
       // Stat cards
       document.getElementById('lsc-players').textContent    = playersSnap.size;
       document.getElementById('lsc-rounds').textContent     = totalRounds;
-      document.getElementById('lsc-leader-gen').textContent = generalRows[0]?.name ?? '—';
-      document.getElementById('lsc-leader-cur').textContent = actualRows[0]?.name ?? '—';
+      const curLeader = actualRows.find(r => r.pts > 0);
+      document.getElementById('lsc-leader-cur').textContent = curLeader?.name ?? '—';
       document.getElementById('l-meta').textContent =
         `${playersSnap.size} jugadores activos · ${totalRounds} fechas finalizadas`;
 
-      renderTable('tbody-general', generalRows, 12);
-      renderTable('tbody-actual',  actualRows,  12);
+      renderTable('tbody-actual', actualRows, 12);
 
-      // ── Tab Jugadores ────────────────────────────────────────────────────
-      const tjug = document.getElementById('tbody-jugadores');
-      if (!Object.keys(activePlayers).length) {
-        tjug.innerHTML = '<tr class="empty-row"><td colspan="2">Sin jugadores inscritos</td></tr>';
-      } else {
-        tjug.innerHTML = Object.entries(activePlayers).map(([,name], i) =>
-          `<tr><td><span class="rank">${i+1}</span></td><td><strong>${esc(name)}</strong></td></tr>`
-        ).join('');
-      }
+      // ── Tabs Mazos y Cartas (stats por mazo/carta según resultados) ───────
+      computeDeckAndCardStats(roundsSnap, activePlayers);
 
-      // ── Tab Fechas ───────────────────────────────────────────────────────
-      const fechasEl = document.getElementById('fechas-content');
-      const allRounds = roundsSnap.docs.map(d => ({id: d.id, ...d.data()}));
-      allRounds.sort((a,b) => (a.createdAt?.seconds??0) - (b.createdAt?.seconds??0));
-
-      if (!allRounds.length) {
-        fechasEl.innerHTML = '<div style="color:var(--text3);padding:24px;text-align:center">Sin fechas cargadas</div>';
-      } else {
-        fechasEl.innerHTML = allRounds.map((r, ri) => {
-          const matches = (r.matches ?? []);
-          const format  = r.deckType ?? r.roundFormat ?? '';
-          const finished = matches.some(m => m.winnerId);
-          const statusColor = finished ? 'var(--accent)' : 'var(--gold)';
-          const statusLabel = finished ? 'Con resultados' : 'Pendiente';
-
-          const matchRows = matches.map((m, mi) => {
-            const hasResult = !!m.winnerId;
-            const winA = hasResult && m.winnerId === m.playerAId;
-            const winB = hasResult && m.winnerId === m.playerBId;
-            const score = hasResult ? `${m.scoreA??0} – ${m.scoreB??0}` : 'vs';
-            return `<tr>
-              <td style="text-align:center;color:var(--text3);font-size:11px">Mesa ${mi+1}</td>
-              <td style="text-align:right;font-weight:${winA?'700':'400'};color:${winA?'var(--accent)':'var(--text)'}">${esc(m.playerAName??'')}</td>
-              <td style="text-align:center;font-weight:700;font-size:13px;padding:6px 16px">${score}</td>
-              <td style="font-weight:${winB?'700':'400'};color:${winB?'var(--accent)':'var(--text)'}">${esc(m.playerBName??m.playerBId??'BYE')}</td>
-            </tr>`;
-          }).join('');
-
-          return `<div class="tw" style="overflow:hidden">
-            <div style="padding:10px 14px;background:var(--surf2);display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
-              <span style="font-family:'Arial Narrow',sans-serif;font-size:16px;font-weight:700">Fecha ${ri+1}${r.name ? ' — '+esc(r.name) : ''}</span>
-              ${format ? `<span style="font-size:11px;color:var(--text2);background:var(--border);padding:2px 8px;border-radius:20px">${esc(format)}</span>` : ''}
-              <span style="margin-left:auto;font-size:11px;color:${statusColor};font-weight:600">${statusLabel}</span>
-            </div>
-            ${matches.length ? `<table style="width:100%;border-collapse:collapse">
-              <tbody>${matchRows}</tbody>
-            </table>` : '<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">Sin enfrentamientos cargados</div>'}
-          </div>`;
-        }).join('');
-      }
     }
 
     unsubLeague = db.collection('leagues').doc(leagueId).collection('rounds')
       .onSnapshot(() => refresh());
+  }
+
+  // ── Stats por mazo y por carta ─────────────────────────────────────────────
+  //
+  // Fuente: por cada fecha, el mazo de un jugador está en round.decks[playerId]
+  // (fallback: deckA/deckB del propio match). La raza en round.deckRaces[pid].
+  // Cada match con resultado suma G/P/E (vict=3, emp=1, der=0) al arquetipo
+  // (raza), al mazo del jugador (jugador+raza) y a cada carta del mazo.
+
+  let _cardStats = [];  // guardado para el filtro de "mín. duelos"
+
+  async function computeDeckAndCardStats(roundsSnap, activePlayers) {
+    await loadCardCatalog();
+
+    const arch  = {};   // raza → stats
+    const pdeck = {};   // `${pid}|${raza}` → stats (+ name, race)
+    const cards = {};   // cardKey → stats (+ name, tipo)
+    const feat  = {};   // característica → stats (a nivel de mazo/duelo)
+    const grp   = {};   // grupo de característica → stats
+    let duelsWithDeck = 0;
+
+    const cat = cardCatalog || { byId:{}, byName:{} };
+    const featsOfCard = (c) => {
+      const byId = c.cardId ? cat.byId[c.cardId] : null;
+      const byName = (!byId && c.name) ? cat.byName[String(c.name).toLowerCase()] : null;
+      return (byId || byName || {}).feats || [];
+    };
+
+    const blank = () => ({won:0,lost:0,draw:0,favor:0,against:0});
+    const cardKey = (c) => (c.cardId || c.name || '').toString().trim().toLowerCase();
+
+    roundsSnap.forEach(rSnap => {
+      const r = rSnap.data();
+      const decks = r.decks || {};
+      const races = r.deckRaces || {};
+
+      // mazo de un jugador en esta fecha: round.decks o fallback al match
+      const deckOf = (pid, fallback) => {
+        const d = decks[pid];
+        if (Array.isArray(d) && d.length) return d;
+        return Array.isArray(fallback) ? fallback : [];
+      };
+
+      (r.matches || []).forEach(m => {
+        if (!m.winnerId) return;
+        if (!m.playerBId) return; // bye: no cuenta
+        const sA = m.scoreA ?? 0, sB = m.scoreB ?? 0;
+        const isDraw = m.winnerId === 'draw';
+
+        const sides = [
+          {pid:m.playerAId, name:m.playerAName, deck:deckOf(m.playerAId, m.deckA), gf:sA, ga:sB,
+           res: isDraw ? 'draw' : (m.winnerId===m.playerAId?'won':'lost')},
+          {pid:m.playerBId, name:m.playerBName, deck:deckOf(m.playerBId, m.deckB), gf:sB, ga:sA,
+           res: isDraw ? 'draw' : (m.winnerId===m.playerBId?'won':'lost')},
+        ];
+
+        if (sides.some(s => s.deck.length)) duelsWithDeck++;
+
+        sides.forEach(side => {
+          if (!side.pid) return;
+          const race = (races[side.pid] || '').trim() || '—';
+          const applied = (bucket) => {
+            bucket[side.res]++;
+            bucket.favor += side.gf; bucket.against += side.ga;
+          };
+
+          // arquetipo
+          if (!arch[race]) arch[race] = blank();
+          applied(arch[race]);
+
+          // jugador + mazo
+          const pk = `${side.pid}|${race}`;
+          if (!pdeck[pk]) { pdeck[pk] = blank(); pdeck[pk].name = activePlayers[side.pid] || side.name || side.pid; pdeck[pk].race = race; }
+          applied(pdeck[pk]);
+
+          // cartas (una vez por carta distinta del mazo) + peso por grupo
+          const deck = side.deck;
+          const seen = new Set();
+          const featSeen = new Set();   // features presentes en este mazo
+          const grpCopies = {};         // grupo → copias de cartas de ese grupo
+          let totalCopies = 0;
+          deck.forEach(c => {
+            const k = cardKey(c);
+            const n = c.count ?? 1;
+            totalCopies += n;
+            if (k && !seen.has(k)) {
+              seen.add(k);
+              if (!cards[k]) { cards[k] = blank(); cards[k].copies = 0; cards[k].name = c.name || k; cards[k].tipo = c.tipo || ''; }
+              cards[k][side.res]++;
+              cards[k].copies += n;
+            }
+            // grupos de esta carta (sin duplicar grupo dentro de la misma carta)
+            const cardGroups = new Set(featsOfCard(c).map(groupOfFeat));
+            cardGroups.forEach(g => { grpCopies[g] = (grpCopies[g] || 0) + n; });
+            featsOfCard(c).forEach(f => featSeen.add(f));
+          });
+          // característica: presencia binaria (detalle)
+          featSeen.forEach(f => {
+            if (!feat[f]) { feat[f] = blank(); feat[f].cards = 0; }
+            feat[f][side.res]++;
+          });
+          // grupo: PONDERADO por % de cartas de ese grupo en el mazo. Cada duelo
+          // aporta a cada grupo su peso (0..1) según cuánto lo compone el mazo.
+          if (totalCopies > 0) {
+            Object.entries(grpCopies).forEach(([g, copies]) => {
+              const w = copies / totalCopies;  // 0..1
+              if (!grp[g]) grp[g] = { won:0, lost:0, draw:0, favor:0, against:0, wsum:0 };
+              grp[g][side.res] += w;
+              grp[g].wsum += w;
+            });
+          }
+        });
+      });
+    });
+
+    // ── Arquetipos ──
+    const archRows = Object.entries(arch).map(([race,s]) => deckStatRow(race, s)).filter(r => r.duels > 0);
+    archRows.sort((a,b) => b.winPct - a.winPct || b.duels - a.duels);
+    renderDeckTable('tbody-arch', archRows, 'race');
+
+    // ── Jugador + mazo ──
+    const pdeckRows = Object.values(pdeck).map(s => { const row = deckStatRow(`${s.name} · ${s.race}`, s); row.name=s.name; row.race=s.race; return row; }).filter(r => r.duels > 0);
+    pdeckRows.sort((a,b) => b.winPct - a.winPct || b.duels - a.duels);
+    renderDeckTable('tbody-pdeck', pdeckRows, 'pdeck');
+
+    // ── Cartas ──
+    _cardStats = Object.values(cards).map(s => {
+      const duels = s.won + s.lost + s.draw;
+      return { name:s.name, tipo:s.tipo, copies:s.copies,
+               won:s.won, lost:s.lost, draw:s.draw, duels,
+               winPct: duels>0 ? s.won/duels*100 : 0 };
+    });
+    renderCardsTable();
+
+    // ── Por grupo de característica, PONDERADO por composición del mazo ──────
+    // won/lost/draw son sumas de pesos (0..1). El winrate ponderado refleja
+    // cuánto pesa cada estilo en los mazos que ganan vs los que pierden.
+    const grpRows = Object.entries(grp).map(([name,s]) => {
+      const wsum = s.wsum || (s.won + s.lost + s.draw);
+      return {
+        name,
+        duels: Math.round(wsum),            // "peso" total ≈ nº de duelos equivalentes
+        won: Math.round(s.won),
+        lost: Math.round(s.lost),
+        winPct: wsum > 0 ? s.won / wsum * 100 : 0,
+      };
+    }).filter(r => r.duels > 0).sort((a,b) => b.winPct - a.winPct || b.duels - a.duels);
+    renderGrpTable(grpRows);
+
+    // ── Detalle por característica individual ──
+    const featRows = Object.entries(feat).map(([name,s]) => {
+      const duels = s.won + s.lost + s.draw;
+      return { name, duels, won:s.won, lost:s.lost, draw:s.draw,
+               winPct: duels>0 ? s.won/duels*100 : 0 };
+    }).filter(r => r.duels > 0).sort((a,b) => b.winPct - a.winPct || b.duels - a.duels);
+    renderFeatTable(featRows);
+
+    // ── Stat cards ──
+    document.getElementById('msc-arch').textContent    = archRows.length || '—';
+    document.getElementById('msc-duels').textContent   = duelsWithDeck || 0;
+    const bestRace = [...archRows].filter(r=>r.duels>=2).sort((a,b)=>b.winPct-a.winPct)[0] || archRows[0];
+    const popRace  = [...archRows].sort((a,b)=>b.duels-a.duels)[0];
+    document.getElementById('msc-bestrace').textContent = bestRace ? `${bestRace.label} ${bestRace.winPct.toFixed(0)}%` : '—';
+    document.getElementById('msc-popular').textContent  = popRace ? `${popRace.label} (${popRace.duels})` : '—';
+
+    const rankable = _cardStats.filter(c => c.duels >= 3);
+    const best  = [...rankable].sort((a,b)=>b.winPct-a.winPct || b.duels-a.duels)[0];
+    const worst = [...rankable].sort((a,b)=>a.winPct-b.winPct || b.duels-a.duels)[0];
+    const pop   = [..._cardStats].sort((a,b)=>b.duels-a.duels)[0];
+    document.getElementById('csc-total').textContent   = _cardStats.length || '—';
+    document.getElementById('csc-best').textContent    = best ? `${best.name} ${best.winPct.toFixed(0)}%` : '—';
+    document.getElementById('csc-worst').textContent   = worst ? `${worst.name} ${worst.winPct.toFixed(0)}%` : '—';
+    document.getElementById('csc-popular').textContent = pop ? `${pop.name} (${pop.duels})` : '—';
+  }
+
+  function deckStatRow(label, s) {
+    const duels = s.won + s.lost + s.draw;
+    const pts   = s.won*3 + s.draw;
+    return { label, duels, won:s.won, lost:s.lost, draw:s.draw, pts,
+             favor:s.favor, against:s.against,
+             winPct: duels>0 ? s.won/duels*100 : 0 };
+  }
+
+  function wrCell(pct) {
+    const cls = pct >= 60 ? 'wr-hi' : pct < 40 ? 'wr-lo' : 'wr-mid';
+    const col = pct >= 60 ? 'var(--accent)' : pct < 40 ? 'var(--danger)' : 'var(--text2)';
+    return `<div class="wr-cell">
+      <div class="wr-track"><div class="wr-fill" style="width:${Math.max(2,pct).toFixed(0)}%;background:${col}"></div></div>
+      <span class="wr-num ${cls}">${pct.toFixed(1)}%</span>
+    </div>`;
+  }
+
+  function renderDeckTable(tbodyId, rows, kind) {
+    const tbody = document.getElementById(tbodyId);
+    if (!rows.length) { tbody.innerHTML = `<tr class="empty-row"><td colspan="10">Sin mazos con resultados todavía</td></tr>`; return; }
+    tbody.innerHTML = rows.map((r,i) => {
+      const rank = i+1, bc = rank===1?'r1':rank===2?'r2':rank===3?'r3':'';
+      const label = kind==='pdeck'
+        ? `<strong>${esc(r.name)}</strong> <span class="race-pill">${esc(r.race)}</span>`
+        : `<span class="race-pill">${esc(r.label)}</span>`;
+      return `<tr>
+        <td><span class="rank ${bc}">${rank}</span></td>
+        <td>${label}</td>
+        <td>${r.duels}</td>
+        <td>${r.won}</td>
+        <td>${r.lost}</td>
+        <td>${r.draw}</td>
+        <td class="pts-cell">${r.pts}</td>
+        <td>${r.favor}</td>
+        <td>${r.against}</td>
+        <td>${wrCell(r.winPct)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderCardsTable() {
+    const min = parseInt(document.getElementById('cards-min').value, 10) || 1;
+    const tbody = document.getElementById('tbody-cards');
+    const rows = _cardStats.filter(c => c.duels >= min)
+      .sort((a,b) => b.winPct - a.winPct || b.duels - a.duels)
+      .slice(0, 10);   // top 10
+    if (!rows.length) { tbody.innerHTML = `<tr class="empty-row"><td colspan="8">Sin cartas con ≥ ${min} duelos</td></tr>`; return; }
+    tbody.innerHTML = rows.map((r,i) => {
+      const rank = i+1, bc = rank===1?'r1':rank===2?'r2':rank===3?'r3':'';
+      const tipo = r.tipo ? `<div class="card-type">${esc(r.tipo)}</div>` : '';
+      return `<tr>
+        <td><span class="rank ${bc}">${rank}</span></td>
+        <td><strong>${esc(r.name)}</strong>${tipo}</td>
+        <td>${r.duels}</td>
+        <td>${r.won}</td>
+        <td>${r.lost}</td>
+        <td>${r.draw}</td>
+        <td>${r.copies}</td>
+        <td>${wrCell(r.winPct)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function prettyFeat(k) {
+    const s = String(k).replace(/_/g,' ').trim();
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : k;
+  }
+
+  function featRowsHtml(rows, pretty) {
+    return rows.map((r,i) => {
+      const rank = i+1, bc = rank===1?'r1':rank===2?'r2':rank===3?'r3':'';
+      return `<tr>
+        <td><span class="rank ${bc}">${rank}</span></td>
+        <td><strong>${esc(pretty ? prettyFeat(r.name) : r.name)}</strong></td>
+        <td>${r.duels}</td>
+        <td>${r.won}</td>
+        <td>${r.lost}</td>
+        <td>${wrCell(r.winPct)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderGrpTable(rows) {
+    const tbody = document.getElementById('tbody-grps');
+    if (!tbody) return;
+    if (!rows.length) { tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Sin estilos (¿mazos sin cartas con características?)</td></tr>`; return; }
+    tbody.innerHTML = featRowsHtml(rows, false);
+  }
+
+  function renderFeatTable(rows) {
+    const tbody = document.getElementById('tbody-feats');
+    if (!tbody) return;
+    if (!rows.length) { tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Sin características</td></tr>`; return; }
+    tbody.innerHTML = featRowsHtml(rows, true);
+  }
+
+  // Filtro "mín. duelos" para la tabla de cartas
+  (function initCardsFilter(){
+    const slider = document.getElementById('cards-min');
+    const label  = document.getElementById('cards-min-val');
+    if (slider) slider.addEventListener('input', () => { label.textContent = slider.value; renderCardsTable(); });
+  })();
+
+  // ── Comparador de mazos (estilo compare_decks_screen de la app) ────────────
+  const _compareRegistry = {};   // key → { a:{playerName,race,cards}, b:{...} }
+  let _deckRegSeq = 0;
+
+  function _normTipo(raw) {
+    const t = String(raw||'').trim().toLowerCase();
+    if (t==='aliado'||t==='gran aliado') return 'aliado';
+    if (t==='talisman'||t==='talismán') return 'talisman';
+    if (t==='arma'||t==='armadura') return 'arma';
+    if (t==='oro'||t==='oros') return 'oro';
+    if (t==='totem'||t==='tótem'||t==='totem de raza') return 'totem';
+    return t;
+  }
+  const _TYPE_LABELS = { aliado:'Aliado', talisman:'Talismán', totem:'Tótem', arma:'Arma', oro:'Oro' };
+
+  // Calcula métricas de un mazo cruzando con el catálogo.
+  function deckMetrics(cards, cat) {
+    const catOf = (c) => (c.cardId && cat.byId[c.cardId]) || (c.name && cat.byName[String(c.name).toLowerCase()]) || {};
+    let total=0, oros=0;
+    let sumCostNoOro=0, nCostNoOro=0;      // coste sin oros (para la curva)
+    let sumCostAll=0, nCostAll=0;          // coste de todas las cartas
+    let sumCostAlly=0, nAlly=0;            // coste de aliados
+    let sumForce=0, nForce=0;              // fuerza de aliados
+    const byType = {}, curva = {}, grpDist = {};
+    let maxCost = 0;
+    const enriched = cards.map(c => {
+      const e = catOf(c);
+      const tipo = _normTipo(c.tipo || e.tipo);
+      const coste = (c.coste ?? e.coste);
+      const fuerza = (c.fuerza ?? e.fuerza);
+      const n = c.count ?? 1;
+      total += n;
+      byType[tipo] = (byType[tipo]||0) + n;
+      if (coste != null) { sumCostAll += coste*n; nCostAll += n; }
+      if (tipo === 'oro') {
+        oros += n;
+      } else if (coste != null) {
+        sumCostNoOro += coste*n; nCostNoOro += n;
+        const b = Math.max(0,coste); curva[b]=(curva[b]||0)+n; if(coste>maxCost)maxCost=coste;
+      }
+      if (tipo === 'aliado') {
+        if (coste != null)  { sumCostAlly += coste*n; nAlly += n; }
+        if (fuerza != null) { sumForce += fuerza*n;   nForce += n; }
+      }
+      const groups = new Set((e.feats||[]).map(groupOfFeat));
+      groups.forEach(g => grpDist[g]=(grpDist[g]||0)+n);
+      return { name:c.name, count:n, tipo, coste, img:e.img||null };
+    });
+    const avgCostAlly = nAlly ? sumCostAlly/nAlly : null;
+    const avgForce    = nForce ? sumForce/nForce : null;
+    return {
+      cards: enriched, total, oros,
+      pctOros: total? oros/total*100 : 0,
+      avgCost: nCostNoOro ? sumCostNoOro/nCostNoOro : null,   // sin oros (curva)
+      avgCostAll: nCostAll ? sumCostAll/nCostAll : null,      // todas
+      avgCostAlly,                                            // aliados
+      avgForce,                                               // aliados
+      costForceRatio: (avgForce && avgForce>0 && avgCostAlly!=null) ? avgCostAlly/avgForce : null,
+      byType, curva, maxCost, grpDist,
+    };
+  }
+
+  function _statChip(label, value) {
+    return `<div style="background:var(--surf2);border-radius:8px;padding:6px 8px;text-align:center;min-width:0">
+      <div style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)">${label}</div>
+      <div style="font-family:'Arial Narrow',sans-serif;font-size:17px;font-weight:700;color:var(--accent)">${value}</div>
+    </div>`;
+  }
+
+  function _bars(entries, maxV, unit) {
+    const mx = maxV || entries.reduce((m,[,v])=>Math.max(m,v),0) || 1;
+    return `<div style="display:flex;flex-direction:column;gap:5px">` + entries.map(([k,v]) => `
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:72px;font-size:10px;color:var(--text2);text-align:right;flex-shrink:0">${esc(k)}</div>
+        <div style="flex:1;height:8px;background:var(--surf2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${(v/mx*100).toFixed(0)}%;background:var(--accent);border-radius:4px"></div></div>
+        <div style="width:24px;font-size:10px;font-weight:700;font-variant-numeric:tabular-nums">${v}${unit||''}</div>
+      </div>`).join('') + `</div>`;
+  }
+
+  // Paleta categórica (Okabe-Ito, colorblind-safe). Colores por tipo fijos.
+  const _TYPE_COLORS = {
+    'Aliado':'#0072B2', 'Talismán':'#E69F00', 'Tótem':'#009E73',
+    'Arma':'#D55E00', 'Oro':'#F0E442',
+  };
+  const _CAT_PALETTE = ['#0072B2','#E69F00','#009E73','#D55E00','#CC79A7','#56B4E9','#F0E442','#999999'];
+
+  // Donut SVG con leyenda. entries: [[label, value], …]; colorFor(label,i)→hex.
+  function _donut(entries, colorFor) {
+    const totalV = entries.reduce((s,[,v])=>s+v,0);
+    if (totalV <= 0) return '<div style="font-size:11px;color:var(--text3)">—</div>';
+    const R = 34, r = 20, cx = 40, cy = 40, C = 2*Math.PI*R;
+    let acc = 0;
+    const segs = entries.map(([label,v],i) => {
+      const frac = v/totalV;
+      const dash = frac*C;
+      const gap  = C - dash;
+      const offset = -acc*C;
+      acc += frac;
+      const col = colorFor(label, i);
+      // pequeño gap visual entre segmentos (2px de superficie)
+      return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${col}" stroke-width="${R-r}"
+        stroke-dasharray="${(dash-2).toFixed(2)} ${(gap+2).toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
+        transform="rotate(-90 ${cx} ${cy})"></circle>`;
+    }).join('');
+    const legend = entries.map(([label,v],i) => {
+      const col = colorFor(label, i);
+      const pct = (v/totalV*100).toFixed(0);
+      return `<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2)">
+        <span style="width:8px;height:8px;border-radius:2px;background:${col};flex-shrink:0"></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}</span>
+        <span style="font-weight:700;color:var(--text);font-variant-numeric:tabular-nums">${v}</span>
+        <span style="color:var(--text3);width:30px;text-align:right">${pct}%</span>
+      </div>`;
+    }).join('');
+    return `<div style="display:flex;align-items:center;gap:12px">
+      <svg width="80" height="80" viewBox="0 0 80 80" style="flex-shrink:0">${segs}</svg>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">${legend}</div>
+    </div>`;
+  }
+
+  function deckPanel(side, cat, curvaMax, distMax) {
+    const m = deckMetrics(side.cards || [], cat);
+    if (!m.total) {
+      return `<div style="flex:1;min-width:0"><div style="font-weight:700;margin-bottom:8px">${esc(side.playerName||'—')}</div>
+        <div style="color:var(--text3);padding:20px;text-align:center;font-size:13px">Sin mazo cargado</div></div>`;
+    }
+    const typeEntries = Object.keys(_TYPE_LABELS).filter(k=>m.byType[k]).map(k=>[_TYPE_LABELS[k], m.byType[k]]);
+    const curvaEntries = Object.keys(m.curva).map(Number).sort((a,b)=>a-b).map(k=>[String(k), m.curva[k]]);
+    const distEntries = Object.entries(m.grpDist).sort((a,b)=>b[1]-a[1]);
+    // Orden: tipo (Aliado→Talismán→Tótem→Arma→Oro) → copias desc → coste desc → nombre.
+    const typeRank = { aliado:0, talisman:1, totem:2, arma:3, oro:4 };
+    const rankOf = (t) => (typeRank[t] ?? 99);
+    const cardsSorted = m.cards.slice().sort((a,b)=>{
+      const rt = rankOf(a.tipo) - rankOf(b.tipo);
+      if (rt !== 0) return rt;
+      const rc = (b.count||0) - (a.count||0);
+      if (rc !== 0) return rc;
+      const rco = (b.coste ?? -1) - (a.coste ?? -1);
+      if (rco !== 0) return rco;
+      return String(a.name||'').localeCompare(String(b.name||''));
+    });
+    const grid = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px;margin-top:10px">` +
+      cardsSorted.map(c => {
+        const thumb = c.img ? `<img src="${esc(c.img)}" loading="lazy" referrerpolicy="no-referrer" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:6px;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : '';
+        const ph = `<div style="width:100%;aspect-ratio:3/4;border-radius:6px;background:var(--surf2);display:${c.img?'none':'flex'};align-items:center;justify-content:center;color:var(--text3);font-size:9px;text-align:center;padding:3px">${esc(c.name||'')}</div>`;
+        return `<div><div style="position:relative">${thumb}${ph}<span style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;font-weight:700;padding:0 5px;border-radius:9px">×${c.count}</span></div></div>`;
+      }).join('') + `</div>`;
+
+    return `<div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:15px;margin-bottom:2px">${esc(side.playerName||'—')}</div>
+      <div style="font-size:11px;color:var(--gold);margin-bottom:10px">${esc(side.race||'')}</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:12px">
+        ${_statChip('Coste prom. aliados', m.avgCostAlly!=null?m.avgCostAlly.toFixed(1):'—')}
+        ${_statChip('Fuerza prom.', m.avgForce!=null?m.avgForce.toFixed(1):'—')}
+        ${_statChip('Coste / Fuerza', m.costForceRatio!=null?m.costForceRatio.toFixed(2):'—')}
+        ${_statChip('Coste prom. (todas)', m.avgCostAll!=null?m.avgCostAll.toFixed(1):'—')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Por tipo</div>
+          ${_donut(typeEntries, (label)=>_TYPE_COLORS[label]||'#999')}
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Por estilo</div>
+          ${distEntries.length?_donut(distEntries, (label,i)=>_CAT_PALETTE[i % _CAT_PALETTE.length]):'<div style="font-size:11px;color:var(--text3)">Sin estilos</div>'}
+        </div>
+      </div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin:12px 0 6px">Curva de coste</div>
+      ${curvaEntries.length?_bars(curvaEntries, curvaMax):'<div style="font-size:11px;color:var(--text3)">—</div>'}
+      <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin:12px 0 2px">Cartas (${m.total})</div>
+      ${grid}
+    </div>`;
+  }
+
+  async function openCompare(key) {
+    const entry = _compareRegistry[key];
+    if (!entry) return;
+    await loadCardCatalog();
+    const cat = cardCatalog || { byId:{}, byName:{} };
+    const ma = deckMetrics(entry.a.cards||[], cat);
+    const mb = deckMetrics(entry.b.cards||[], cat);
+    // escalas comunes para comparar de forma justa
+    const curvaMax = Math.max(1, ...Object.values(ma.curva), ...Object.values(mb.curva));
+    const distMax  = Math.max(1, ...Object.values(ma.grpDist), ...Object.values(mb.grpDist));
+
+    document.getElementById('dm-title').textContent = 'Comparar mazos';
+    document.getElementById('dm-sub').textContent =
+      `${entry.a.playerName||''} vs ${entry.b.playerName||''}`;
+    document.getElementById('dm-body').innerHTML =
+      `<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">
+        ${deckPanel(entry.a, cat, curvaMax, distMax)}
+        <div style="width:1px;align-self:stretch;background:var(--border)"></div>
+        ${deckPanel(entry.b, cat, curvaMax, distMax)}
+      </div>`;
+    document.getElementById('deck-modal').style.display = 'block';
+  }
+  window.openCompare = openCompare;
+  (function initDeckModal(){
+    const modal = document.getElementById('deck-modal');
+    document.getElementById('dm-close').addEventListener('click', () => modal.style.display='none');
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display='none'; });
+    document.addEventListener('keydown', (e) => { if (e.key==='Escape') modal.style.display='none'; });
+  })();
+
+  // ── Render de una fecha (reutilizable: tab Fechas y vista de fecha) ─────────
+  function renderRoundCard(r, ri) {
+    const matches = (r.matches ?? []);
+    const races   = r.deckRaces ?? {};
+    const format  = r.deckType ?? r.roundFormat ?? '';
+    const finished = matches.some(m => m.winnerId);
+    const statusColor = finished ? 'var(--accent)' : 'var(--gold)';
+    const statusLabel = finished ? 'Finalizada' : 'Pendiente';
+
+    const decks = r.decks || {};
+
+    function matchCard(m, mi) {
+      const hasResult = !!m.winnerId;
+      const isDraw = m.winnerId === 'draw';
+      const winA = hasResult && m.winnerId === m.playerAId;
+      const winB = hasResult && m.winnerId === m.playerBId;
+      const raceA = races[m.playerAId] ? `<div style="font-size:10px;color:var(--gold)">${esc(races[m.playerAId])}</div>` : '';
+      const raceB = races[m.playerBId] ? `<div style="font-size:10px;color:var(--gold);text-align:right">${esc(races[m.playerBId])}</div>` : '';
+      const nameA = esc(m.playerAName ?? '');
+      const nameB = !m.playerBId ? 'BYE' : esc(m.playerBName ?? m.playerBId);
+      const colA = winA ? 'var(--accent)' : winB ? 'var(--text3)' : 'var(--text)';
+      const colB = winB ? 'var(--accent)' : winA ? 'var(--text3)' : 'var(--text)';
+      const fwA  = winA ? '700' : '500';
+      const fwB  = winB ? '700' : '500';
+      const statusBadge = hasResult
+        ? `<div style="font-family:'Arial Narrow',sans-serif;font-size:18px;font-weight:700;color:${isDraw?'var(--gold)':'var(--text)'};font-variant-numeric:tabular-nums;line-height:1">${m.scoreA??0}–${m.scoreB??0}</div>`
+        : `<div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);background:rgba(245,166,35,.12);padding:2px 7px;border-radius:20px">Pendiente</div>`;
+      const border = winA||winB ? '1px solid rgba(0,201,167,.3)' : '1px solid var(--border)';
+      const bg = winA||winB ? 'rgba(0,201,167,.04)' : 'var(--surface)';
+
+      // Registrar el enfrentamiento para abrir el comparador de ambos mazos.
+      const deckA = decks[m.playerAId] || [];
+      const deckB = m.playerBId ? (decks[m.playerBId] || []) : [];
+      const canCompare = deckA.length || deckB.length;
+      const key = 'mx'+(_deckRegSeq++);
+      _compareRegistry[key] = {
+        a: { playerName: m.playerAName || m.playerAId, race: races[m.playerAId], cards: deckA },
+        b: { playerName: m.playerBName || m.playerBId, race: races[m.playerBId], cards: deckB },
+      };
+      const nameStyle = (col,fw) => `font-size:12px;font-weight:${fw};color:${col};overflow:hidden;text-overflow:ellipsis;white-space:nowrap`;
+      const clickable = (txt, col, fw, align) => canCompare
+        ? `<button onclick="openCompare('${key}')" title="Comparar mazos" style="${nameStyle(col,fw)};text-align:${align};background:none;padding:0;width:100%;cursor:pointer;text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px">${txt}</button>`
+        : `<div style="${nameStyle(col,fw)}">${txt}</div>`;
+
+      return `<div style="background:${bg};border:${border};border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:7px;min-width:0">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Mesa ${mi+1}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div style="flex:1;min-width:0">
+            ${clickable(nameA, colA, fwA, 'left')}${raceA}
+          </div>
+          <div style="flex-shrink:0;text-align:center">${statusBadge}</div>
+          <div style="flex:1;min-width:0;text-align:right">
+            ${clickable(nameB, colB, fwB, 'right')}${raceB}
+          </div>
+        </div>
+      </div>`;
+    }
+    const matchCardsHtml = matches.map((m,i) => matchCard(m,i)).join('');
+
+    const roundStandings = buildRoundStandings(matches);
+    const th = (t,al) => `<th style="padding:7px 10px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);text-align:${al||'right'}">${t}</th>`;
+    const standingRows = roundStandings.map((s, si) => {
+      const diff = s.favor - s.against;
+      const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
+      const diffColor = diff > 0 ? 'var(--accent)' : diff < 0 ? 'var(--danger)' : 'var(--text3)';
+      const bc = si===0?'r1':si===1?'r2':si===2?'r3':'';
+      return `<tr>
+        <td style="text-align:center;padding:8px 10px"><span class="rank ${bc}">${si+1}</span></td>
+        <td style="padding:8px 10px;font-weight:600">${esc(s.name)}</td>
+        <td class="pts-cell" style="text-align:right;padding:8px 10px">${s.pts}</td>
+        <td style="text-align:right;padding:8px 10px">${s.played}</td>
+        <td style="text-align:right;padding:8px 10px">${s.won}</td>
+        <td style="text-align:right;padding:8px 10px">${s.lost}</td>
+        <td style="text-align:right;padding:8px 10px">${s.draw}</td>
+        <td style="text-align:right;padding:8px 10px">${s.favor}</td>
+        <td style="text-align:right;padding:8px 10px">${s.against}</td>
+        <td style="text-align:right;padding:8px 10px;font-weight:600;color:${diffColor}">${diffStr}</td>
+      </tr>`;
+    }).join('');
+
+    const standingTable = roundStandings.length ? `
+      <details>
+        <summary style="cursor:pointer;list-style:none;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:6px;background:rgba(0,201,167,.06);border-bottom:1px solid var(--border)">
+          <span style="font-size:13px">▸</span> Ver tabla de la fecha
+        </summary>
+        <div style="overflow-x:auto;border-bottom:1px solid var(--border)">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap">
+          <thead><tr style="background:var(--surf2);border-bottom:1px solid var(--border)">
+            ${th('#','center')}${th('Jugador','left')}${th('Pts')}${th('J')}${th('G')}${th('P')}${th('E')}${th('Dif.F')}${th('Dif.C')}${th('Dif')}
+          </tr></thead>
+          <tbody>${standingRows}</tbody>
+        </table>
+        </div>
+      </details>` : '';
+
+    return `<div class="tw" style="overflow:hidden">
+      <div style="padding:10px 14px;background:var(--surf2);display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
+        <span style="font-family:'Arial Narrow',sans-serif;font-size:16px;font-weight:700">Fecha ${ri+1}${r.name ? ' — '+esc(r.name) : ''}</span>
+        ${format ? `<span style="font-size:11px;color:var(--text2);background:var(--border);padding:2px 8px;border-radius:20px">${esc(format)}</span>` : ''}
+        <span style="margin-left:auto;font-size:11px;color:${statusColor};font-weight:600">${statusLabel}</span>
+      </div>
+      ${standingTable}
+      ${matches.length ? `
+        <div style="padding:10px 14px 8px;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Enfrentamientos</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;padding:0 14px 14px">${matchCardsHtml}</div>
+      ` : '<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">Sin enfrentamientos cargados</div>'}
+    </div>`;
+  }
+
+  // ── Seleccionar una fecha desde el sidebar ─────────────────────────────────
+  async function selectRound(leagueId, leagueName, teamId, roundId, ri) {
+    if (unsubLeague) { unsubLeague(); unsubLeague = null; }
+    activeTeamId = teamId; activeLeagueId = leagueId;
+    setSidebarActive('round', roundId);
+    showSection('sec-round');
+    document.getElementById('r-meta').textContent = 'Cargando…';
+    document.getElementById('round-content').innerHTML = `<div style="color:var(--text3);padding:24px;text-align:center"><span class="sp"></span> Cargando…</div>`;
+
+    unsubLeague = db.collection('leagues').doc(leagueId).collection('rounds').doc(roundId)
+      .onSnapshot(snap => {
+        const r = { id: snap.id, ...snap.data() };
+        document.getElementById('r-title').textContent = r.name ? r.name : `Fecha ${ri+1}`;
+        const nMatches = (r.matches ?? []).length;
+        const finished = (r.matches ?? []).some(m => m.winnerId);
+        document.getElementById('r-meta').textContent =
+          `${esc(leagueName)} · ${nMatches} mesa${nMatches===1?'':'s'} · ${finished?'Con resultados':'Pendiente'}`;
+        document.getElementById('round-content').innerHTML = renderRoundCard(r, ri);
+      });
+  }
+
+  // ── Tabla interna por fecha ────────────────────────────────────────────────
+  function buildRoundStandings(matches) {
+    const map = {};
+    matches.forEach(m => {
+      if (!m.winnerId) return;
+      const isBye = !m.playerBId;
+      if (isBye) return;
+      [m.playerAId, m.playerBId].forEach((pid, idx) => {
+        if (!pid) return;
+        if (!map[pid]) map[pid] = { id: pid, name: idx===0?(m.playerAName??pid):(m.playerBName??pid), played:0, won:0, lost:0, draw:0, pts:0, favor:0, against:0 };
+      });
+      const sA = m.scoreA ?? 0, sB = m.scoreB ?? 0;
+      map[m.playerAId].played++; map[m.playerBId].played++;
+      map[m.playerAId].favor  += sA; map[m.playerAId].against += sB;
+      map[m.playerBId].favor  += sB; map[m.playerBId].against += sA;
+      if (m.winnerId === 'draw') {
+        map[m.playerAId].draw++; map[m.playerAId].pts++;
+        map[m.playerBId].draw++; map[m.playerBId].pts++;
+      } else if (m.winnerId === m.playerAId) {
+        map[m.playerAId].won++; map[m.playerAId].pts += 3; map[m.playerBId].lost++;
+      } else if (m.winnerId === m.playerBId) {
+        map[m.playerBId].won++; map[m.playerBId].pts += 3; map[m.playerAId].lost++;
+      }
+    });
+    return Object.values(map).sort((a,b) => b.pts - a.pts || (b.favor-b.against) - (a.favor-a.against));
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -609,7 +1335,9 @@
   function setSidebarActive(type, id) {
     document.querySelectorAll('.aside-item').forEach(el => el.classList.remove('active'));
     if (type === 'team') {
-      document.querySelector(`.aside-item[data-team-id="${id}"]:not(.aside-league)`)?.classList.add('active');
+      document.querySelector(`.aside-item[data-team-id="${id}"]:not(.aside-league):not(.aside-round)`)?.classList.add('active');
+    } else if (type === 'round') {
+      document.querySelector(`.aside-round[data-round-id="${id}"]`)?.classList.add('active');
     } else {
       document.querySelector(`.aside-league[data-league-id="${id}"]`)?.classList.add('active');
     }

@@ -1,0 +1,73 @@
+# Nexus AI — QA automático en PRs creados por los agentes + @claude bajo demanda.
+# Autenticación con tu suscripción (CLAUDE_CODE_OAUTH_TOKEN, generado con `claude setup-token`).
+# Consume del mismo cupo que tus sesiones. Límites de costo: max-turns, timeout, concurrencia y filtros.
+name: nexus-qa
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+    branches: [main]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: nexus-qa-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+
+jobs:
+  qa-review:
+    # Solo PRs de ramas de agentes; no corre en forks.
+    if: >
+      github.event_name == 'pull_request' &&
+      startsWith(github.head_ref, 'claude/') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Actúa como el subagente `qa` definido en .claude/agents/qa.md.
+            Revisa el PR #${{ github.event.pull_request.number }} contra los criterios de su tarea en docs/TASKS.md.
+            Publica un único comentario con el informe y el veredicto `QA: APROBADO` o `QA: RECHAZADO — motivos`.
+            No modifiques código.
+          claude_args: >-
+            --model sonnet
+            --max-turns 25
+            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*)"
+
+  on-demand:
+    # Respuesta a "@claude" solo del dueño del repo (evita que terceros gasten tu cupo).
+    if: >
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '@claude') &&
+      github.event.comment.author_association == 'OWNER'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --model sonnet
+            --max-turns 40

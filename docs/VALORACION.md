@@ -1,10 +1,22 @@
-# VALORACIÓN — Valor estimado del desarrollo
+# VALORACIÓN — Valor de mercado y costo de desarrollo
 
 > Mantenida por los agentes de Nexus AI. Se actualiza con cada módulo o mejora entregada (PR).
 > Método: horas reales estimadas que tomaría desarrollar el módulo desde cero × tarifa base **$25.000 CLP/hora** (ver comercial/SERVICIOS.md en el repo nexus-ai). Incluye diseño, desarrollo, pruebas y documentación; no incluye hosting ni licencias.
 
+## Valor de mercado (lo que se puede cobrar)
+> Estimación comercial: cuánto pagaría un cliente por resolver su problema, según precios de alternativas en el mercado chileno (nov 2026). Las horas de abajo son solo el costo interno de desarrollo.
+
+- **Qué resuelve:** Laboratorio del meta de Mitos y Leyendas: simular partidas y probar mazos.
+- **Competencia y precios de referencia:** Nicho sin competidor directo conocido para MyL; en otros TCG las herramientas son freemium con planes premium de pocos dólares al mes.
+- **Precio a un cliente:** Premium $2.000–$5.000/mes por jugador; licencia a tiendas u organizadores de torneos $20.000–$50.000/mes
+- **Venta exclusiva a un cliente:** $2.000.000 – $5.000.000 (venta a una tienda/editorial de MyL)
+- **Valor hoy como producto (sin clientes):** $3.000.000 – $8.000.000
+- **Nota:** Valor alto por ser único en su nicho, pero depende del tamaño de la comunidad que pague; validar con 20–30 jugadores antes de invertir más.
+- Fuentes: apps.shopify.com/bsale · guiadesoftware.com/blog/mejor-software-gestion-inventario-pymes-latam · capterra.es (GymMaster, Fitco, Boxmagic) · zenoti.com/es/thecheckin/best-fitness-gym-software-2026 · ecosistemastartup.com (easycancha) · 2x3.cl/p/precios-desarrollo-aplicacion-movil
+
+
 ## Resumen
-- **Valor total estimado: $67.250.000 CLP**
+- **Costo de desarrollo estimado (horas × tarifa): $67.250.000 CLP**
 - Horas acumuladas: 2.690 h
 - Última actualización: 2026-11-15 (valoración inicial, T-001)
 - Referencia de mercado (funcional, sin precio de desarrollo comparable verificado):

@@ -1,0 +1,6 @@
+# Cambios a controles de seguridad, CI y memoria del sistema requieren tu revisión.
+# Reemplaza @healthandfitness2022lv-afk por tu usuario de GitHub (lo hace scripts/install.sh).
+/.github/     @healthandfitness2022lv-afk
+/.claude/     @healthandfitness2022lv-afk
+/CLAUDE.md    @healthandfitness2022lv-afk
+*             @healthandfitness2022lv-afk

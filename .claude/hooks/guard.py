@@ -27,7 +27,7 @@ BASH_RULES = [
     (r"\bgh\s+api\b.*(-X|--method)\s*(DELETE|PUT|PATCH)", "escritura directa a la API de GitHub"),
     (r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)\s+(/|~|\$HOME|\.\s*$|\*|\.\.)", "borrado recursivo peligroso"),
     (r"\b(firebase\s+deploy|vercel\b.*--prod|netlify\s+deploy\b.*--prod|fly\s+deploy|heroku\b|gcloud\s+(app|run|functions)\s+deploy|aws\s+\S+\s+(deploy|delete|terminate)|eas\s+(submit|update)|fastlane)", "despliegue a producción prohibido"),
-    (r"\b(npm|pnpm|yarn)\s+run\s+deploy|\bnetlify\s+deploy\b", "despliegue prohibido (scripts deploy / netlify)"),
+    (r"\b(npm|pnpm|yarn)\s+run\s+[\w:.-]*(deploy|prod|migrate|seed|clear|reset|drop)\b|\bnetlify\s+deploy\b|\bprisma\s+(migrate\s+(deploy|reset)|db\s+(push|seed))|\bsupabase\s+db\s+(push|reset)", "despliegue o cambio de base de datos prohibido"),
     (r"\b(npm|pnpm|yarn)\s+publish\b|\bflutter\s+pub\s+publish\b|\bdart\s+pub\s+publish\b|\btwine\s+upload\b", "publicación de paquetes prohibida"),
     (r"\b(terraform\s+(apply|destroy)|kubectl|helm\s+(install|upgrade|uninstall)|pulumi\s+up)\b", "cambios de infraestructura prohibidos"),
     (r"\b(psql|mysql|mongosh|mongo|redis-cli)\b.*\b(drop|delete|truncate|update|insert)\b", "escritura en base de datos prohibida"),

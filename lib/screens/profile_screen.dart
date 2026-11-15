@@ -42,7 +42,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Sube imagen a Firebase Storage y guarda photoUrl en users/{uid}
   Future<void> _pickAndUploadAvatar() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
+    );
     if (picked == null) return;
 
     setState(() => _uploading = true);
@@ -56,19 +59,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
       final url = await ref.getDownloadURL();
 
-      await FirebaseFirestore.instance.collection('users').doc(_uid).set(
-        {'photoUrl': url},
-        SetOptions(merge: true),
-      );
+      await FirebaseFirestore.instance.collection('users').doc(_uid).set({
+        'photoUrl': url,
+      }, SetOptions(merge: true));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Foto actualizada')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Foto actualizada')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al subir foto: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al subir foto: $e')));
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -85,23 +87,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('users').doc(_uid).snapshots(),
+      stream:
+          FirebaseFirestore.instance.collection('users').doc(_uid).snapshots(),
       builder: (context, snap) {
         final data = snap.data?.data() ?? {};
         final name = (data['displayName'] as String?) ?? 'Jugador';
-        final email = (data['email'] as String?) ?? FirebaseAuth.instance.currentUser?.email ?? '';
+        final email =
+            (data['email'] as String?) ??
+            FirebaseAuth.instance.currentUser?.email ??
+            '';
         final photoUrl = (data['photoUrl'] as String?);
-        final wins = (data['wins'] is int) ? data['wins'] as int : (data['wins'] ?? 0).toInt();
-        final losses = (data['losses'] is int) ? data['losses'] as int : (data['losses'] ?? 0).toInt();
+        final wins =
+            (data['wins'] is int)
+                ? data['wins'] as int
+                : (data['wins'] ?? 0).toInt();
+        final losses =
+            (data['losses'] is int)
+                ? data['losses'] as int
+                : (data['losses'] ?? 0).toInt();
 
         final winRate = _computeWinRate(wins, losses);
         final totalGames = wins + losses;
 
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Perfil'),
-            centerTitle: true,
-          ),
+          appBar: AppBar(title: const Text('Perfil'), centerTitle: true),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
             children: [
@@ -114,12 +123,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         CircleAvatar(
                           radius: 56,
                           backgroundColor: cs.surfaceContainerHighest,
-                          backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
-                              ? NetworkImage(photoUrl)
-                              : null,
-                          child: (photoUrl == null || photoUrl.isEmpty)
-                              ? Icon(Icons.person, size: 56, color: cs.onSurfaceVariant)
-                              : null,
+                          backgroundImage:
+                              (photoUrl != null && photoUrl.isNotEmpty)
+                                  ? NetworkImage(photoUrl)
+                                  : null,
+                          child:
+                              (photoUrl == null || photoUrl.isEmpty)
+                                  ? Icon(
+                                    Icons.person,
+                                    size: 56,
+                                    color: cs.onSurfaceVariant,
+                                  )
+                                  : null,
                         ),
                         Positioned(
                           right: 0,
@@ -132,15 +147,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: _uploading ? cs.surfaceVariant : cs.primary,
+                                  color:
+                                      _uploading
+                                          ? cs.surfaceVariant
+                                          : cs.primary,
                                   shape: BoxShape.circle,
                                 ),
-                                child: _uploading
-                                    ? const SizedBox(
-                                        width: 18, height: 18,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      )
-                                    : const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                                child:
+                                    _uploading
+                                        ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                        : const Icon(
+                                          Icons.camera_alt,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
                               ),
                             ),
                           ),
@@ -151,7 +177,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Text(name, style: Theme.of(context).textTheme.titleLarge),
                     if (email.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text(email, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                      Text(
+                        email,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -209,13 +240,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Card(
                 elevation: 0,
                 color: cs.surfaceContainerLowest,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Acciones', style: Theme.of(context).textTheme.titleMedium),
+                      Text(
+                        'Acciones',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
@@ -253,17 +289,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             decoration: const InputDecoration(hintText: 'Tu nombre'),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, null), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.pop(context, ctrl.text.trim()), child: const Text('Guardar')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+              child: const Text('Guardar'),
+            ),
           ],
         );
       },
     );
     if (newName == null || newName.isEmpty) return;
-    await FirebaseFirestore.instance.collection('users').doc(_uid).set(
-      {'displayName': newName},
-      SetOptions(merge: true),
-    );
+    await FirebaseFirestore.instance.collection('users').doc(_uid).set({
+      'displayName': newName,
+      'username': newName,
+    }, SetOptions(merge: true));
   }
 }
 
@@ -304,12 +346,27 @@ class _StatCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    value,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 2),
-                    Text(subtitle!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                    Text(
+                      subtitle!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ],
               ),

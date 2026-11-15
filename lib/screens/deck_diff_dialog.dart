@@ -1,10 +1,22 @@
 // lib/screens/deck_diff_dialog.dart
-import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:collection/collection.dart';
 import '../../models/deck.dart';
 import '../../models/card_myl.dart';
+import '../../utils/card_utils.dart';
+import '../../services/drive_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../domain/inventory_planner.dart';
+import '../../models/inventory.dart';
+import '../../services/inventory_service.dart';
+
+/// Par tengo→objetivo para una variación de mazo.
+class DeckVariationPair {
+  final Deck tengo;
+  final Deck objetivo;
+  const DeckVariationPair({required this.tengo, required this.objetivo});
+}
 
 /// Versión del diálogo en formato póster: fondo negro, sin nombres, con multiplicador arriba.
 /// Además la sección "Aportable" indica de qué mazo(s) proviene cada carta.
@@ -23,17 +35,18 @@ Future<void> showDeckDiffDialog(
   await Navigator.of(context).push(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => _DeckDiffScreen(
-        tengo: tengo,
-        objetivo: objetivo,
-        allDecks: allDecks,
-        cardsById: cardsById,
-        cardsByNameLower: cardsByNameLower,
-        cardsByIdDynamic: cardsByIdDynamic,
-        cardsByNameLowerDynamic: cardsByNameLowerDynamic,
-        imgByCardId: imgByCardId,
-        officialImgByCardId: officialImgByCardId,
-      ),
+      builder:
+          (_) => _DeckDiffScreen(
+            tengo: tengo,
+            objetivo: objetivo,
+            allDecks: allDecks,
+            cardsById: cardsById,
+            cardsByNameLower: cardsByNameLower,
+            cardsByIdDynamic: cardsByIdDynamic,
+            cardsByNameLowerDynamic: cardsByNameLowerDynamic,
+            imgByCardId: imgByCardId,
+            officialImgByCardId: officialImgByCardId,
+          ),
     ),
   );
 }
@@ -65,10 +78,24 @@ class _DeckDiffScreen extends StatefulWidget {
   State<_DeckDiffScreen> createState() => _DeckDiffScreenState();
 }
 
-class _DeckDiffScreenState extends State<_DeckDiffScreen> {
+class _DeckDiffScreenState extends State<_DeckDiffScreen>
+    with SingleTickerProviderStateMixin {
   final Map<String, String> _resolvedUrlByCardId = {};
   final Set<String> _officialResolvedIds = {};
   bool _resolving = false;
+  TabController? _tabController;
+  List<InventoryItem>? _inventory;
+
+  Future<void> _loadInventory() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final service = InventoryService(uid);
+      await service.migrateFromDecksIfNeeded(widget.allDecks);
+      final inventory = await service.listInventory();
+      if (mounted) setState(() => _inventory = inventory);
+    } catch (_) {}
+  }
 
   String _extractCardName(dynamic item) {
     if (item == null) return '';
@@ -116,8 +143,8 @@ class _DeckDiffScreenState extends State<_DeckDiffScreen> {
     }
   }
 
-  Map<String,int> _cardCountMap(List<dynamic> cards) {
-    final m = <String,int>{};
+  Map<String, int> _cardCountMap(List<dynamic> cards) {
+    final m = <String, int>{};
     for (final c in cards) {
       final rawName = _extractCardName(c).trim().toLowerCase();
       if (rawName.isEmpty) continue;
@@ -128,101 +155,113 @@ class _DeckDiffScreenState extends State<_DeckDiffScreen> {
   }
 
   // Reemplaza/pega esto (misma clase)
-bool _isSameDeck(Deck a, Deck b) {
-  final aId = (a.id).trim();
-  final bId = (b.id).trim();
+  bool _isSameDeck(Deck a, Deck b) {
+    final aId = (a.id).trim();
+    final bId = (b.id).trim();
 
-  // Si ambos tienen id y coinciden -> mismo mazo
-  if (aId.isNotEmpty && bId.isNotEmpty && aId == bId) return true;
+    // Si ambos tienen id y coinciden -> mismo mazo
+    if (aId.isNotEmpty && bId.isNotEmpty && aId == bId) return true;
 
-  // Si ambos tienen nombre no vacío y coinciden, y además los conteos de cartas coinciden -> mismo mazo
-  final aName = (a.name).trim().toLowerCase();
-  final bName = (b.name).trim().toLowerCase();
-  if (aName.isNotEmpty && aName == bName) {
-    final am = _cardCountMap(a.cards);
-    final bm = _cardCountMap(b.cards);
-    if (const DeepCollectionEquality().equals(am, bm)) return true;
+    // Si ambos tienen nombre no vacío y coinciden, y además los conteos de cartas coinciden -> mismo mazo
+    final aName = (a.name).trim().toLowerCase();
+    final bName = (b.name).trim().toLowerCase();
+    if (aName.isNotEmpty && aName == bName) {
+      final am = _cardCountMap(a.cards);
+      final bm = _cardCountMap(b.cards);
+      if (const DeepCollectionEquality().equals(am, bm)) return true;
+    }
+
+    return false;
   }
 
-  return false;
-}
-
-
-
-// Reemplaza/pega esto (misma clase)
-Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<Deck> allDecks) {
-  final tengoMap = _cardCountMap(tengo.cards);
-  final objetivoMap = _cardCountMap(objetivo.cards);
-
-  final faltantes = <String,int>{};
-  objetivoMap.forEach((name, need) {
-    final have = tengoMap[name] ?? 0;
-    final falt = (need > have) ? (need - have) : 0;
-    if (falt > 0) faltantes[name] = falt;
-  });
-
-  final contribuciones = <String, Map<String,int>>{};
-  if (faltantes.isEmpty) return contribuciones;
-
-  // Preparar lista de donantes: excluir mazos que sean 'tengo' o 'objetivo' por heurística robusta
-  final candidateDonors = <Deck>[];
-  for (final d in allDecks) {
-    if (_isSameDeck(d, tengo)) {
-      developer.log('deck_diff_debug: excluyendo ${d.name} (id:${d.id}) por ser igual a tengo', name: 'deck_diff_debug');
-      continue;
-    }
-    if (_isSameDeck(d, objetivo)) {
-      developer.log('deck_diff_debug: excluyendo ${d.name} (id:${d.id}) por ser igual a objetivo', name: 'deck_diff_debug');
-      continue;
-    }
-
-    if (d.isTarget == true) {
-      developer.log('deck_diff_debug: excluyendo ${d.name} (id:${d.id}) por isTarget==true', name: 'deck_diff_debug');
-      continue;
-    }
-
-    final idTrim = (d.id).trim();
-    if (idTrim.isEmpty) {
-      developer.log('deck_diff_debug: excluyendo ${d.name} por id vacío', name: 'deck_diff_debug');
-      continue;
-    }
-
-    candidateDonors.add(d);
-  }
-
-  developer.log('deck_diff_debug: candidateDonors -> ${candidateDonors.map((d) => {'id': d.id, 'name': d.name}).toList()}', name: 'deck_diff_debug');
-
-  for (final deck in candidateDonors) {
-    final deckMap = _cardCountMap(deck.cards);
-
-    for (final entry in List<MapEntry<String,int>>.from(faltantes.entries)) {
-      final cardName = entry.key;
-      var need = entry.value;
-      final available = deckMap[cardName] ?? 0;
-      if (available <= 0) continue;
-
-      final take = (available >= need) ? need : available;
-      if (take <= 0) continue;
-
-      final key = (deck.id).trim();
-      final byDeck = contribuciones.putIfAbsent(key, () => <String,int>{});
-      byDeck[cardName] = (byDeck[cardName] ?? 0) + take;
-
-      need -= take;
-      if (need <= 0) {
-        faltantes.remove(cardName);
-      } else {
-        faltantes[cardName] = need;
+  // Reemplaza/pega esto (misma clase)
+  Map<String, Map<String, int>> _computeBorrowPlan(
+    Deck tengo,
+    Deck objetivo,
+    List<Deck> allDecks, [
+    List<InventoryItem>? inventory,
+  ]) {
+    if (inventory != null) {
+      final calculated = buildInventoryPlan(
+        inventory: inventory,
+        orderedTargets: [objetivo],
+        destinationByTarget: {objetivo.id: tengo.id},
+      );
+      final result = <String, Map<String, int>>{};
+      for (final move in calculated.moves.where(
+        (move) => move.toDeckId == tengo.id,
+      )) {
+        final source = move.fromDeckId ?? '__free__';
+        final byCard = result.putIfAbsent(source, () => <String, int>{});
+        final name = move.cardName.trim().toLowerCase();
+        byCard[name] = (byCard[name] ?? 0) + move.quantity;
       }
+      return result;
+    }
+    final tengoMap = _cardCountMap(tengo.cards);
+    final objetivoMap = _cardCountMap(objetivo.cards);
+
+    final faltantes = <String, int>{};
+    objetivoMap.forEach((name, need) {
+      final have = tengoMap[name] ?? 0;
+      final falt = (need > have) ? (need - have) : 0;
+      if (falt > 0) faltantes[name] = falt;
+    });
+
+    final contribuciones = <String, Map<String, int>>{};
+    if (faltantes.isEmpty) return contribuciones;
+
+    // Preparar lista de donantes: excluir mazos que sean 'tengo' o 'objetivo' por heurística robusta
+    final candidateDonors = <Deck>[];
+    for (final d in allDecks) {
+      if (_isSameDeck(d, tengo)) {
+        continue;
+      }
+      if (_isSameDeck(d, objetivo)) {
+        continue;
+      }
+
+      if (d.isTarget == true) {
+        continue;
+      }
+
+      final idTrim = (d.id).trim();
+      if (idTrim.isEmpty) {
+        continue;
+      }
+
+      candidateDonors.add(d);
     }
 
-    if (faltantes.isEmpty) break;
+    for (final deck in candidateDonors) {
+      final deckMap = _cardCountMap(deck.cards);
+
+      for (final entry in List<MapEntry<String, int>>.from(faltantes.entries)) {
+        final cardName = entry.key;
+        var need = entry.value;
+        final available = deckMap[cardName] ?? 0;
+        if (available <= 0) continue;
+
+        final take = (available >= need) ? need : available;
+        if (take <= 0) continue;
+
+        final key = (deck.id).trim();
+        final byDeck = contribuciones.putIfAbsent(key, () => <String, int>{});
+        byDeck[cardName] = (byDeck[cardName] ?? 0) + take;
+
+        need -= take;
+        if (need <= 0) {
+          faltantes.remove(cardName);
+        } else {
+          faltantes[cardName] = need;
+        }
+      }
+
+      if (faltantes.isEmpty) break;
+    }
+
+    return contribuciones;
   }
-
-  developer.log('deck_diff_debug: contribuciones finales -> $contribuciones', name: 'deck_diff_debug');
-  return contribuciones;
-}
-
 
   Iterable<List<T>> _chunks<T>(List<T> list, int size) sync* {
     for (var i = 0; i < list.length; i += size) {
@@ -239,11 +278,19 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
       if (idList.isEmpty) return;
 
       for (final chunk in _chunks(idList, 10)) {
-        final qs = await db.collection('cards').where(FieldPath.documentId, whereIn: chunk).get();
+        final qs =
+            await db
+                .collection('cards')
+                .where(FieldPath.documentId, whereIn: chunk)
+                .get();
         for (final doc in qs.docs) {
           final id = doc.id;
           final data = doc.data();
-          final officialUrl = (data['officialImageUrl'] as String?)?.trim();
+          final rawUrl = (data['officialImageUrl'] as String?)?.trim();
+          final officialUrl =
+              rawUrl != null && rawUrl.isNotEmpty
+                  ? DriveService.webSafeUrl(rawUrl)
+                  : null;
           if (officialUrl != null && officialUrl.isNotEmpty) {
             _resolvedUrlByCardId[id] = officialUrl;
             _officialResolvedIds.add(id);
@@ -253,13 +300,20 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
         }
       }
 
-      final stillMissing = idList.where((id) => !_resolvedUrlByCardId.containsKey(id)).toList();
+      final stillMissing =
+          idList.where((id) => !_resolvedUrlByCardId.containsKey(id)).toList();
       for (final id in stillMissing) {
         final cardRef = FirebaseFirestore.instance.collection('cards').doc(id);
         try {
-          final offSnap = await cardRef.collection('variants').where('official', isEqualTo: true).limit(1).get();
+          final offSnap =
+              await cardRef
+                  .collection('variants')
+                  .where('official', isEqualTo: true)
+                  .limit(1)
+                  .get();
           if (offSnap.docs.isNotEmpty) {
-            final url = (offSnap.docs.first.data()['imageFrontUrl'] as String?)?.trim();
+            final url =
+                (offSnap.docs.first.data()['imageFrontUrl'] as String?)?.trim();
             if (url != null && url.isNotEmpty) {
               _resolvedUrlByCardId[id] = url;
               _officialResolvedIds.add(id);
@@ -268,7 +322,8 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
           }
           final anySnap = await cardRef.collection('variants').limit(1).get();
           if (anySnap.docs.isNotEmpty) {
-            final url = (anySnap.docs.first.data()['imageFrontUrl'] as String?)?.trim();
+            final url =
+                (anySnap.docs.first.data()['imageFrontUrl'] as String?)?.trim();
             if (url != null && url.isNotEmpty) {
               _resolvedUrlByCardId[id] = url;
             }
@@ -276,23 +331,23 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
         } catch (_) {}
       }
     } catch (e, st) {
-      developer.log('deck_diff resolve error: $e\n$st', name: 'deck_diff');
     } finally {
       if (mounted) setState(() {});
       _resolving = false;
     }
   }
 
-  String? _thumb120x170(String? url) {
-    if (url == null || url.isEmpty) return url;
-    if (!url.contains('/upload/')) return url;
-    return url.replaceFirst('/upload/', '/upload/f_auto,q_auto,w_120,h_170,c_fill,g_auto/');
-  }
-
   @override
   void initState() {
     super.initState();
     _scheduleResolve();
+    _loadInventory();
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
   }
 
   Future<void> _scheduleResolve() async {
@@ -313,18 +368,27 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
 
   String? _findImageCandidateForName(String cardName) {
     final key = cardName.trim().toLowerCase();
-    developer.log('deck_diff: probe candidate for "$key"', name: 'deck_diff');
 
     String? foundFromModel;
     if (widget.cardsByNameLowerDynamic?.containsKey(key) == true) {
-      final probe = _probeImageFieldsFromDynamic(widget.cardsByNameLowerDynamic![key]);
+      final probe = _probeImageFieldsFromDynamic(
+        widget.cardsByNameLowerDynamic![key],
+      );
       if (probe != null) foundFromModel = probe;
     }
-    if (foundFromModel == null && widget.cardsByNameLower?.containsKey(key) == true) {
+    if (foundFromModel == null &&
+        widget.cardsByNameLower?.containsKey(key) == true) {
       try {
         final dyn = widget.cardsByNameLower![key] as dynamic;
-        final candidate = (dyn.officialImageUrl ?? dyn.imageUrl ?? dyn.image ?? dyn.thumbnail ?? dyn.url)?.toString();
-        if (candidate != null && candidate.isNotEmpty) foundFromModel = candidate;
+        final candidate =
+            (dyn.officialImageUrl ??
+                    dyn.imageUrl ??
+                    dyn.image ??
+                    dyn.thumbnail ??
+                    dyn.url)
+                ?.toString();
+        if (candidate != null && candidate.isNotEmpty)
+          foundFromModel = candidate;
         else if (dyn.toJson != null) {
           final map = dyn.toJson() as Map<String, dynamic>;
           final probe = _probeImageFieldsFromDynamic(map);
@@ -345,46 +409,45 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
       }
       return null;
     }
+
     final foundId = tryFindIdInDecks(key);
 
     if (foundId != null && widget.officialImgByCardId != null) {
       final official = widget.officialImgByCardId![foundId];
       if (official != null && official.isNotEmpty) {
-        developer.log('deck_diff: found official prop for id $foundId', name: 'deck_diff');
-        return _thumb120x170(official);
+        return thumb120x170(official);
       }
     }
 
     if (foundId != null && _resolvedUrlByCardId.containsKey(foundId)) {
       final url = _resolvedUrlByCardId[foundId];
       if (url != null && url.isNotEmpty) {
-        developer.log('deck_diff: found resolved url for id $foundId -> $url', name: 'deck_diff');
-        return _thumb120x170(url);
+        return thumb120x170(url);
       }
     }
 
     if (foundId != null && widget.imgByCardId != null) {
       final base = widget.imgByCardId![foundId];
       if (base != null && base.isNotEmpty) {
-        developer.log('deck_diff: found base imgByCardId for id $foundId -> $base', name: 'deck_diff');
-        return _thumb120x170(base);
+        return thumb120x170(base);
       }
     }
 
     if (foundFromModel != null && foundFromModel.isNotEmpty) {
-      developer.log('deck_diff: found candidate from model/dynamic -> $foundFromModel', name: 'deck_diff');
-      return _thumb120x170(foundFromModel);
+      return thumb120x170(foundFromModel);
     }
 
     if (widget.cardsByIdDynamic != null) {
       for (final v in widget.cardsByIdDynamic!.values) {
         try {
-          final nombre = ((v is Map) ? (v['nombre'] ?? v['name']) : null)?.toString().toLowerCase();
+          final nombre =
+              ((v is Map) ? (v['nombre'] ?? v['name']) : null)
+                  ?.toString()
+                  .toLowerCase();
           if (nombre == key) {
             final cand = _probeImageFieldsFromDynamic(v);
             if (cand != null && cand.isNotEmpty) {
-              developer.log('deck_diff: found candidate in cardsByIdDynamic -> $cand', name: 'deck_diff');
-              return _thumb120x170(cand);
+              return thumb120x170(cand);
             }
           }
         } catch (_) {}
@@ -395,23 +458,28 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
       for (final v in widget.cardsById!.values) {
         try {
           final dyn = v as dynamic;
-          final nombre = ((dyn.nombre ?? dyn.name) ?? '').toString().toLowerCase();
+          final nombre =
+              ((dyn.nombre ?? dyn.name) ?? '').toString().toLowerCase();
           if (nombre == key) {
-            final candidate = (dyn.officialImageUrl ?? dyn.imageUrl ?? dyn.image ?? dyn.thumbnail ?? dyn.url)?.toString();
+            final candidate =
+                (dyn.officialImageUrl ??
+                        dyn.imageUrl ??
+                        dyn.image ??
+                        dyn.thumbnail ??
+                        dyn.url)
+                    ?.toString();
             if (candidate != null && candidate.isNotEmpty) {
-              developer.log('deck_diff: found candidate in cardsById model -> $candidate', name: 'deck_diff');
-              return _thumb120x170(candidate);
+              return thumb120x170(candidate);
             }
             if (dyn.toJson != null) {
               final probe = _probeImageFieldsFromDynamic(dyn.toJson());
-              if (probe != null) return _thumb120x170(probe);
+              if (probe != null) return thumb120x170(probe);
             }
           }
         } catch (_) {}
       }
     }
 
-    developer.log('deck_diff: no image candidate for "$key"', name: 'deck_diff');
     return null;
   }
 
@@ -420,8 +488,18 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
     try {
       if (dyn is Map<String, dynamic>) {
         final candidateKeys = [
-          'officialImageUrl', 'official_image_url', 'imageUrl', 'image_url',
-          'image', 'thumbnail', 'thumbnailUrl', 'thumbnail_url', 'url', 'img', 'photo', 'cover'
+          'officialImageUrl',
+          'official_image_url',
+          'imageUrl',
+          'image_url',
+          'image',
+          'thumbnail',
+          'thumbnailUrl',
+          'thumbnail_url',
+          'url',
+          'img',
+          'photo',
+          'cover',
         ];
         for (final k in candidateKeys) {
           if (dyn.containsKey(k) && dyn[k] != null) {
@@ -431,7 +509,11 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
         }
         for (final k in dyn.keys) {
           final kl = k.toString().toLowerCase();
-          if (kl.contains('image') || kl.contains('img') || kl.contains('thumb') || kl.contains('photo') || kl.contains('cover')) {
+          if (kl.contains('image') ||
+              kl.contains('img') ||
+              kl.contains('thumb') ||
+              kl.contains('photo') ||
+              kl.contains('cover')) {
             final v = dyn[k];
             if (v != null) return v.toString();
           }
@@ -439,7 +521,13 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
       } else {
         final vdyn = dyn as dynamic;
         final possibles = [
-          vdyn.officialImageUrl, vdyn.imageUrl, vdyn.image, vdyn.thumbnail, vdyn.url, vdyn.photo, vdyn.cover
+          vdyn.officialImageUrl,
+          vdyn.imageUrl,
+          vdyn.image,
+          vdyn.thumbnail,
+          vdyn.url,
+          vdyn.photo,
+          vdyn.cover,
         ];
         for (final p in possibles) {
           if (p != null) return p.toString();
@@ -453,41 +541,104 @@ Map<String, Map<String,int>> _computeBorrowPlan(Deck tengo, Deck objetivo, List<
     return null;
   }
 
-  Widget _buildPosterGridFromMap(Map<String,int> map, { Map<String, Map<String,int>>? donorsByCard }) {
-    // map: cardName -> qty
-    final tiles = <Widget>[];
-    map.forEach((name, qty) {
-      final candidate = _findImageCandidateForName(name);
-      final donors = donorsByCard == null ? null : (donorsByCard[name] ?? {});
-      tiles.add(_PosterThumb(
-        imageCandidate: candidate,
-        cardName: name,
-        qty: qty,
-        donors: donors,
-        onTapDonors: donors == null || donors.isEmpty ? null : () => _showDonorsDialog(name, donors),
-      ));
-    });
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: tiles,
-    );
+  // Tipo normalizado (sin acentos) → rank
+  static const _typeRanks = {
+    'aliado': 0,
+    'talisman': 1,
+    'arma': 2,
+    'totem': 3,
+    'oro': 4,
+  };
+
+  static String _normTipo(String s) =>
+      s
+          .toLowerCase()
+          .replaceAll(RegExp(r'[áàä]'), 'a')
+          .replaceAll(RegExp(r'[éèë]'), 'e')
+          .replaceAll(RegExp(r'[íìï]'), 'i')
+          .replaceAll(RegExp(r'[óòö]'), 'o')
+          .replaceAll(RegExp(r'[úùü]'), 'u')
+          .replaceAll('ñ', 'n')
+          .trim();
+
+  int _typeRank(String cardName) {
+    final key = cardName.trim().toLowerCase();
+    String? tipo;
+    if (widget.cardsByNameLower?.containsKey(key) == true) {
+      tipo = widget.cardsByNameLower![key]!.tipo;
+    }
+    if (tipo == null &&
+        widget.cardsByNameLowerDynamic?.containsKey(key) == true) {
+      final d = widget.cardsByNameLowerDynamic![key];
+      tipo = ((d is Map) ? d['tipo'] : null)?.toString();
+    }
+    if (tipo == null || tipo.trim().isEmpty) return _typeRanks.length;
+    final norm = _normTipo(tipo);
+    for (final entry in _typeRanks.entries) {
+      if (norm.startsWith(entry.key)) return entry.value;
+    }
+    return _typeRanks.length;
   }
 
-  String _prettyCardName(String s) {
-  final str = s.trim();
-  if (str.isEmpty) return str;
-  final parts = str.split(RegExp(r'\s+'));
-  return parts.map((p) => p.isEmpty ? p : '${p[0].toUpperCase()}${p.substring(1)}').join(' ');
-}
+  int _cardCost(String cardName) {
+    final key = cardName.trim().toLowerCase();
+    if (widget.cardsByNameLower?.containsKey(key) == true) {
+      return widget.cardsByNameLower![key]!.coste ?? 99;
+    }
+    if (widget.cardsByNameLowerDynamic?.containsKey(key) == true) {
+      final d = widget.cardsByNameLowerDynamic![key];
+      final v = (d is Map) ? d['coste'] : null;
+      if (v != null) return int.tryParse('$v') ?? 99;
+    }
+    return 99;
+  }
 
-void _showDonorsDialog(String cardName, Map<String,int> donors) {
+  List<String> _sortedCardNames(Iterable<String> names) {
+    final list = names.toList();
+    list.sort((a, b) {
+      final ra = _typeRank(a);
+      final rb = _typeRank(b);
+      if (ra != rb) return ra.compareTo(rb);
+      final ca = _cardCost(a);
+      final cb = _cardCost(b);
+      if (ca != cb) return ca.compareTo(cb);
+      return a.compareTo(b);
+    });
+    return list;
+  }
+
+  Widget _buildPosterGridFromMap(
+    Map<String, int> map, {
+    Map<String, Map<String, int>>? donorsByCard,
+  }) {
+    final tiles = <Widget>[];
+    for (final name in _sortedCardNames(map.keys)) {
+      final qty = map[name]!;
+      final candidate = _findImageCandidateForName(name);
+      final donors = donorsByCard == null ? null : (donorsByCard[name] ?? {});
+      tiles.add(
+        _PosterThumb(
+          imageCandidate: candidate,
+          cardName: name,
+          qty: qty,
+          donors: donors,
+          onTapDonors:
+              donors == null || donors.isEmpty
+                  ? null
+                  : () => _showDonorsDialog(name, donors),
+        ),
+      );
+    }
+    return Wrap(spacing: 8, runSpacing: 8, children: tiles);
+  }
+
+  void _showDonorsDialog(String cardName, Map<String, int> donors) {
     showDialog(
       context: context,
       builder: (_) {
         final list = donors.entries.toList();
         return AlertDialog(
-          title: Text(_prettyCardName(cardName)),
+          title: Text(prettyCardName(cardName)),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView.separated(
@@ -504,163 +655,242 @@ void _showDonorsDialog(String cardName, Map<String,int> donors) {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cerrar')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
           ],
         );
       },
     );
   }
 
+  /// Tab "Común": muestra cada carta del superconjunto de objetivos con columnas por variación.
+  /// Para cada carta indica: cuántas necesita cada objetivo y cuántas aporta el pool.
+
+  /// Construye el cuerpo de diff para UNA variación dado el pool compartido.
+
   @override
   Widget build(BuildContext context) {
-    // calcular faltantes usando mapas agregados (coherente con _computeBorrowPlan)
+    // Diff simple: un tengo contra un objetivo (sin pool ni variaciones).
     final tengoMap = _cardCountMap(widget.tengo.cards);
     final objetivoMap = _cardCountMap(widget.objetivo.cards);
 
-    final faltanInicial = <String,int>{};
+    final faltanInicial = <String, int>{};
     objetivoMap.forEach((name, need) {
       final have = tengoMap[name] ?? 0;
       final falt = (need > have) ? (need - have) : 0;
       if (falt > 0) faltanInicial[name] = falt;
     });
+    final sobranInicial = <String, int>{};
+    tengoMap.forEach((name, have) {
+      final need = objetivoMap[name] ?? 0;
+      final sobra = (have > need) ? (have - need) : 0;
+      if (sobra > 0) sobranInicial[name] = sobra;
+    });
 
-    if (faltanInicial.isEmpty) {
+    if (faltanInicial.isEmpty && sobranInicial.isEmpty) {
       return Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(title: const Text('Cartas faltantes')),
-        body: const Center(child: Text('¡Este mazo ya cumple con el objetivo!')),
+        appBar: AppBar(title: const Text('Diferencias del mazo')),
+        body: const Center(
+          child: Text('¡Este mazo ya cumple con el objetivo!'),
+        ),
       );
     }
 
-    final plan = _computeBorrowPlan(widget.tengo, widget.objetivo, widget.allDecks);
+    final plan = _computeBorrowPlan(
+      widget.tengo,
+      widget.objetivo,
+      widget.allDecks,
+      _inventory,
+    );
 
-    final aportablePorCarta = <String,int>{};
+    final aportablePorCarta = <String, int>{};
     plan.forEach((_, contrib) {
       contrib.forEach((cardName, qty) {
         aportablePorCarta[cardName] = (aportablePorCarta[cardName] ?? 0) + qty;
       });
     });
 
-    
-
-    final donorsByCard = <String, Map<String,int>>{};
-    // Construir mapa nombre->cantidad de mazos con ese nombre (para detectar colisiones)
-final nameCounts = <String,int>{};
-for (final d in widget.allDecks) {
-  final n = (d.name).trim();
-  if (n.isEmpty) continue;
-  nameCounts[n] = (nameCounts[n] ?? 0) + 1;
-}
-
-plan.forEach((deckId, contrib) {
-  final deck = widget.allDecks.firstWhereOrNull((d) => (d.id).trim() == (deckId).trim());
-  String deckLabel;
-  if (deck == null) {
-    final idShort = deckId.length >= 6 ? deckId.substring(0,6) : deckId;
-    deckLabel = 'Mazo $idShort';
-  } else {
-    final name = (deck.name).trim();
-    if (name.isEmpty) {
-      final idShort = deck.id.length >= 6 ? deck.id.substring(0,6) : deck.id;
-      deckLabel = 'Mazo $idShort';
-    } else {
-      // Solo añadimos id corto si hay más de 1 mazo con el mismo nombre
-      if ((nameCounts[name] ?? 0) > 1) {
-        final idShort = (deck.id).length >= 6 ? (deck.id).substring(0,6) : (deck.id);
-        deckLabel = '$name (id:$idShort)';
-      } else {
-        deckLabel = name;
-      }
+    final donorsByCard = <String, Map<String, int>>{};
+    final nameCounts = <String, int>{};
+    for (final d in widget.allDecks) {
+      final n = (d.name).trim();
+      if (n.isEmpty) continue;
+      nameCounts[n] = (nameCounts[n] ?? 0) + 1;
     }
-  }
 
-  contrib.forEach((cardName, qty) {
-    final map = donorsByCard.putIfAbsent(cardName, () => <String,int>{});
-    map[deckLabel] = (map[deckLabel] ?? 0) + qty;
-  });
-});
+    plan.forEach((deckId, contrib) {
+      final deck = widget.allDecks.firstWhereOrNull(
+        (d) => (d.id).trim() == (deckId).trim(),
+      );
+      String deckLabel;
+      if (deckId == '__free__') {
+        deckLabel = 'Stock libre';
+      } else if (deck == null) {
+        final idShort = deckId.length >= 6 ? deckId.substring(0, 6) : deckId;
+        deckLabel = 'Mazo $idShort';
+      } else {
+        final name = (deck.name).trim();
+        if (name.isEmpty) {
+          final idShort =
+              deck.id.length >= 6 ? deck.id.substring(0, 6) : deck.id;
+          deckLabel = 'Mazo $idShort';
+        } else {
+          if ((nameCounts[name] ?? 0) > 1) {
+            final idShort =
+                (deck.id).length >= 6 ? (deck.id).substring(0, 6) : (deck.id);
+            deckLabel = '$name (id:$idShort)';
+          } else {
+            deckLabel = name;
+          }
+        }
+      }
+      contrib.forEach((cardName, qty) {
+        final map = donorsByCard.putIfAbsent(cardName, () => <String, int>{});
+        map[deckLabel] = (map[deckLabel] ?? 0) + qty;
+      });
+    });
 
-
-    final restAfter = <String,int>{};
+    final restAfter = <String, int>{};
     faltanInicial.forEach((card, need) {
       final aport = aportablePorCarta[card] ?? 0;
       final r = (need - aport) > 0 ? (need - aport) : 0;
       if (r > 0) restAfter[card] = r;
     });
 
-    final totalFaltanInicial = faltanInicial.values.fold<int>(0, (p,e) => p + e);
-    final totalContribuible = aportablePorCarta.values.fold<int>(0, (p,e) => p + e);
-    final totalQuedaran = restAfter.values.fold<int>(0, (p,e) => p + e);
+    final totalFaltanInicial = faltanInicial.values.fold<int>(
+      0,
+      (p, e) => p + e,
+    );
+    final totalSobranInicial = sobranInicial.values.fold<int>(
+      0,
+      (p, e) => p + e,
+    );
+    final totalContribuible = aportablePorCarta.values.fold<int>(
+      0,
+      (p, e) => p + e,
+    );
+    final totalQuedaran = restAfter.values.fold<int>(0, (p, e) => p + e);
     final canBuild = totalQuedaran == 0;
-    
 
-    // UI: fondo negro, textos en blanco
-    final titleStyle = const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white);
-    final infoStyle = TextStyle(color: Colors.white70);
+    final titleStyle = const TextStyle(
+      fontWeight: FontWeight.bold,
+      fontSize: 16,
+      color: Colors.white,
+    );
+    final infoStyle = const TextStyle(color: Colors.white70);
 
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.grey[900],
-        title: Text(canBuild ? 'Se puede armar (con préstamos)' : 'No se puede armar completamente'),
+        title: Text(
+          canBuild
+              ? 'Se puede armar (con préstamos)'
+              : 'No se puede armar completamente',
+        ),
         centerTitle: true,
         actions: [
-          if (_resolving) const Padding(padding: EdgeInsets.symmetric(horizontal:12), child: Center(child: SizedBox(width:16,height:16, child:CircularProgressIndicator(strokeWidth:2)))),
-          IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
+          if (_resolving)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
         ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // FALTANTES (mosaico)
-            Text('Cartas faltantes ($totalFaltanInicial)', style: titleStyle),
-            const SizedBox(height: 8),
-            _buildPosterGridFromMap(faltanInicial),
-
-            const SizedBox(height: 18),
-
-            // APORTABLE (mosaico) — PASAMOS donorsByCard para que el thumb sepa de dónde viene
-            Text('Total aportable ($totalContribuible)', style: titleStyle),
-            const SizedBox(height: 8),
-            if (aportablePorCarta.isEmpty)
-              Text('No hay cartas disponibles para prestar desde otros mazos.', style: infoStyle)
-            else
-              _buildPosterGridFromMap(aportablePorCarta, donorsByCard: donorsByCard),
-
-            const SizedBox(height: 18),
-
-            // REST AFTER (mosaico)
-            Text('Faltantes tras aportes ($totalQuedaran)', style: titleStyle),
-            const SizedBox(height: 8),
-            if (restAfter.isEmpty)
-              Text('No quedarán cartas faltantes después de los préstamos.', style: infoStyle)
-            else
-              _buildPosterGridFromMap(restAfter),
-
-            const SizedBox(height: 22),
-            Text(
-              canBuild ? 'Resumen: con los préstamos propuestos se puede completar el mazo objetivo.' :
-              'Resumen: faltan cartas que no pueden ser aportadas por los mazos disponibles.',
-              style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.white70),
-            ),
-
-            const SizedBox(height: 18),
-            if (canBuild)
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Plan listo. (No se hicieron cambios en la base de datos)')));
-                },
-                child: const Text('Aceptar plan'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Cartas para sacar ($totalSobranInicial)',
+                style: titleStyle,
               ),
-            const SizedBox(height: 14),
-          ]),
+              const SizedBox(height: 8),
+              if (sobranInicial.isEmpty)
+                Text(
+                  'No hay cartas extra que sacar del mazo actual.',
+                  style: infoStyle,
+                )
+              else
+                _buildPosterGridFromMap(sobranInicial),
+
+              const SizedBox(height: 18),
+
+              Text(
+                'Cartas para agregar ($totalFaltanInicial)',
+                style: titleStyle,
+              ),
+              const SizedBox(height: 8),
+              if (faltanInicial.isEmpty)
+                Text('No faltan cartas por agregar.', style: infoStyle)
+              else
+                _buildPosterGridFromMap(faltanInicial),
+
+              const SizedBox(height: 18),
+
+              Text('Total aportable ($totalContribuible)', style: titleStyle),
+              const SizedBox(height: 8),
+              if (aportablePorCarta.isEmpty)
+                Text(
+                  'No hay cartas disponibles para prestar desde otros mazos.',
+                  style: infoStyle,
+                )
+              else
+                _buildPosterGridFromMap(
+                  aportablePorCarta,
+                  donorsByCard: donorsByCard,
+                ),
+
+              const SizedBox(height: 18),
+
+              Text(
+                'Faltantes tras aportes ($totalQuedaran)',
+                style: titleStyle,
+              ),
+              const SizedBox(height: 8),
+              if (restAfter.isEmpty)
+                Text(
+                  'No quedarán cartas faltantes después de los préstamos.',
+                  style: infoStyle,
+                )
+              else
+                _buildPosterGridFromMap(restAfter),
+
+              const SizedBox(height: 22),
+              Text(
+                canBuild
+                    ? 'Resumen: con los préstamos propuestos se puede completar el mazo objetivo.'
+                    : 'Resumen: faltan cartas que no pueden ser aportadas por los mazos disponibles.',
+                style: const TextStyle(
+                  fontStyle: FontStyle.italic,
+                  color: Colors.white70,
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              const SizedBox(height: 14),
+            ],
+          ),
         ),
       ),
     );
   }
-
 }
 
 /// Poster-style thumb: imagen 120x170 con multiplicador ARRIBA a la izquierda.
@@ -669,7 +899,7 @@ class _PosterThumb extends StatelessWidget {
   final String? imageCandidate; // ya transformada con thumb120x170 si aplica
   final String cardName;
   final int qty;
-  final Map<String,int>? donors; // donorLabel -> qty
+  final Map<String, int>? donors; // donorLabel -> qty
   final VoidCallback? onTapDonors;
 
   const _PosterThumb({
@@ -694,15 +924,39 @@ class _PosterThumb extends StatelessWidget {
           width: width,
           height: height,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(width: width, height: height, color: Colors.grey.shade800, child: const Icon(Icons.image_not_supported, color: Colors.white70)),
+          errorBuilder:
+              (_, __, ___) => Container(
+                width: width,
+                height: height,
+                color: Colors.grey.shade800,
+                child: const Icon(
+                  Icons.image_not_supported,
+                  color: Colors.white70,
+                ),
+              ),
         );
       } else if (cand.startsWith('gs://')) {
-        imageWidget = Container(width: width, height: height, color: Colors.grey.shade700, child: const Icon(Icons.cloud, color: Colors.white70));
+        imageWidget = Container(
+          width: width,
+          height: height,
+          color: Colors.grey.shade700,
+          child: const Icon(Icons.cloud, color: Colors.white70),
+        );
       } else {
-        imageWidget = Container(width: width, height: height, color: Colors.grey.shade700, child: const Icon(Icons.image, color: Colors.white70));
+        imageWidget = Container(
+          width: width,
+          height: height,
+          color: Colors.grey.shade700,
+          child: const Icon(Icons.image, color: Colors.white70),
+        );
       }
     } else {
-      imageWidget = Container(width: width, height: height, color: Colors.grey.shade700, child: const Icon(Icons.image_not_supported, color: Colors.white70));
+      imageWidget = Container(
+        width: width,
+        height: height,
+        color: Colors.grey.shade700,
+        child: const Icon(Icons.image_not_supported, color: Colors.white70),
+      );
     }
 
     // donor badge content
@@ -733,7 +987,11 @@ class _PosterThumb extends StatelessWidget {
               ),
               child: Text(
                 'x$qty',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
               ),
             ),
           ),
@@ -761,10 +1019,22 @@ class _PosterThumb extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.black87,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 4, offset: const Offset(0,2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }
-

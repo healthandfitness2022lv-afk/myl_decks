@@ -1,0 +1,192 @@
+GUÍA RÁPIDA DEL DASHBOARD DE LIGAS
+==================================
+
+Ingresa aquí:
+https://mylmazos.web.app/dashboard/
+
+
+¿CÓMO USARLO?
+--------------
+
+En el menú de la izquierda encontrarás:
+
+- Los teams.
+- Las ligas de cada team.
+- Las fechas de cada liga.
+
+Solo debes seleccionar lo que quieres revisar.
+
+
+AL SELECCIONAR UN TEAM
+----------------------
+
+Verás la tabla histórica de sus jugadores.
+
+Esta tabla muestra quién ha tenido el mejor rendimiento general a lo largo del
+tiempo.
+
+Al lado de cada posición aparece un símbolo:
+
+- ▲ Verde: el jugador subió de posición.
+- ▼ Rojo: el jugador bajó de posición.
+- — Gris: el jugador mantuvo su posición.
+
+
+AL SELECCIONAR UNA LIGA
+-----------------------
+
+Verás un resumen del avance, la forma del líder, los duelos pendientes y la
+cobertura de los datos del dado. La liga se concentra en tres pestañas:
+
+- Clasificación.
+- Impacto del dado.
+- Duelos pendientes.
+
+Cada fecha tiene un color estable. Ese color se repite en el resumen por fecha,
+el desglose del dado y los grupos de duelos pendientes para que sea fácil
+reconocer de qué fecha proviene cada dato.
+
+El jugador con más puntos aparecerá primero. Si dos jugadores tienen los mismos
+puntos, se usarán sus demás resultados para desempatar.
+
+Las partidas contra BYE sí cuentan como victoria en la clasificación, suman
+puntos y forman parte del avance de la fecha. Se excluyen únicamente del
+rendimiento de mazos y cartas, porque no hubo un enfrentamiento real. Tampoco
+entran en el impacto del dado, ya que no existió rival.
+
+Los símbolos muestran el cambio producido por la última fecha:
+
+- ▲ Verde: subió posiciones.
+- ▼ Rojo: bajó posiciones.
+- — Gris: se mantuvo en el mismo lugar.
+
+El botón "PNG" descarga únicamente el contenido de la pestaña activa, sin
+capturar la pantalla completa. En "Duelos pendientes" exporta solo las fechas
+que contienen enfrentamientos pendientes.
+
+
+AL SELECCIONAR UNA FECHA
+------------------------
+
+Podrás revisar:
+
+- El avance real de la fecha y la cantidad de duelos pendientes.
+- El líder provisional o definitivo de la fecha.
+- La cantidad de resultados 2-0, 2-1 y empates.
+- La cobertura de mazos considerados y cuántos todavía permanecen anónimos.
+- Los enfrentamientos.
+- Los jugadores de cada mesa.
+- Los marcadores.
+- Los ganadores y perdedores.
+- La tabla de posiciones de esa fecha.
+
+La información competitiva se organiza en pestañas propias de la fecha:
+
+- Tabla: es la primera vista al abrir una fecha y muestra directamente su
+  clasificación, sin desplegables.
+- Resumen.
+- Duelos pendientes: separados de los duelos ya jugados.
+- Meta de mazos.
+- Cartas.
+- Impacto del dado.
+- Ban List: aparece únicamente cuando la fecha tiene un snapshot asociado y
+  muestra formato, origen, fecha de captura, cartas prohibidas y limitadas.
+
+El botón "PNG" descarga únicamente el contenido de la pestaña activa de la
+fecha, sin capturar la pantalla completa.
+
+
+¿CUÁNDO SE PUEDE VER UN MAZO?
+-----------------------------
+
+El mazo de un jugador se mantiene oculto hasta que complete sus cinco duelos de
+la fecha.
+
+Si todavía no termina, aparecerá un candado y su avance, por ejemplo:
+
+"3 de 5 duelos completados".
+
+Cuando termine el quinto duelo, el mazo se podrá ver automáticamente.
+
+
+ESTADÍSTICAS DE MAZOS POR FECHA
+-------------------------------
+
+En la pestaña "Meta de mazos" de cada fecha podrás revisar:
+
+- Rendimiento y popularidad por raza.
+- Enfrentamientos directos entre razas registradas.
+- Arquetipos detectados según las características dominantes de cada lista.
+
+Todas las barajas asignadas entran en los cálculos, incluso cuando su jugador
+todavía no termina sus duelos. En ese caso se consideran sus resultados
+parciales, raza, composición y características, pero en el desglose aparece
+como "Mazo oculto" y nunca se muestra el nombre del jugador ni se permite abrir
+la lista.
+
+
+ESTADÍSTICAS DE CARTAS POR FECHA
+--------------------------------
+
+El análisis de cartas se encuentra dentro de cada fecha y nunca mezcla sus
+datos con otras fechas de la liga. Allí podrás revisar:
+
+- Adopción de cada carta sobre los mazos donde era legal según formato, raza y
+  edición. Por ejemplo, 3 usos en 3 mazos elegibles equivalen a 100%, aunque
+  existan otros mazos donde la carta no podía jugarse.
+- Copias utilizadas frente a la capacidad legal total.
+- Límites de 1 copia para cartas únicas y los máximos de la Ban List vigente.
+- Ban Lists independientes para Racial Edición, Racial Libre y Full.
+- Resultado asociado a cada carta frente al promedio de los mazos donde esa
+  misma carta era legal.
+- Cartas tech por raza. Una carta se considera tech cuando la utiliza una sola
+  lista dentro de una raza con al menos dos jugadores y dos barajas donde esa
+  carta era legal.
+- Copias, resultados, winrate y diferencia de cada tech frente a las demás
+  listas de la misma raza.
+- Tamaño y nivel de confianza de cada muestra.
+
+Las barajas bloqueadas también cuentan en adopción, copias, características y
+resultados parciales, pero el análisis agregado no revela a qué jugador
+pertenecen.
+
+Si una raza fue utilizada por un solo jugador, sus cartas exclusivas no se
+etiquetan como tech porque no existe una segunda lista comparable. Pueden
+aparecer varias techs pertenecientes a la misma baraja. Si esa baraja todavía
+está bloqueada, se muestra como "Mazo oculto" sin revelar al jugador.
+
+El resultado asociado a una carta indica correlación con el rendimiento del
+mazo, no demuestra que esa carta haya causado sus victorias. El dashboard
+señala cuando la muestra disponible es baja.
+
+
+BAN LIST POR FECHA
+------------------
+
+Cada fecha guarda una copia propia de la Ban List que se utilizó. Los cambios
+posteriores a la lista general no modifican retroactivamente sus estadísticas.
+Racial Edición, Racial Libre y Full cargan listas independientes.
+
+Dentro de la liga, el botón "Ban Lists" permite seleccionar una fecha y ver su
+snapshot completo: cartas prohibidas, limitadas, máximo de copias, formato y
+origen. En cada fecha, el mismo visor está disponible en el icono del escudo,
+ubicado junto a "Asignar mazos".
+
+Todos los usuarios pueden consultar la lista. Un administrador además puede:
+
+- Cargar y congelar la Ban List vigente.
+- Reemplazar el snapshot si se cargó una lista incorrecta.
+- Copiar la Ban List desde otra fecha del mismo formato.
+
+En el menú de la liga también está la opción "Completar Ban Lists faltantes".
+Esta carga la lista vigente únicamente en fechas que todavía no tienen
+snapshot; no sobrescribe fechas ya regularizadas. Debe utilizarse solo cuando
+esas fechas realmente se jugaron con la lista actual.
+
+
+IMPORTANTE
+----------
+
+El dashboard es público y cualquier persona puede revisar los resultados desde
+el enlace. Solo los encargados pueden agregar o modificar información desde la
+aplicación MyL Mazos.

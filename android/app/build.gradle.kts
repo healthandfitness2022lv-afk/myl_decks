@@ -11,7 +11,7 @@ android {
     namespace = "com.example.myl_decks"
 
     // SDKs/NDK requeridos por los plugins Firebase/Google
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -25,7 +25,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.myl_decks"
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -49,4 +49,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Necesario para WindowInsetsAnimationCompat / ViewCompat en MainActivity
+    implementation("androidx.core:core-ktx:1.13.1")
 }

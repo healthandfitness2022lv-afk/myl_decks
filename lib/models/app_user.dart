@@ -62,13 +62,22 @@ class AppUser {
 
     return AppUser(
       uid: uid,
-      displayName: m['displayName'] as String?,
+      displayName: (m['displayName'] ?? m['username']) as String?,
       photoUrl: m['photoUrl'] as String?,
       email: m['email'] as String?,
       createdAt: parseCreatedAt(m['createdAt']),
-      matchesPlayed: (m['matchesPlayed'] ?? 0) is int ? (m['matchesPlayed'] as int) : ((m['matchesPlayed'] ?? 0) as num).toInt(),
-      wins: (m['wins'] ?? 0) is int ? (m['wins'] as int) : ((m['wins'] ?? 0) as num).toInt(),
-      losses: (m['losses'] ?? 0) is int ? (m['losses'] as int) : ((m['losses'] ?? 0) as num).toInt(),
+      matchesPlayed:
+          (m['matchesPlayed'] ?? 0) is int
+              ? (m['matchesPlayed'] as int)
+              : ((m['matchesPlayed'] ?? 0) as num).toInt(),
+      wins:
+          (m['wins'] ?? 0) is int
+              ? (m['wins'] as int)
+              : ((m['wins'] ?? 0) as num).toInt(),
+      losses:
+          (m['losses'] ?? 0) is int
+              ? (m['losses'] as int)
+              : ((m['losses'] ?? 0) as num).toInt(),
       role: (m['role'] as String?) ?? 'basico',
       proSince: parseOptionalDate(m['proSince']),
       maxDecks: m['maxDecks'] != null ? (m['maxDecks'] as num).toInt() : null,
@@ -77,20 +86,21 @@ class AppUser {
   }
 
   Map<String, dynamic> toMap() => {
-        'displayName': displayName,
-        'photoUrl': photoUrl,
-        'email': email,
-        // tu código actual usaba ms epoch; mantenemos eso para compatibilidad.
-        'createdAt': createdAt.millisecondsSinceEpoch,
-        'matchesPlayed': matchesPlayed,
-        'wins': wins,
-        'losses': losses,
-        // campos de rol/feature
-        'role': role,
-        if (proSince != null) 'proSince': proSince!.millisecondsSinceEpoch,
-        if (maxDecks != null) 'maxDecks': maxDecks,
-        if (canUploadImages != null) 'canUploadImages': canUploadImages,
-      };
+    'displayName': displayName,
+    'username': displayName,
+    'photoUrl': photoUrl,
+    'email': email,
+    // tu código actual usaba ms epoch; mantenemos eso para compatibilidad.
+    'createdAt': createdAt.millisecondsSinceEpoch,
+    'matchesPlayed': matchesPlayed,
+    'wins': wins,
+    'losses': losses,
+    // campos de rol/feature
+    'role': role,
+    if (proSince != null) 'proSince': proSince!.millisecondsSinceEpoch,
+    if (maxDecks != null) 'maxDecks': maxDecks,
+    if (canUploadImages != null) 'canUploadImages': canUploadImages,
+  };
 
   AppUser copyWith({
     String? displayName,

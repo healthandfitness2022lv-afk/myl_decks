@@ -17,12 +17,13 @@ class NotificationsButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Stream para contar items: pendings (admin) o notificaciones sin leer (user)
-    final stream = (userRole == 'administrador')
-        ? FirebaseFirestore.instance
-            .collection('card_submissions')
-            .where('status', isEqualTo: 'pending')
-            .snapshots()
-        : (currentUid == null)
+    final stream =
+        (userRole == 'administrador')
+            ? FirebaseFirestore.instance
+                .collection('card_submissions')
+                .where('status', isEqualTo: 'pending')
+                .snapshots()
+            : (currentUid == null)
             ? const Stream<QuerySnapshot<Map<String, dynamic>>>.empty()
             : FirebaseFirestore.instance
                 .collection('notifications')
@@ -41,7 +42,11 @@ class NotificationsButton extends StatelessWidget {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => SubmissionsScreen(currentUid: currentUid, userRole: userRole),
+                    builder:
+                        (_) => SubmissionsScreen(
+                          currentUid: currentUid,
+                          userRole: userRole,
+                        ),
                   ),
                 );
               },
@@ -61,17 +66,26 @@ class NotificationsButton extends StatelessWidget {
                 right: -6,
                 top: -6,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.redAccent,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
+                    boxShadow: const [
+                      BoxShadow(blurRadius: 4, color: Colors.black26),
+                    ],
                   ),
                   constraints: const BoxConstraints(minWidth: 20),
                   child: Text(
                     count > 9 ? '9+' : '$count',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -131,7 +145,11 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
     try {
       final raw = cardData['caracteristicas'];
       if (raw is Iterable) {
-        caracteristicas = raw.map((e) => e?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+        caracteristicas =
+            raw
+                .map((e) => e?.toString() ?? '')
+                .where((s) => s.isNotEmpty)
+                .toList();
       }
     } catch (_) {}
 
@@ -155,7 +173,10 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
 
   /// Abre el editor (NewCardScreen) precargado con la info de la submission.
   /// Espera `true` como resultado si el admin publicó/guardó la carta.
-  Future<void> _openEditorForSubmission(String submissionId, Map<String, dynamic> data) async {
+  Future<void> _openEditorForSubmission(
+    String submissionId,
+    Map<String, dynamic> data,
+  ) async {
     final card = _cardFromSubmission(data);
     final imageUrl = (data['imageUrl'] as String?)?.trim();
 
@@ -203,9 +224,17 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
           });
         }
 
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Propuesta aprobada y usuario notificado.')));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Propuesta aprobada y usuario notificado.'),
+            ),
+          );
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar: $e')));
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error al actualizar: $e')));
       } finally {
         if (mounted) setState(() => _busy = false);
       }
@@ -215,14 +244,21 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
   Future<void> _confirmReject(String id) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Rechazar propuesta'),
-        content: const Text('¿Seguro que quieres rechazar esta propuesta?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sí')),
-        ],
-      ),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Rechazar propuesta'),
+            content: const Text('¿Seguro que quieres rechazar esta propuesta?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Sí'),
+              ),
+            ],
+          ),
     );
     if (ok != true) return;
 
@@ -233,16 +269,25 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
         'reviewedBy': FirebaseAuth.instance.currentUser?.uid,
         'reviewedAt': FieldValue.serverTimestamp(),
       });
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Propuesta rechazada')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Propuesta rechazada')));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   /// Muestra preview grande de la submission con opciones: Abrir editor / Aprobar ahora / Rechazar
-  Future<void> _showSubmissionPreview(String submissionId, Map<String, dynamic> data) async {
+  Future<void> _showSubmissionPreview(
+    String submissionId,
+    Map<String, dynamic> data,
+  ) async {
     final title = (data['title'] ?? '(sin título)') as String;
     final desc = (data['description'] ?? '') as String;
     final imageUrl = (data['imageUrl'] as String?)?.trim();
@@ -251,57 +296,75 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
     final action = await showDialog<String>(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        insetPadding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (imageUrl != null && imageUrl.isNotEmpty)
-              SizedBox(
-                height: MediaQuery.of(ctx).size.height * 0.6,
-                child: InteractiveViewer(
-                  child: Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 56)),
-                ),
-              )
-            else
-              const SizedBox(height: 120, child: Center(child: Icon(Icons.image_not_supported, size: 48))),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  const SizedBox(height: 8),
-                  Text(desc, style: const TextStyle(fontSize: 14)),
-                  const SizedBox(height: 12),
-                  Row(
+      builder:
+          (ctx) => Dialog(
+            insetPadding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (imageUrl != null && imageUrl.isNotEmpty)
+                  SizedBox(
+                    height: MediaQuery.of(ctx).size.height * 0.6,
+                    child: InteractiveViewer(
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder:
+                            (_, __, ___) =>
+                                const Icon(Icons.broken_image, size: 56),
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(
+                    height: 120,
+                    child: Center(
+                      child: Icon(Icons.image_not_supported, size: 48),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () => Navigator.of(ctx).pop('editor'),
-                          child: const Text('Abrir editor y publicar'),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: FilledButton.tonal(
-                          onPressed: () => Navigator.of(ctx).pop('approve'),
-                          child: const Text('Aprobar ahora'),
-                        ),
+                      const SizedBox(height: 8),
+                      Text(desc, style: const TextStyle(fontSize: 14)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () => Navigator.of(ctx).pop('editor'),
+                              child: const Text('Abrir editor y publicar'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.tonal(
+                              onPressed: () => Navigator.of(ctx).pop('approve'),
+                              child: const Text('Aprobar ahora'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop('reject'),
+                        child: const Text('Rechazar'),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop('reject'),
-                    child: const Text('Rechazar'),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
     );
 
     if (action == null) return;
@@ -325,7 +388,10 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
   }
 
   /// Publica la submission directamente: crea doc en 'cards' (si no existe) y agrega variante 'Oficial' con la imagen.
-  Future<void> _publishSubmissionDirect(String submissionId, Map<String, dynamic> data) async {
+  Future<void> _publishSubmissionDirect(
+    String submissionId,
+    Map<String, dynamic> data,
+  ) async {
     setState(() => _busy = true);
     try {
       final card = _cardFromSubmission(data);
@@ -364,7 +430,9 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
             'nombre_lower': card.nombre.toLowerCase(),
           }, SetOptions(merge: true));
         } else {
-          tx.set(cardRef, {'nombre_lower': card.nombre.toLowerCase()}, SetOptions(merge: true));
+          tx.set(cardRef, {
+            'nombre_lower': card.nombre.toLowerCase(),
+          }, SetOptions(merge: true));
         }
       });
 
@@ -387,7 +455,8 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
         await _db.collection('notifications').add({
           'toUid': submittedByUid,
           'title': 'Tu propuesta fue aprobada',
-          'body': 'La propuesta "$title" fue aprobada y publicada por el equipo.',
+          'body':
+              'La propuesta "$title" fue aprobada y publicada por el equipo.',
           'linkType': 'card',
           'linkId': card.id,
           'read': false,
@@ -402,9 +471,17 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
         });
       }
 
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Propuesta aprobada y publicada. Autor notificado.')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Propuesta aprobada y publicada. Autor notificado.'),
+          ),
+        );
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al publicar: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al publicar: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -416,7 +493,9 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isAdmin ? 'Propuestas (Admin)' : 'Notificaciones / Propuestas'),
+        title: Text(
+          isAdmin ? 'Propuestas (Admin)' : 'Notificaciones / Propuestas',
+        ),
       ),
       body: isAdmin ? _buildAdminTabs() : _buildUserView(),
     );
@@ -424,253 +503,321 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
 
   // Admin: pestañas Pendientes / Aprobadas
   // Reemplaza tu método _buildAdminTabs() por esto
-Widget _buildAdminTabs() {
-  return DefaultTabController(
-    length: 3,
-    child: Column(
-      children: [
-        Material(
-          color: Theme.of(context).appBarTheme.backgroundColor,
-          child: const TabBar(
-            tabs: [
-              Tab(text: 'Pendientes'),
-              Tab(text: 'Variantes'),
-              Tab(text: 'Aprobadas'),
-            ],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            children: [
-              _buildAdminPendingList(),
-              _buildAdminPendingVariants(),
-              _buildAdminApprovedList(),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-// Lista de variantes pendientes (para admins)
-Widget _buildAdminPendingVariants() {
-  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-    stream: FirebaseFirestore.instance
-        .collectionGroup('variants')
-        .where('approved', isEqualTo: false)
-        .orderBy('createdAt', descending: true)
-        .snapshots(),
-    builder: (context, snap) {
-      if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
-      if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-      final docs = snap.data!.docs;
-      if (docs.isEmpty) return const Center(child: Text('No hay variantes pendientes.'));
-
-      return ListView.separated(
-        padding: const EdgeInsets.all(12),
-        separatorBuilder: (_, __) => const Divider(),
-        itemCount: docs.length,
-        itemBuilder: (context, i) {
-          final d = docs[i];
-          final m = d.data();
-          final name = (m['name'] ?? '(sin nombre)').toString();
-          final imageUrl = (m['imageFrontUrl'] as String?)?.trim();
-          final submittedBy = (m['submittedByEmail'] ?? m['submittedBy'])?.toString() ?? '(desconocido)';
-
-          // cardRef = parent.parent de la variante
-          final cardRef = d.reference.parent.parent;
-          final cardId = cardRef?.id ?? '(desconocido)';
-
-          return ListTile(
-            leading: imageUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.network(imageUrl, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)),
-                  )
-                : const Icon(Icons.image_not_supported),
-            title: Text(name),
-            subtitle: Text('Carta: $cardId\nEnviado por: $submittedBy'),
-            isThreeLine: true,
-            onTap: () => _showVariantPreview(d),
-          );
-        },
-      );
-    },
-  );
-}
-
-/// Muestra preview grande + acciones para una variante (docSnapshot de variant)
-Future<void> _showVariantPreview(QueryDocumentSnapshot<Map<String, dynamic>> variantDoc) async {
-  final m = variantDoc.data();
-  final name = (m['name'] ?? '(sin nombre)').toString();
-  final imageUrl = (m['imageFrontUrl'] as String?)?.trim();
-  final submittedByUid = (m['submittedBy'] as String?)?.trim();
-  final cardRef = variantDoc.reference.parent.parent;
-  final cardId = cardRef?.id ?? '(desconocido)';
-
-  bool markOfficial = false;
-
-  final action = await showDialog<String>(
-    context: context,
-    builder: (ctx) => Dialog(
-      insetPadding: const EdgeInsets.all(12),
+  Widget _buildAdminTabs() {
+    return DefaultTabController(
+      length: 3,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          if (imageUrl != null && imageUrl.isNotEmpty)
-            SizedBox(height: MediaQuery.of(ctx).size.height * 0.6, child: InteractiveViewer(child: Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 56))))
-          else
-            const SizedBox(height: 120, child: Center(child: Icon(Icons.image_not_supported, size: 48))),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          Material(
+            color: Theme.of(context).appBarTheme.backgroundColor,
+            child: const TabBar(
+              tabs: [
+                Tab(text: 'Pendientes'),
+                Tab(text: 'Variantes'),
+                Tab(text: 'Aprobadas'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
               children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                const SizedBox(height: 8),
-                Text('Carta: $cardId', style: const TextStyle(fontSize: 14)),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () => Navigator.of(ctx).pop('approve'),
-                        child: const Text('Aprobar'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton.tonal(
-                        onPressed: () => Navigator.of(ctx).pop('reject'),
-                        child: const Text('Rechazar'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: markOfficial,
-                      onChanged: (v) {
-                        markOfficial = v ?? false;
-                        // actualizar visual no necesario en dialog simple; si querés, rehacer con StatefulBuilder
-                      },
-                    ),
-                    const SizedBox(width: 6),
-                    const Text('Marcar como oficial (si apruebo)'),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                TextButton(onPressed: () => Navigator.of(ctx).pop('cancel'), child: const Text('Cancelar')),
+                _buildAdminPendingList(),
+                _buildAdminPendingVariants(),
+                _buildAdminApprovedList(),
               ],
             ),
           ),
         ],
       ),
-    ),
-  );
-
-  if (action == null || action == 'cancel') return;
-
-  if (action == 'reject') {
-    // Marcar rechazada
-    try {
-      await variantDoc.reference.update({
-        'approved': false,
-        'status': 'rejected',
-        'reviewedBy': FirebaseAuth.instance.currentUser?.uid,
-        'reviewedAt': FieldValue.serverTimestamp(),
-      });
-      // notificar al autor
-      if (submittedByUid != null && submittedByUid.isNotEmpty) {
-        await FirebaseFirestore.instance.collection('notifications').add({
-          'toUid': submittedByUid,
-          'title': 'Tu variante fue rechazada',
-          'body': 'La variante "$name" de la carta $cardId fue rechazada por el equipo.',
-          'read': false,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Variante rechazada. Autor notificado.')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al rechazar: $e')));
-    }
-    return;
+    );
   }
 
-  if (action == 'approve') {
-    setState(() => _busy = true);
-    try {
-      final adminUid = FirebaseAuth.instance.currentUser?.uid;
-      // 1) marcar la variante aprobada
-      await variantDoc.reference.update({
-        'approved': true,
-        'status': 'approved',
-        'reviewedBy': adminUid,
-        'reviewedAt': FieldValue.serverTimestamp(),
-      });
+  // Lista de variantes pendientes (para admins)
+  Widget _buildAdminPendingVariants() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream:
+          FirebaseFirestore.instance
+              .collectionGroup('variants')
+              .where('approved', isEqualTo: false)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+      builder: (context, snap) {
+        if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+        if (!snap.hasData)
+          return const Center(child: CircularProgressIndicator());
+        final docs = snap.data!.docs;
+        if (docs.isEmpty)
+          return const Center(child: Text('No hay variantes pendientes.'));
 
-      // 2) si se pidió marcar como oficial, actualizar otras variantes y el documento card
-      if (markOfficial && cardRef != null) {
-        final col = cardRef.collection('variants');
-        final snap = await col.get();
-        final batch = FirebaseFirestore.instance.batch();
-        for (final d in snap.docs) {
-          if (d.id == variantDoc.id) {
-            batch.set(d.reference, {'official': true}, SetOptions(merge: true));
-          } else {
-            batch.set(d.reference, {'official': false}, SetOptions(merge: true));
-          }
+        return ListView.separated(
+          padding: const EdgeInsets.all(12),
+          separatorBuilder: (_, __) => const Divider(),
+          itemCount: docs.length,
+          itemBuilder: (context, i) {
+            final d = docs[i];
+            final m = d.data();
+            final name = (m['name'] ?? '(sin nombre)').toString();
+            final imageUrl = (m['imageFrontUrl'] as String?)?.trim();
+            final submittedBy =
+                (m['submittedByEmail'] ?? m['submittedBy'])?.toString() ??
+                '(desconocido)';
+
+            // cardRef = parent.parent de la variante
+            final cardRef = d.reference.parent.parent;
+            final cardId = cardRef?.id ?? '(desconocido)';
+
+            return ListTile(
+              leading:
+                  imageUrl != null
+                      ? ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.network(
+                          imageUrl,
+                          width: 64,
+                          height: 64,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (_, __, ___) => const Icon(Icons.broken_image),
+                        ),
+                      )
+                      : const Icon(Icons.image_not_supported),
+              title: Text(name),
+              subtitle: Text('Carta: $cardId\nEnviado por: $submittedBy'),
+              isThreeLine: true,
+              onTap: () => _showVariantPreview(d),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Muestra preview grande + acciones para una variante (docSnapshot de variant)
+  Future<void> _showVariantPreview(
+    QueryDocumentSnapshot<Map<String, dynamic>> variantDoc,
+  ) async {
+    final m = variantDoc.data();
+    final name = (m['name'] ?? '(sin nombre)').toString();
+    final imageUrl = (m['imageFrontUrl'] as String?)?.trim();
+    final submittedByUid = (m['submittedBy'] as String?)?.trim();
+    final cardRef = variantDoc.reference.parent.parent;
+    final cardId = cardRef?.id ?? '(desconocido)';
+
+    bool markOfficial = false;
+
+    final action = await showDialog<String>(
+      context: context,
+      builder:
+          (ctx) => Dialog(
+            insetPadding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (imageUrl != null && imageUrl.isNotEmpty)
+                  SizedBox(
+                    height: MediaQuery.of(ctx).size.height * 0.6,
+                    child: InteractiveViewer(
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder:
+                            (_, __, ___) =>
+                                const Icon(Icons.broken_image, size: 56),
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(
+                    height: 120,
+                    child: Center(
+                      child: Icon(Icons.image_not_supported, size: 48),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Carta: $cardId',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () => Navigator.of(ctx).pop('approve'),
+                              child: const Text('Aprobar'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.tonal(
+                              onPressed: () => Navigator.of(ctx).pop('reject'),
+                              child: const Text('Rechazar'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: markOfficial,
+                            onChanged: (v) {
+                              markOfficial = v ?? false;
+                              // actualizar visual no necesario en dialog simple; si querés, rehacer con StatefulBuilder
+                            },
+                          ),
+                          const SizedBox(width: 6),
+                          const Text('Marcar como oficial (si apruebo)'),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop('cancel'),
+                        child: const Text('Cancelar'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+
+    if (action == null || action == 'cancel') return;
+
+    if (action == 'reject') {
+      // Marcar rechazada
+      try {
+        await variantDoc.reference.update({
+          'approved': false,
+          'status': 'rejected',
+          'reviewedBy': FirebaseAuth.instance.currentUser?.uid,
+          'reviewedAt': FieldValue.serverTimestamp(),
+        });
+        // notificar al autor
+        if (submittedByUid != null && submittedByUid.isNotEmpty) {
+          await FirebaseFirestore.instance.collection('notifications').add({
+            'toUid': submittedByUid,
+            'title': 'Tu variante fue rechazada',
+            'body':
+                'La variante "$name" de la carta $cardId fue rechazada por el equipo.',
+            'read': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
         }
-        // denormalizar en la carta
-        batch.set(cardRef, {
-          'officialVariantId': variantDoc.id,
-          'officialImageUrl': imageUrl ?? FieldValue.delete(),
-          'officialUpdatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        await batch.commit();
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Variante rechazada. Autor notificado.'),
+            ),
+          );
+      } catch (e) {
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error al rechazar: $e')));
       }
+      return;
+    }
 
-      // 3) notificar al autor
-      if (submittedByUid != null && submittedByUid.isNotEmpty) {
-        await FirebaseFirestore.instance.collection('notifications').add({
-          'toUid': submittedByUid,
-          'title': 'Tu variante fue aprobada',
-          'body': 'La variante "$name" de la carta $cardId fue aprobada por el equipo.',
-          'linkType': 'card',
-          'linkId': cardRef?.id ?? '',
-          'read': false,
-          'createdAt': FieldValue.serverTimestamp(),
+    if (action == 'approve') {
+      setState(() => _busy = true);
+      try {
+        final adminUid = FirebaseAuth.instance.currentUser?.uid;
+        // 1) marcar la variante aprobada
+        await variantDoc.reference.update({
+          'approved': true,
+          'status': 'approved',
+          'reviewedBy': adminUid,
+          'reviewedAt': FieldValue.serverTimestamp(),
         });
-      }
 
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Variante aprobada y autor notificado.')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al aprobar variante: $e')));
-    } finally {
-      if (mounted) setState(() => _busy = false);
+        // 2) si se pidió marcar como oficial, actualizar otras variantes y el documento card
+        if (markOfficial && cardRef != null) {
+          final col = cardRef.collection('variants');
+          final snap = await col.get();
+          final batch = FirebaseFirestore.instance.batch();
+          for (final d in snap.docs) {
+            if (d.id == variantDoc.id) {
+              batch.set(d.reference, {
+                'official': true,
+              }, SetOptions(merge: true));
+            } else {
+              batch.set(d.reference, {
+                'official': false,
+              }, SetOptions(merge: true));
+            }
+          }
+          // denormalizar en la carta
+          batch.set(cardRef, {
+            'officialVariantId': variantDoc.id,
+            'officialImageUrl': imageUrl ?? FieldValue.delete(),
+            'officialUpdatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          await batch.commit();
+        }
+
+        // 3) notificar al autor
+        if (submittedByUid != null && submittedByUid.isNotEmpty) {
+          await FirebaseFirestore.instance.collection('notifications').add({
+            'toUid': submittedByUid,
+            'title': 'Tu variante fue aprobada',
+            'body':
+                'La variante "$name" de la carta $cardId fue aprobada por el equipo.',
+            'linkType': 'card',
+            'linkId': cardRef?.id ?? '',
+            'read': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Variante aprobada y autor notificado.'),
+            ),
+          );
+      } catch (e) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al aprobar variante: $e')),
+          );
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
     }
   }
-}
-
-
 
   Widget _buildAdminPendingList() {
     return Stack(
       children: [
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _db
-              .collection('card_submissions')
-              .where('status', isEqualTo: 'pending')
-              .orderBy('createdAt', descending: false)
-              .snapshots(),
+          stream:
+              _db
+                  .collection('card_submissions')
+                  .where('status', isEqualTo: 'pending')
+                  .orderBy('createdAt', descending: false)
+                  .snapshots(),
           builder: (context, snap) {
-            if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
-            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+            if (snap.hasError)
+              return Center(child: Text('Error: ${snap.error}'));
+            if (!snap.hasData)
+              return const Center(child: CircularProgressIndicator());
             final docs = snap.data!.docs;
-            if (docs.isEmpty) return const Center(child: Text('No hay propuestas pendientes.'));
+            if (docs.isEmpty)
+              return const Center(child: Text('No hay propuestas pendientes.'));
 
             return ListView.separated(
               padding: const EdgeInsets.all(12),
@@ -683,7 +830,8 @@ Future<void> _showVariantPreview(QueryDocumentSnapshot<Map<String, dynamic>> var
                 final desc = data['description'] ?? '';
                 final imageUrl = data['imageUrl'] as String?;
                 final edicion = (data['cardData']?['edicion'] ?? '') as String;
-                final normalizedId = '${_normalize(edicion)}_${_normalize(title)}';
+                final normalizedId =
+                    '${_normalize(edicion)}_${_normalize(title)}';
 
                 // Stream que dice si la carta ya existe (publicada)
                 return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -706,34 +854,59 @@ Future<void> _showVariantPreview(QueryDocumentSnapshot<Map<String, dynamic>> var
                       }
                     }
                     String? publishedAtText;
-                    if (publishedAtDt != null) publishedAtText = publishedAtDt.toLocal().toString().split('.').first;
+                    if (publishedAtDt != null)
+                      publishedAtText =
+                          publishedAtDt.toLocal().toString().split('.').first;
 
                     return ListTile(
-                      leading: imageUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: Image.network(imageUrl, width: 64, height: 64, fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)),
-                            )
-                          : const Icon(Icons.image_not_supported),
+                      leading:
+                          imageUrl != null
+                              ? ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.network(
+                                  imageUrl,
+                                  width: 64,
+                                  height: 64,
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (_, __, ___) =>
+                                          const Icon(Icons.broken_image),
+                                ),
+                              )
+                              : const Icon(Icons.image_not_supported),
                       title: Row(
                         children: [
                           Expanded(child: Text(title)),
                           if (published) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.green.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.greenAccent.withOpacity(0.9)),
+                                border: Border.all(
+                                  color: Colors.greenAccent.withOpacity(0.9),
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.check_circle, size: 16, color: Colors.greenAccent),
+                                  const Icon(
+                                    Icons.check_circle,
+                                    size: 16,
+                                    color: Colors.greenAccent,
+                                  ),
                                   const SizedBox(width: 6),
-                                  const Text('Publicado',
-                                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
+                                  const Text(
+                                    'Publicado',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -741,14 +914,21 @@ Future<void> _showVariantPreview(QueryDocumentSnapshot<Map<String, dynamic>> var
                         ],
                       ),
                       subtitle: Text(
-                        [desc, if (publishedAtText != null) 'Publicado: $publishedAtText']
+                        [
+                              desc,
+                              if (publishedAtText != null)
+                                'Publicado: $publishedAtText',
+                            ]
                             .where((s) => s != null && s.toString().isNotEmpty)
                             .join('\n'),
                       ),
                       isThreeLine: true,
 
                       // Si ya está publicado NO hacer nada al tocar (onTap == null)
-onTap: published ? null : () => _showSubmissionPreview(d.id, data),
+                      onTap:
+                          published
+                              ? null
+                              : () => _showSubmissionPreview(d.id, data),
 
                       trailing: SizedBox(
                         width: 150,
@@ -756,16 +936,29 @@ onTap: published ? null : () => _showSubmissionPreview(d.id, data),
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.close, color: Colors.redAccent),
+                              icon: const Icon(
+                                Icons.close,
+                                color: Colors.redAccent,
+                              ),
                               tooltip: 'Rechazar',
-                              onPressed: _busy ? null : () => _confirmReject(d.id),
+                              onPressed:
+                                  _busy ? null : () => _confirmReject(d.id),
                             ),
                             const SizedBox(width: 6),
                             IconButton(
-                              icon: const Icon(Icons.check, color: Colors.greenAccent),
-                              tooltip: published ? 'Ya publicada' : 'Abrir en editor y aprobar',
-                              onPressed: (_busy || published) ? null : () => _showSubmissionPreview(d.id, data),
-
+                              icon: const Icon(
+                                Icons.check,
+                                color: Colors.greenAccent,
+                              ),
+                              tooltip:
+                                  published
+                                      ? 'Ya publicada'
+                                      : 'Abrir en editor y aprobar',
+                              onPressed:
+                                  (_busy || published)
+                                      ? null
+                                      : () =>
+                                          _showSubmissionPreview(d.id, data),
                             ),
                           ],
                         ),
@@ -790,16 +983,19 @@ onTap: published ? null : () => _showSubmissionPreview(d.id, data),
 
   Widget _buildAdminApprovedList() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _db
-          .collection('card_submissions')
-          .where('status', isEqualTo: 'approved')
-          .orderBy('publishedAt', descending: true)
-          .snapshots(),
+      stream:
+          _db
+              .collection('card_submissions')
+              .where('status', isEqualTo: 'approved')
+              .orderBy('publishedAt', descending: true)
+              .snapshots(),
       builder: (context, snap) {
         if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snap.hasData)
+          return const Center(child: CircularProgressIndicator());
         final docs = snap.data!.docs;
-        if (docs.isEmpty) return const Center(child: Text('No hay propuestas aprobadas.'));
+        if (docs.isEmpty)
+          return const Center(child: Text('No hay propuestas aprobadas.'));
 
         return ListView.separated(
           padding: const EdgeInsets.all(12),
@@ -814,20 +1010,41 @@ onTap: published ? null : () => _showSubmissionPreview(d.id, data),
             final pa = data['publishedAt'];
             String? publishedAtText;
             if (pa is Timestamp) {
-              publishedAtText = pa.toDate().toLocal().toString().split('.').first;
+              publishedAtText =
+                  pa.toDate().toLocal().toString().split('.').first;
             } else if (pa is int) {
-              publishedAtText = DateTime.fromMillisecondsSinceEpoch(pa).toLocal().toString().split('.').first;
+              publishedAtText =
+                  DateTime.fromMillisecondsSinceEpoch(
+                    pa,
+                  ).toLocal().toString().split('.').first;
             } else if (pa is String) {
               final dt = DateTime.tryParse(pa);
-              if (dt != null) publishedAtText = dt.toLocal().toString().split('.').first;
+              if (dt != null)
+                publishedAtText = dt.toLocal().toString().split('.').first;
             }
 
             return ListTile(
-              leading: imageUrl != null
-                  ? ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.network(imageUrl, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)))
-                  : const Icon(Icons.image_not_supported),
+              leading:
+                  imageUrl != null
+                      ? ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.network(
+                          imageUrl,
+                          width: 64,
+                          height: 64,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (_, __, ___) => const Icon(Icons.broken_image),
+                        ),
+                      )
+                      : const Icon(Icons.image_not_supported),
               title: Text(title),
-              subtitle: Text(['Enviado por: $submittedBy', if (publishedAtText != null) 'Publicado: $publishedAtText'].join('\n')),
+              subtitle: Text(
+                [
+                  'Enviado por: $submittedBy',
+                  if (publishedAtText != null) 'Publicado: $publishedAtText',
+                ].join('\n'),
+              ),
               isThreeLine: true,
               // en aprobadas no hacemos nada al tocar (solo info), podrías abrir detalle si quieres
               onTap: null,
@@ -848,10 +1065,7 @@ onTap: published ? null : () => _showSubmissionPreview(d.id, data),
           Material(
             color: Theme.of(context).appBarTheme.backgroundColor,
             child: const TabBar(
-              tabs: [
-                Tab(text: 'Notificaciones'),
-                Tab(text: 'Mis propuestas'),
-              ],
+              tabs: [Tab(text: 'Notificaciones'), Tab(text: 'Mis propuestas')],
             ),
           ),
           Expanded(
@@ -869,14 +1083,24 @@ onTap: published ? null : () => _showSubmissionPreview(d.id, data),
 
   Widget _buildUserNotificationsList() {
     final uid = widget.currentUid;
-    if (uid == null) return const Center(child: Text('Debes iniciar sesión para ver notificaciones.'));
+    if (uid == null)
+      return const Center(
+        child: Text('Debes iniciar sesión para ver notificaciones.'),
+      );
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _db.collection('notifications').where('toUid', isEqualTo: uid).orderBy('createdAt', descending: true).snapshots(),
+      stream:
+          _db
+              .collection('notifications')
+              .where('toUid', isEqualTo: uid)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
       builder: (context, snap) {
         if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snap.hasData)
+          return const Center(child: CircularProgressIndicator());
         final docs = snap.data!.docs;
-        if (docs.isEmpty) return const Center(child: Text('No tienes notificaciones.'));
+        if (docs.isEmpty)
+          return const Center(child: Text('No tienes notificaciones.'));
 
         return ListView.separated(
           padding: const EdgeInsets.all(12),
@@ -891,13 +1115,18 @@ onTap: published ? null : () => _showSubmissionPreview(d.id, data),
             final linkType = data['linkType'] as String?;
             final linkId = data['linkId'] as String?;
             return ListTile(
-              leading: Icon(read ? Icons.notifications_none : Icons.notifications_active, color: read ? Colors.white54 : Colors.amberAccent),
+              leading: Icon(
+                read ? Icons.notifications_none : Icons.notifications_active,
+                color: read ? Colors.white54 : Colors.amberAccent,
+              ),
               title: Text(title),
               subtitle: Text(body),
               trailing: TextButton(
                 onPressed: () async {
                   await d.reference.update({'read': true});
-                  if (linkType == 'card' && linkId != null && linkId.isNotEmpty) {
+                  if (linkType == 'card' &&
+                      linkId != null &&
+                      linkId.isNotEmpty) {
                     // abrir vista de carta si tienes pantalla para eso
                     // Navigator.of(context).push(MaterialPageRoute(builder: (_) => CardDetailScreen(cardId: linkId)));
                   }
@@ -913,14 +1142,24 @@ onTap: published ? null : () => _showSubmissionPreview(d.id, data),
 
   Widget _buildUserSubmissionsList() {
     final uid = widget.currentUid;
-    if (uid == null) return const Center(child: Text('Debes iniciar sesión para ver tus propuestas.'));
+    if (uid == null)
+      return const Center(
+        child: Text('Debes iniciar sesión para ver tus propuestas.'),
+      );
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _db.collection('card_submissions').where('submittedBy', isEqualTo: uid).orderBy('createdAt', descending: true).snapshots(),
+      stream:
+          _db
+              .collection('card_submissions')
+              .where('submittedBy', isEqualTo: uid)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
       builder: (context, snap) {
         if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snap.hasData)
+          return const Center(child: CircularProgressIndicator());
         final docs = snap.data!.docs;
-        if (docs.isEmpty) return const Center(child: Text('No has enviado propuestas.'));
+        if (docs.isEmpty)
+          return const Center(child: Text('No has enviado propuestas.'));
 
         return ListView.separated(
           padding: const EdgeInsets.all(12),
@@ -933,9 +1172,20 @@ onTap: published ? null : () => _showSubmissionPreview(d.id, data),
             final status = data['status'] ?? 'pending';
             final imageUrl = data['imageUrl'] as String?;
             return ListTile(
-              leading: imageUrl != null
-                  ? ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.network(imageUrl, width: 56, height: 56, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)))
-                  : const Icon(Icons.image_not_supported),
+              leading:
+                  imageUrl != null
+                      ? ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.network(
+                          imageUrl,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (_, __, ___) => const Icon(Icons.broken_image),
+                        ),
+                      )
+                      : const Icon(Icons.image_not_supported),
               title: Text(title),
               subtitle: Text('Estado: $status'),
               trailing: TextButton(
@@ -943,20 +1193,33 @@ onTap: published ? null : () => _showSubmissionPreview(d.id, data),
                   // opcional: ver detalles
                   showDialog(
                     context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: Text(title),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (imageUrl != null) Image.network(imageUrl, height: 140, fit: BoxFit.contain),
-                          const SizedBox(height: 8),
-                          Text('Estado: $status'),
-                          const SizedBox(height: 8),
-                          Text('Detalles:\n${(data['cardData'] ?? {}).toString()}'),
-                        ],
-                      ),
-                      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar'))],
-                    ),
+                    builder:
+                        (ctx) => AlertDialog(
+                          title: Text(title),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (imageUrl != null)
+                                Image.network(
+                                  imageUrl,
+                                  height: 140,
+                                  fit: BoxFit.contain,
+                                ),
+                              const SizedBox(height: 8),
+                              Text('Estado: $status'),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Detalles:\n${(data['cardData'] ?? {}).toString()}',
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cerrar'),
+                            ),
+                          ],
+                        ),
                   );
                 },
                 child: const Text('Ver'),

@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze:*)",
+      "Bash(\"C:\\\\Users\\\\healt\\\\Desktop\\\\NEXUS\\\\myl_decks\\\\lib\\\\screens\\\\card_details_screen.dart\")",
+      "Bash(dart analyze:*)",
+      "Bash(grep -n \"class.*StatefulWidget\" /c/Users/healt/Desktop/NEXUS/myl_decks/lib/**/*.dart)",
+      "Bash(grep -n \"class _.*extends StatelessWidget\\\\|class _.*extends StatefulWidget\" /c/Users/healt/Desktop/NEXUS/myl_decks/lib/screens/*.dart)",
+      "Bash(grep -h \"^class _.*extends StatelessWidget\\\\|^class _.*extends StatefulWidget\" /c/Users/healt/Desktop/NEXUS/myl_decks/lib/screens/*.dart)",
+      "Bash(grep -l \"_normalizeTipo\" /c/Users/healt/Desktop/NEXUS/myl_decks/lib/**/*.dart)",
+      "Bash(grep -l \"_normalizeCardLookup\" /c/Users/healt/Desktop/NEXUS/myl_decks/lib/**/*.dart)",
+      "Bash(grep -l \"import.*shared_preferences\" /c/Users/healt/Desktop/NEXUS/myl_decks/lib/**/*.dart)",
+      "Bash(/tmp/audit_summary.txt:*)",
+      "Read(//tmp/**)",
+      "Bash(grep -n \"print\\\\\\(''Error\\\\|print\\\\\\(''duplicate\" /c/Users/healt/Desktop/NEXUS/myl_decks/lib/**/*.dart)",
+      "Bash(node -e \":*)",
+      "Bash(flutter build:*)",
+      "Bash(firebase deploy:*)",
+      "PowerShell(cd \"C:\\\\Users\\\\healt\\\\Desktop\\\\NEXUS\\\\myl_decks\"; flutter analyze lib/screens/leagues/ 2>&1 | where { $_ -match \"error|warning\" } | Select-Object -First 10)",
+      "Bash(node -e ' *)",
+      "Bash(powershell -Command \"\\(Get-Content 'c:\\\\Users\\\\healt\\\\Desktop\\\\NEXUS\\\\myl_decks\\\\lib\\\\domain\\\\inventory_planner.dart'\\).Count\")",
+      "Bash(powershell -Command \"\\(Get-Content 'c:\\\\Users\\\\healt\\\\Desktop\\\\NEXUS\\\\myl_decks\\\\lib\\\\screens\\\\card_inventory_screen.dart'\\).Count\")",
+      "Bash(grep -n \"'\\\\${entry.item.assigned} en mazos'\" lib/screens/card_inventory_screen.dart)"
+    ]
+  }
+}

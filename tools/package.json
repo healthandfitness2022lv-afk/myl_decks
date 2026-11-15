@@ -1,0 +1,8 @@
+{
+  "name": "myl-decks-tools",
+  "private": true,
+  "description": "Scripts de mantenimiento con firebase-admin (respaldos, migraciones).",
+  "dependencies": {
+    "firebase-admin": "^14.2.0"
+  }
+}

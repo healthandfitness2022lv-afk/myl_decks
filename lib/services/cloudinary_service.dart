@@ -8,7 +8,8 @@ import 'package:image/image.dart' as img;
 class CloudinaryService {
   static const String _cloudName = 'detliykh6'; // tu cloud correcto
   static const String _presetImage = 'myl_preset'; // unsigned imágenes (existe)
-  static const String _presetVideo = 'myl_videos_unsigned'; // unsigned videos (DEBE existir)
+  static const String _presetVideo =
+      'myl_videos_unsigned'; // unsigned videos (DEBE existir)
 
   static const String _defaultImageFolder = 'myl_cards';
   static const String _defaultVideoFolder = 'myl_videos';
@@ -20,13 +21,14 @@ class CloudinaryService {
   static final CloudinaryService instance = CloudinaryService._();
 
   // Mantén image/upload normal
-  static Uri _imageUrl() => Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
+  static Uri _imageUrl() =>
+      Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
 
   // ⚠️ Video: forzamos el preset en query para que JAMÁS falte
   static Uri _videoUrl() => Uri.parse(
-        'https://api.cloudinary.com/v1_1/$_cloudName/auto/upload'
-        '?upload_preset=$_presetVideo',
-      );
+    'https://api.cloudinary.com/v1_1/$_cloudName/auto/upload'
+    '?upload_preset=$_presetVideo',
+  );
 
   // ===============================
   // Helper: comprimir bytes (JPEG) para que queden < maxSizeKB
@@ -38,7 +40,10 @@ class CloudinaryService {
   /// 1) decodifica la imagen (paquete `image`)
   /// 2) intenta codificar JPEG con calidad decreciente (90 -> 20)
   /// 3) si no alcanza, reduce la dimensión (scale 0.9 por iteración) y repite
-  static Uint8List _compressImageBytes(Uint8List input, {int maxSizeKB = _defaultMaxImageKB}) {
+  static Uint8List _compressImageBytes(
+    Uint8List input, {
+    int maxSizeKB = _defaultMaxImageKB,
+  }) {
     final int maxBytes = maxSizeKB * 1024;
     // quick check
     if (input.lengthInBytes <= maxBytes) return input;
@@ -51,7 +56,9 @@ class CloudinaryService {
 
     // Intentar reducir calidad primero
     int quality = 90;
-    Uint8List encoded = Uint8List.fromList(img.encodeJpg(image, quality: quality));
+    Uint8List encoded = Uint8List.fromList(
+      img.encodeJpg(image, quality: quality),
+    );
     if (encoded.lengthInBytes <= maxBytes) return encoded;
 
     // baja calidad progresivamente
@@ -100,7 +107,12 @@ class CloudinaryService {
   }) async {
     // Lee el archivo y pasa por la ruta de bytes para poder comprimir
     final bytes = await File(path).readAsBytes();
-    return uploadImageFromBytes(bytes, filename: filename ?? path.split(Platform.pathSeparator).last, folder: folder, maxSizeKB: maxSizeKB);
+    return uploadImageFromBytes(
+      bytes,
+      filename: filename ?? path.split(Platform.pathSeparator).last,
+      folder: folder,
+      maxSizeKB: maxSizeKB,
+    );
   }
 
   static Future<Map<String, String>> uploadImageFromBytes(
@@ -112,16 +124,23 @@ class CloudinaryService {
     // Comprimir antes de armar el multipart
     final compressed = _compressImageBytes(bytes, maxSizeKB: maxSizeKB);
 
-    final req = http.MultipartRequest('POST', _imageUrl())
-      ..fields['upload_preset'] = _presetImage
-      ..fields['folder'] = folder ?? _defaultImageFolder
-      ..files.add(
-        http.MultipartFile.fromBytes('file', compressed, filename: filename),
-      );
+    final req =
+        http.MultipartRequest('POST', _imageUrl())
+          ..fields['upload_preset'] = _presetImage
+          ..fields['folder'] = folder ?? _defaultImageFolder
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              compressed,
+              filename: filename,
+            ),
+          );
 
     final resp = await http.Response.fromStream(await req.send());
     if (resp.statusCode != 200) {
-      throw Exception('Cloudinary image error ${resp.statusCode}: ${resp.body}');
+      throw Exception(
+        'Cloudinary image error ${resp.statusCode}: ${resp.body}',
+      );
     }
     final data = json.decode(resp.body) as Map<String, dynamic>;
     return {'url': '${data['secure_url']}', 'publicId': '${data['public_id']}'};
@@ -133,16 +152,20 @@ class CloudinaryService {
     String? filename,
     String? folder,
   }) async {
-    final req = http.MultipartRequest('POST', _videoUrl())
-      ..fields['upload_preset'] = _presetVideo // redundante a propósito
-      ..fields['folder'] = folder ?? _defaultVideoFolder
-      ..files.add(
-        await http.MultipartFile.fromPath('file', path, filename: filename),
-      );
+    final req =
+        http.MultipartRequest('POST', _videoUrl())
+          ..fields['upload_preset'] =
+              _presetVideo // redundante a propósito
+          ..fields['folder'] = folder ?? _defaultVideoFolder
+          ..files.add(
+            await http.MultipartFile.fromPath('file', path, filename: filename),
+          );
 
     final resp = await http.Response.fromStream(await req.send());
     if (resp.statusCode != 200) {
-      throw Exception('Cloudinary video error ${resp.statusCode}: ${resp.body}');
+      throw Exception(
+        'Cloudinary video error ${resp.statusCode}: ${resp.body}',
+      );
     }
     final data = json.decode(resp.body) as Map<String, dynamic>;
     return {'url': '${data['secure_url']}', 'publicId': '${data['public_id']}'};
@@ -153,16 +176,20 @@ class CloudinaryService {
     required String filename,
     String? folder,
   }) async {
-    final req = http.MultipartRequest('POST', _videoUrl())
-      ..fields['upload_preset'] = _presetVideo // redundante a propósito
-      ..fields['folder'] = folder ?? _defaultVideoFolder
-      ..files.add(
-        http.MultipartFile.fromBytes('file', bytes, filename: filename),
-      );
+    final req =
+        http.MultipartRequest('POST', _videoUrl())
+          ..fields['upload_preset'] =
+              _presetVideo // redundante a propósito
+          ..fields['folder'] = folder ?? _defaultVideoFolder
+          ..files.add(
+            http.MultipartFile.fromBytes('file', bytes, filename: filename),
+          );
 
     final resp = await http.Response.fromStream(await req.send());
     if (resp.statusCode != 200) {
-      throw Exception('Cloudinary video error ${resp.statusCode}: ${resp.body}');
+      throw Exception(
+        'Cloudinary video error ${resp.statusCode}: ${resp.body}',
+      );
     }
     final data = json.decode(resp.body) as Map<String, dynamic>;
     return {'url': '${data['secure_url']}', 'publicId': '${data['public_id']}'};
@@ -174,23 +201,30 @@ class CloudinaryService {
     String? filename,
     String? folder,
     int maxSizeKB = _defaultMaxImageKB,
-  }) =>
-      uploadImageFromPath(path, filename: filename, folder: folder, maxSizeKB: maxSizeKB);
+  }) => uploadImageFromPath(
+    path,
+    filename: filename,
+    folder: folder,
+    maxSizeKB: maxSizeKB,
+  );
 
   static Future<Map<String, String>> uploadFromBytes(
     Uint8List bytes, {
     required String filename,
     String? folder,
     int maxSizeKB = _defaultMaxImageKB,
-  }) =>
-      uploadImageFromBytes(bytes, filename: filename, folder: folder, maxSizeKB: maxSizeKB);
+  }) => uploadImageFromBytes(
+    bytes,
+    filename: filename,
+    folder: folder,
+    maxSizeKB: maxSizeKB,
+  );
 
   Future<Map<String, String>> uploadVideoUnsignedFile({
     required String filePath,
     String? fileName,
     String? folder,
-  }) =>
-      CloudinaryService.uploadVideoFromPath(
+  }) => CloudinaryService.uploadVideoFromPath(
     filePath,
     filename: fileName,
     folder: folder,
@@ -200,8 +234,7 @@ class CloudinaryService {
     required Uint8List bytes,
     required String fileName,
     String? folder,
-  }) =>
-      CloudinaryService.uploadVideoFromBytes(
+  }) => CloudinaryService.uploadVideoFromBytes(
     bytes,
     filename: fileName,
     folder: folder,

@@ -1,31 +1,22 @@
-// lib/screens/home_screen.dart
 import 'dart:ui';
-import 'package:flutter/material.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import './admin_users_screen.dart';
-import '../models/current_user.dart';
-import './cards_catalog_screen.dart';
-import './teams_screen.dart';
-import './create_deck_screen.dart';
-import './my_decks_screen.dart';
-import './profile_screen.dart';
-import './new_card_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import './communities_screen.dart';
-import './match_screen.dart';
-import './friends_screen.dart';
-import './wishlist_screen.dart';
-import './tournaments/tournaments_screen.dart';
-import './submissions_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../models/current_user.dart';
+import '../services/drive_service.dart';
+import '../widgets/drive_image_picker.dart';
+import '../utils/wallpaper_image.dart';
+import './admin_users_screen.dart';
+import './admin_bulk_assign_screen.dart';
 import './feature_grouping_screen.dart';
+import './ban_list_screen.dart';
+import './submissions_screen.dart';
 
-
-
-
-
-enum MenuSection { none, jugar, mazos, cartas, social }
+enum MenuSection { mazos, cartas, social }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,223 +26,189 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  MenuSection _selected = MenuSection.none;
-
-  // Fondo seleccionado
-  String _selectedBg = 'assets/wallpaper/1.jpg';
+  MenuSection _selected = MenuSection.mazos;
+  String _selectedBg = '';
 
   @override
   void initState() {
     super.initState();
     _loadBg();
-    // Nota: NO llamamos a _loadUserGreeting() porque ahora usamos Provider CurrentUser.
   }
 
-
-Future<void> _logout() async {
+  Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sesión cerrada')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Sesión cerrada')));
   }
 
-  // ==========================
-  // Navegaciones reales
-  // ==========================
   void _goFriends() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const FriendsScreen()),
-    );
+    context.push('/amigos');
   }
 
-  void _goCreateDeck() => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const CreateDeckScreen()),
-      );
+  void _goCreateDeck() => context.push('/mazos/nuevo');
 
-  void _goMyDecks() => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const MyDecksScreen()),
-      );
+  void _goMyDecks() => context.push('/mazos');
 
-  void _goCatalog() => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const CardsCatalogScreen()),
-      );
+  void _goCatalog() => context.push('/catalogo');
 
-  void _goNewCard() => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const NewCardScreen()),
-      );
-
-
-  // ==========================
-  // Acciones dummy
-  // ==========================
-  void _openGoldCurve() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Curva de oro')),
-    );
-  }
-
-  void _openTypeBreakdown() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Cartas por tipo')),
-    );
-  }
-
-  void _openImportExport() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Importar / Exportar')),
-    );
-  }
-
-  void _openDataTools() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Herramientas de datos')),
-    );
-  }
-
-  // ==========================
-  // Fondo
-  // ==========================
   Future<void> _loadBg() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
-      _selectedBg = prefs.getString('background') ?? 'assets/wallpaper/1.jpg';
+      _selectedBg = prefs.getString('background') ?? '';
     });
   }
 
   Future<void> _setBg(String asset) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('background', asset);
+    if (!mounted) return;
     setState(() => _selectedBg = asset);
   }
 
-  void _openBgSelector() {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) {
-        final fondos = [
-          'assets/wallpaper/1.jpg',
-          'assets/wallpaper/2.jpg',
-          'assets/wallpaper/3.png',
-          'assets/wallpaper/4.jpg',
-          'assets/wallpaper/5.jpg',
-          'assets/wallpaper/6.jpg',
-        ];
-        return GridView.builder(
-          padding: const EdgeInsets.all(12),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-          ),
-          itemCount: fondos.length,
-          itemBuilder: (_, i) {
-            final asset = fondos[i];
-            final selected = _selectedBg == asset;
-            return GestureDetector(
-              onTap: () {
-                Navigator.pop(context);
-                _setBg(asset);
-              },
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.asset(asset, fit: BoxFit.cover),
-                  if (selected)
-                    Container(
-                      color: Colors.black45,
-                      child: const Icon(Icons.check, color: Colors.white, size: 40),
-                    ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+  Future<void> _openBgSelector() async {
+    final result = await showRaceWallpaperPicker(
+      context,
+      rootFolderId: DriveService.wallpaperRootFolderId,
     );
+    if (result == null) return;
+    await _setBg(result.viewUrl);
   }
 
-  // ==========================
-  // UI
-  // ==========================
   @override
   Widget build(BuildContext context) {
-    // Usamos Provider CurrentUser en toda la pantalla
-    final cu = context.watch<CurrentUser>();
-
-    final isWide = MediaQuery.of(context).size.width > 700; // breakpoint
+    final currentUser = context.watch<CurrentUser>();
+    final isWide = MediaQuery.of(context).size.width > 700;
 
     return Scaffold(
-      drawer: isWide
-          ? null
-          : Drawer(
-              child: _LeftBar(
-                displayName: cu.displayName,
-                email: cu.email,
-                userRole: cu.role,
-                selected: _selected,
-                onSelect: (s) {
-                  setState(() => _selected = s);
-                  Navigator.pop(context); // cierra drawer
-                },
-                onLogout: _logout,
-                onOpenFriends: _goFriends,
-                currentUid: cu.uid, onAddUser: () {  },
-              ),
-            ),
-      appBar: isWide
-          ? null
-          : AppBar(
-              title: Text(cu.displayName ?? cu.email ?? "MyL Decks"),
-              backgroundColor: Colors.black.withOpacity(0.6),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.wallpaper),
-                  tooltip: "Cambiar fondo",
-                  onPressed: _openBgSelector,
+      appBar:
+          isWide
+              ? null
+              : AppBar(
+                title: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.shield_rounded, color: Color(0xFFF1D48B)),
+                    SizedBox(width: 9),
+                    Text('MyL Mazos'),
+                  ],
                 ),
-              ],
-            ),
+                backgroundColor: Colors.black.withOpacity(0.6),
+                actions: [
+                  NotificationsButton(
+                    currentUid: currentUser.uid,
+                    userRole: currentUser.role,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.wallpaper),
+                    tooltip: 'Cambiar fondo',
+                    onPressed: _openBgSelector,
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Cuenta',
+                    onSelected: (value) {
+                      if (value == 'profile') context.push('/perfil');
+                      if (value == 'logout') _logout();
+                    },
+                    itemBuilder:
+                        (_) => const [
+                          PopupMenuItem(
+                            value: 'profile',
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(Icons.person_outline),
+                              title: Text('Mi perfil'),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'logout',
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(Icons.logout),
+                              title: Text('Cerrar sesión'),
+                            ),
+                          ),
+                        ],
+                  ),
+                ],
+              ),
+      bottomNavigationBar:
+          isWide
+              ? null
+              : NavigationBar(
+                height: 68,
+                backgroundColor: const Color(0xFF11141B),
+                indicatorColor: const Color(0xFFF1D48B).withOpacity(0.18),
+                selectedIndex: _selected.index,
+                onDestinationSelected:
+                    (index) =>
+                        setState(() => _selected = MenuSection.values[index]),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.style_outlined),
+                    selectedIcon: Icon(Icons.style_rounded),
+                    label: 'Mazos',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.inventory_2_outlined),
+                    selectedIcon: Icon(Icons.inventory_2_rounded),
+                    label: 'Colección',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.groups_outlined),
+                    selectedIcon: Icon(Icons.groups_rounded),
+                    label: 'Comunidad',
+                  ),
+                ],
+              ),
       body: Stack(
         children: [
-          // Fondo
-          Container(
+          DecoratedBox(
             decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage(_selectedBg),
-                fit: BoxFit.cover,
-              ),
+              color:
+                  isWallpaperUnset(_selectedBg) ? wallpaperFallbackColor : null,
+              image:
+                  isWallpaperUnset(_selectedBg)
+                      ? null
+                      : DecorationImage(
+                        image: wallpaperImageProvider(_selectedBg),
+                        fit: BoxFit.cover,
+                      ),
             ),
+            child: const SizedBox.expand(),
           ),
-          Container(color: Colors.black.withOpacity(0.4)),
-
+          Container(color: Colors.black.withOpacity(0.42)),
           if (isWide)
             Row(
               children: [
                 _LeftBar(
-                  displayName: cu.displayName,
-                  email: cu.email,
-                  userRole: cu.role,
+                  displayName: currentUser.displayName,
+                  email: currentUser.email,
+                  userRole: currentUser.role,
                   selected: _selected,
-                  onSelect: (s) => setState(() => _selected = s),
+                  onSelect: (section) => setState(() => _selected = section),
                   onLogout: _logout,
                   onOpenFriends: _goFriends,
-                  currentUid: cu.uid, onAddUser: () {  },
+                  currentUid: currentUser.uid,
                 ),
                 Expanded(child: _buildPanel()),
               ],
             )
           else
-            _buildPanel(),
-
-          // botón fondo solo en pantallas anchas
+            SafeArea(child: _buildPanel()),
           if (isWide)
             Positioned(
               right: 16,
               top: 40,
               child: IconButton(
-                icon: const Icon(Icons.wallpaper, color: Colors.white, size: 30),
-                tooltip: "Cambiar fondo",
+                icon: const Icon(
+                  Icons.wallpaper,
+                  color: Colors.white,
+                  size: 30,
+                ),
+                tooltip: 'Cambiar fondo',
                 onPressed: _openBgSelector,
               ),
             ),
@@ -261,36 +218,27 @@ Future<void> _logout() async {
   }
 
   Widget _buildPanel() {
+    final currentUser = context.watch<CurrentUser>();
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 220),
-      child: _selected == MenuSection.none
-          ? const _CenterHint(key: ValueKey('hint'))
-          : _SubmenuPanel(
-              key: ValueKey(_selected),
-              section: _selected,
-              onCreateDeck: _goCreateDeck,
-              onMyDecks: _goMyDecks,
-              onCatalog: _goCatalog,
-              onAddCard: _goNewCard,
-              onGoldCurve: _openGoldCurve,
-              onTypeBreakdown: _openTypeBreakdown,
-              onImportExport: _openImportExport,
-              onDataTools: _openDataTools,
-            ),
+      child: _SubmenuPanel(
+        key: ValueKey(_selected),
+        section: _selected,
+        isAdmin: currentUser.role == 'administrador',
+        onCreateDeck: _goCreateDeck,
+        onMyDecks: _goMyDecks,
+        onCatalog: _goCatalog,
+      ),
     );
   }
 }
 
-/* -------------------------
-   LEFT BAR (actualizado)
-   ------------------------- */
 class _LeftBar extends StatelessWidget {
   final String? displayName;
   final String? email;
-  final String? userRole; // <- nuevo
+  final String? userRole;
   final MenuSection selected;
   final ValueChanged<MenuSection> onSelect;
-  final VoidCallback onAddUser;
   final VoidCallback onLogout;
   final VoidCallback onOpenFriends;
   final String? currentUid;
@@ -301,7 +249,6 @@ class _LeftBar extends StatelessWidget {
     required this.userRole,
     required this.selected,
     required this.onSelect,
-    required this.onAddUser,
     required this.onLogout,
     required this.onOpenFriends,
     required this.currentUid,
@@ -309,9 +256,8 @@ class _LeftBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const double width = 270;
     return SizedBox(
-      width: width,
+      width: 270,
       child: ClipRRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -321,12 +267,11 @@ class _LeftBar extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Saludo
                 Row(
                   children: [
                     Expanded(
                       child: Text(
-                        'Hola, ${displayName ?? (email ?? 'Jugador')}',
+                        'Hola, ${displayName ?? email ?? 'Jugador'}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -340,72 +285,74 @@ class _LeftBar extends StatelessWidget {
                     const Icon(Icons.shield, color: Color(0xFFF9D74B)),
                   ],
                 ),
-
-                // Rol del usuario (si está disponible)
                 if (userRole != null) ...[
                   const SizedBox(height: 6),
                   Text(
                     userRole!.toUpperCase(),
-                    style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
-
                 const SizedBox(height: 18),
-
                 _SideItem(
-                  icon: Icons.sports_esports_outlined,
-                  label: 'Jugar',
-                  selected: selected == MenuSection.jugar,
-                  onTap: () => onSelect(MenuSection.jugar),
-                ),
-                _SideItem(
-                  icon: Icons.collections_bookmark_outlined,
+                  icon: Icons.style_outlined,
                   label: 'Mazos',
                   selected: selected == MenuSection.mazos,
                   onTap: () => onSelect(MenuSection.mazos),
                 ),
                 _SideItem(
-                  icon: Icons.style,
-                  label: 'Cartas',
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Colección',
                   selected: selected == MenuSection.cartas,
                   onTap: () => onSelect(MenuSection.cartas),
                 ),
                 _SideItem(
-                  icon: Icons.dataset_outlined,
-                  label: 'Social',
+                  icon: Icons.groups_outlined,
+                  label: 'Comunidad',
                   selected: selected == MenuSection.social,
                   onTap: () => onSelect(MenuSection.social),
                 ),
                 const Spacer(),
-
-                Row(
-  children: [
-    NotificationsButton(currentUid: currentUid, userRole: userRole),
-
-    const SizedBox(width: 12),
-    _CircleBtn(icon: Icons.dark_mode),
-    const SizedBox(width: 12),
-    _FriendsButton(
-      currentUid: currentUid,
-      onTap: onOpenFriends,
-    ),
-    const SizedBox(width: 12),
-    // Botón Admin: solo visible si es administrador
-    if (userRole == 'administrador') ...[
-      _CircleBtn(
-        icon: Icons.admin_panel_settings,
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AdminUsersScreen()),
-          );
-        },
-      ),
-      const SizedBox(width: 12),
-    ],
-    _CircleBtn(icon: Icons.logout, onTap: onLogout),
-  ],
-),
-
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    NotificationsButton(
+                      currentUid: currentUid,
+                      userRole: userRole,
+                    ),
+                    _FriendsButton(
+                      currentUid: currentUid,
+                      onTap: onOpenFriends,
+                    ),
+                    if (userRole == 'administrador') ...[
+                      _CircleBtn(
+                        icon: Icons.admin_panel_settings,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AdminUsersScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _CircleBtn(
+                        icon: Icons.photo_library_rounded,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AdminBulkAssignScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    _CircleBtn(icon: Icons.logout, onTap: onLogout),
+                  ],
+                ),
               ],
             ),
           ),
@@ -415,12 +362,10 @@ class _LeftBar extends StatelessWidget {
   }
 }
 
-/* -------------------------
-   FRIENDS BUTTON
-   ------------------------- */
 class _FriendsButton extends StatelessWidget {
   final String? currentUid;
   final VoidCallback onTap;
+
   const _FriendsButton({required this.currentUid, required this.onTap});
 
   @override
@@ -430,13 +375,15 @@ class _FriendsButton extends StatelessWidget {
     }
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('friend_requests')
-          .where('toUid', isEqualTo: currentUid)
-          .where('status', isEqualTo: 'pending')
-          .snapshots(),
-      builder: (context, snap) {
-        final count = (snap.data?.docs.length ?? 0);
+      stream:
+          FirebaseFirestore.instance
+              .collection('friend_requests')
+              .where('toUid', isEqualTo: currentUid)
+              .where('status', isEqualTo: 'pending')
+              .snapshots(),
+      builder: (context, snapshot) {
+        final count = snapshot.data?.docs.length ?? 0;
+
         return Stack(
           clipBehavior: Clip.none,
           children: [
@@ -446,17 +393,26 @@ class _FriendsButton extends StatelessWidget {
                 right: -2,
                 top: -2,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  constraints: const BoxConstraints(minWidth: 20),
                   decoration: BoxDecoration(
                     color: Colors.redAccent,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
+                    boxShadow: const [
+                      BoxShadow(blurRadius: 4, color: Colors.black26),
+                    ],
                   ),
-                  constraints: const BoxConstraints(minWidth: 20),
                   child: Text(
                     count > 9 ? '9+' : '$count',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -466,7 +422,6 @@ class _FriendsButton extends StatelessWidget {
     );
   }
 }
-
 
 class _SideItem extends StatelessWidget {
   final IconData icon;
@@ -516,6 +471,7 @@ class _SideItem extends StatelessWidget {
 class _CircleBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
+
   const _CircleBtn({required this.icon, this.onTap});
 
   @override
@@ -536,251 +492,219 @@ class _CircleBtn extends StatelessWidget {
   }
 }
 
-class _CenterHint extends StatelessWidget {
-  const _CenterHint({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Selecciona una opción',
-        style: TextStyle(color: Colors.white70, fontSize: 22, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-}
-
 class _SubmenuPanel extends StatelessWidget {
   final MenuSection section;
-
+  final bool isAdmin;
   final VoidCallback onCreateDeck;
   final VoidCallback onMyDecks;
   final VoidCallback onCatalog;
-  final VoidCallback onAddCard;
-  final VoidCallback onGoldCurve;
-  final VoidCallback onTypeBreakdown;
-  final VoidCallback onImportExport;
-  final VoidCallback onDataTools;
 
   const _SubmenuPanel({
     super.key,
     required this.section,
+    required this.isAdmin,
     required this.onCreateDeck,
     required this.onMyDecks,
     required this.onCatalog,
-    required this.onAddCard,
-    required this.onGoldCurve,
-    required this.onTypeBreakdown,
-    required this.onImportExport,
-    required this.onDataTools,
   });
-
-  void _showWorkInProgress(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => DraggableScrollableSheet(
-      initialChildSize: 0.36,
-      minChildSize: 0.2,
-      maxChildSize: 0.8,
-      builder: (context, scrollController) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        decoration: BoxDecoration(
-          color: Theme.of(context).dialogBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 12,
-              offset: const Offset(0, -4),
-            )
-          ],
-        ),
-        child: SingleChildScrollView(
-          controller: scrollController,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 44,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Icon(Icons.construction, size: 52, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(height: 12),
-              Text(
-                'En construcción',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Estamos afinando los detalles para Partida normal. Pronto estará disponible para todos (o solo para quien deba tenerlo).',
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.tonal(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Entendido'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cerrar'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
 
   @override
   Widget build(BuildContext context) {
     final items = _itemsForSection(context);
+    final title = switch (section) {
+      MenuSection.mazos => 'Tus mazos',
+      MenuSection.cartas => 'Tu colección',
+      MenuSection.social => 'Comunidad',
+    };
+    final subtitle = switch (section) {
+      MenuSection.mazos => 'Construye, organiza y revisa tus mazos.',
+      MenuSection.cartas => 'Controla tus copias, faltantes y deseos.',
+      MenuSection.social => 'Conecta, compite y comparte con otros jugadores.',
+    };
+    final icon = switch (section) {
+      MenuSection.mazos => Icons.style_rounded,
+      MenuSection.cartas => Icons.inventory_2_rounded,
+      MenuSection.social => Icons.groups_rounded,
+    };
+    final accent = switch (section) {
+      MenuSection.mazos => const Color(0xFF78A9FF),
+      MenuSection.cartas => const Color(0xFF5DD69E),
+      MenuSection.social => const Color(0xFFC79BF2),
+    };
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-      child: ListView.separated(
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 14),
-        itemBuilder: (_, i) {
-          final it = items[i];
-          return _PanelRow(
-            icon: it.icon,
-            title: it.title,
-            subtitle: it.subtitle,
-            onTap: it.onTap,
-          );
-        },
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ListView(
+          padding: EdgeInsets.fromLTRB(
+            constraints.maxWidth < 600 ? 16 : 32,
+            24,
+            constraints.maxWidth < 600 ? 16 : 32,
+            28,
+          ),
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: accent.withOpacity(0.35)),
+                  ),
+                  child: Icon(icon, color: accent, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: Column(
+                  children: [
+                    for (var index = 0; index < items.length; index++) ...[
+                      if (index > 0) const SizedBox(height: 11),
+                      _PanelRow(
+                        icon: items[index].icon,
+                        title: items[index].title,
+                        subtitle: items[index].subtitle,
+                        onTap: items[index].onTap,
+                        enabled: items[index].enabled,
+                        accent: accent,
+                        featured: items[index].featured,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
   List<_RowItem> _itemsForSection(BuildContext context) {
     switch (section) {
-      case MenuSection.jugar:
-  final userEmail = FirebaseAuth.instance.currentUser?.email?.toLowerCase();
-  const allowedEmail = 'hecturnicolas@gmail.com';
-
-  return [
-    _RowItem(
-      Icons.sports_kabaddi,
-      'Partida normal',
-      'Mejor de 3',
-      () {
-        if (userEmail == allowedEmail) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const MatchScreen()),
-          );
-        } else {
-          _showWorkInProgress(context);
-        }
-      },
-    ),
-  ];
-
       case MenuSection.mazos:
         return [
-          _RowItem(Icons.add_box_outlined, 'Crear mazo', 'Empieza uno nuevo', onCreateDeck),
-          _RowItem(Icons.collections_bookmark_outlined, 'Todos mis mazos', 'Ver / editar', onMyDecks),
+          _RowItem(
+            Icons.collections_bookmark_rounded,
+            'Mis mazos',
+            'Ver, completar y editar tus mazos',
+            onMyDecks,
+            featured: true,
+          ),
+          _RowItem(
+            Icons.add_circle_outline_rounded,
+            'Nuevo mazo',
+            'Crea una lista sin elegir variantes',
+            onCreateDeck,
+          ),
+          _RowItem(
+            Icons.insights_rounded,
+            'Meta y tendencias',
+            'Razas y cartas más jugadas',
+            () => context.push('/meta'),
+          ),
         ];
       case MenuSection.cartas:
-  return [
-    _RowItem(Icons.style, 'Nueva carta', 'Agregar a la base', onAddCard),
-    _RowItem(Icons.manage_search, 'Explorar cartas', 'Filtrar por edición/tipo', onCatalog),
-    _RowItem(
-      Icons.favorite_border,
-      'Lista de deseos',
-      'Cartas que quiero conseguir',
-      () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const WishlistScreen()),
-        );
-      },
-    ),
-    // ↓ Nuevo item justo debajo de “Lista de deseos”
-    _RowItem(
-      Icons.category_outlined,
-      'Agrupar características',
-      'Crear grupos y arrastrar features',
-      () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const FeatureGroupingScreen(
-              // Todo libre, sin seed:
-              initialGroups: {},              // opcional (vacío por defecto)
-              // canonicalFeaturesOverride: [], // descomenta si NO quieres canónicas base
-              // disableFirestore: true,       // para pruebas locales sin nube
-            ),
+        return [
+          _RowItem(
+            Icons.inventory_2_rounded,
+            'Mi colección',
+            'Copias libres, asignadas y faltantes',
+            () => context.push('/inventario'),
+            featured: true,
           ),
-        );
-      },
-    ),
-  ];
-
+          _RowItem(
+            Icons.favorite_border_rounded,
+            'Wishlist',
+            'Faltantes automáticos y deseos personales',
+            () => context.push('/wishlist'),
+          ),
+          _RowItem(
+            Icons.manage_search_rounded,
+            'Catálogo de cartas',
+            'Busca por nombre, edición o tipo',
+            onCatalog,
+          ),
+          if (isAdmin)
+            _RowItem(
+              Icons.category_outlined,
+              'Agrupar características',
+              'Administrar grupos del catálogo',
+              () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder:
+                      (_) => const FeatureGroupingScreen(initialGroups: {}),
+                ),
+              ),
+            ),
+        ];
       case MenuSection.social:
-  final userEmail = FirebaseAuth.instance.currentUser?.email?.toLowerCase();
-  const allowedEmail = 'hecturnicolas@gmail.com';
-
-  return [
-    _RowItem(
-      Icons.forum_outlined,
-      'Comunidades',
-      'Foro • Miembros • Videos',
-      () {
-        if (userEmail == allowedEmail) {
-          const communityId = 'global';
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => CommunitiesScreen(communityId: communityId)),
-          );
-        } else {
-          _showWorkInProgress(context);
-        }
-      },
-    ),
-    _RowItem(
-      Icons.flag,
-      'Torneos',
-      'Gestionar eventos y partidas',
-      () {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TournamentsScreen()));
-      },
-    ),
-    _RowItem(
-      Icons.groups_2_outlined,
-      'Teams',
-      'Crea o únete a un equipo',
-      () {
-        if (userEmail == allowedEmail) {
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TeamsScreen()));
-        } else {
-          _showWorkInProgress(context);
-        }
-      },
-    ),
-    _RowItem(
-      Icons.person_outline,
-      'Perfil',
-      'Tu cuenta y estadísticas',
-      () {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
-      },
-    ),
-  ];
-
-      case MenuSection.none:
-        return const [];
+        return [
+          _RowItem(
+            Icons.forum_rounded,
+            'Comunidades',
+            'Conversaciones, miembros y contenido',
+            () => context.push('/comunidades/global'),
+            featured: true,
+          ),
+          _RowItem(
+            Icons.people_alt_outlined,
+            'Amigos',
+            'Solicitudes y jugadores conectados',
+            () => context.push('/amigos'),
+          ),
+          _RowItem(
+            Icons.groups_2_outlined,
+            'Equipos y ligas',
+            'Teams, competencias y posiciones',
+            () => context.push('/teams'),
+          ),
+          _RowItem(
+            Icons.person_outline,
+            'Mi perfil',
+            'Cuenta, actividad y estadísticas',
+            () => context.push('/perfil'),
+          ),
+          if (isAdmin)
+            _RowItem(
+              Icons.block,
+              'Ban List',
+              'Administrar cartas prohibidas o limitadas',
+              () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const BanListScreen())),
+            ),
+        ];
     }
   }
 }
@@ -789,30 +713,59 @@ class _PanelRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool enabled;
+  final Color accent;
+  final bool featured;
 
   const _PanelRow({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    required this.accent,
+    this.enabled = true,
+    this.featured = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withOpacity(0.12),
+      color:
+          enabled
+              ? featured
+                  ? accent.withOpacity(0.18)
+                  : Colors.white.withOpacity(0.10)
+              : Colors.white.withOpacity(0.07),
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          height: 70,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
+          height: 76,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: featured ? accent.withOpacity(0.5) : Colors.white10,
+            ),
+          ),
           child: Row(
             children: [
-              Icon(icon, color: Colors.white, size: 26),
-              const SizedBox(width: 14),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: (enabled ? accent : Colors.white54).withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(
+                  enabled ? icon : Icons.lock_clock_outlined,
+                  color: enabled ? accent : Colors.white60,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 13),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -820,24 +773,32 @@ class _PanelRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: enabled ? Colors.white : Colors.white70,
                         fontWeight: FontWeight.w800,
-                        fontSize: 16,
+                        fontSize: 15,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w500,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: enabled ? Colors.white60 : Colors.white38,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.help_outline, color: Colors.white70),
+              const SizedBox(width: 6),
+              Icon(
+                enabled ? Icons.chevron_right_rounded : Icons.lock_outline,
+                color: enabled ? Colors.white54 : Colors.white38,
+              ),
             ],
           ),
         ),
@@ -850,6 +811,16 @@ class _RowItem {
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
-  _RowItem(this.icon, this.title, this.subtitle, this.onTap);
+  final VoidCallback? onTap;
+  final bool enabled;
+  final bool featured;
+
+  const _RowItem(
+    this.icon,
+    this.title,
+    this.subtitle,
+    this.onTap, {
+    this.enabled = true,
+    this.featured = false,
+  });
 }

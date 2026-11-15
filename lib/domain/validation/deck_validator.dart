@@ -1,13 +1,17 @@
 import 'package:flutter/foundation.dart';
+
 import '../../models/deck.dart';
+import '../../models/ban_list_entry.dart';
+import '../../models/card_myl.dart';
 
 @immutable
 class CardData {
   final String id;
   final String name;
-  final String type;      // "Aliado", "Oro", "Talismán", "Tótem", "Arma", etc.
-  final String? race;     // solo para Aliados
-  final String? edition;  // edición/bloque
+  final String type;
+  final String? race;
+  final String? edition;
+  final bool soloLibre;
 
   const CardData({
     required this.id,
@@ -15,21 +19,24 @@ class CardData {
     required this.type,
     this.race,
     this.edition,
+    this.soloLibre = false,
   });
 }
 
 @immutable
 class ValidationIssue {
-  final String code;   // "TOTAL_NOT_50", "COPIES_LIMIT", "RACE_MISMATCH", "EDITION_MISMATCH", "INITIAL_GOLD_MISSING", "INITIAL_GOLD_NOT_IN_DECK", "INITIAL_GOLD_NOT_GOLD"
+  final String code;
   final String message;
+
   const ValidationIssue(this.code, this.message);
 }
 
 @immutable
 class ValidationResult {
-  final bool okForDraft;    // permite guardar borrador
-  final bool okForPublish;  // permite publicar
+  final bool okForDraft;
+  final bool okForPublish;
   final List<ValidationIssue> issues;
+
   const ValidationResult({
     required this.okForDraft,
     required this.okForPublish,
@@ -37,162 +44,201 @@ class ValidationResult {
   });
 }
 
-// -------------------------------------
-// Helpers internos del validador
-// -------------------------------------
-bool _isGoldType(String? raw) {
-  if (raw == null) return false;
-  final t = raw.trim().toLowerCase();
-  return t == 'oro' || t == 'oros';
+CardData? _cardDataFrom(dynamic card) {
+  if (card is CardData) return card;
+  if (card is CardMyL) {
+    return CardData(
+      id: card.id,
+      name: card.nombre,
+      type: card.tipo,
+      race: card.raza,
+      edition: card.edicion,
+      soloLibre: card.soloLibre,
+    );
+  }
+  return null;
 }
 
-String _keyFor(DeckCardEntry e) => (e.cardId ?? e.name).toLowerCase();
+String _keyFor(DeckCardEntry e) {
+  final name = e.name.trim();
+  return normalizeBanListKey(name.isNotEmpty ? name : (e.cardId ?? ''));
+}
 
-/// Reglas:
-/// - Draft: permite casi todo, excepto exceder 3 copias por carta.
-/// - Publish: exige 50 cartas exactas, 1 Oro inicial válido y cero issues (racial/edición/copias).
+int _copyLimitForEntry(DeckCardEntry entry, Map<String, int> copyLimitsByKey) {
+  final cardId = entry.cardId?.trim();
+  if (cardId != null && cardId.isNotEmpty) {
+    final fromId = copyLimitsByKey[normalizeBanListKey(cardId)];
+    if (fromId != null) {
+      return entry.unica ? fromId.clamp(0, 1) : fromId;
+    }
+  }
+
+  final name = entry.name.trim();
+  if (name.isNotEmpty) {
+    final fromName = copyLimitsByKey[normalizeBanListKey(name)];
+    if (fromName != null) {
+      return entry.unica ? fromName.clamp(0, 1) : fromName;
+    }
+  }
+
+  return entry.unica ? 1 : 3;
+}
+
 ValidationResult validateDeck({
   required Deck deck,
   required Map<String, dynamic> catalogById,
   required Map<String, dynamic> catalogByName,
+  Map<String, int> copyLimitsByKey = const {},
 }) {
   final issues = <ValidationIssue>[];
+  final total = deck.cards.fold<int>(0, (sum, entry) => sum + entry.count);
+  final sideboardTotal = deck.sideboardCards.fold<int>(
+    0,
+    (sum, entry) => sum + entry.count,
+  );
+  final configuredCards = [...deck.cards, ...deck.sideboardCards];
 
-  // Total de cartas
-  final total = deck.cards.fold<int>(0, (s, e) => s + e.count);
-
-  // ----- Oro inicial: debe existir -----
-  final hasInitial = (deck.initialGoldCardId != null && deck.initialGoldCardId!.isNotEmpty) ||
-                     (deck.initialGoldName != null && deck.initialGoldName!.trim().isNotEmpty);
-
-  if (!hasInitial) {
-    issues.add(const ValidationIssue(
-      "INITIAL_GOLD_MISSING",
-      "Debes seleccionar un Oro inicial.",
-    ));
-  } else {
-    // Resolver entrada de carta que corresponde al oro inicial
-    DeckCardEntry? initialEntry;
-    if ((deck.initialGoldCardId ?? '').isNotEmpty) {
-      initialEntry = deck.cards.firstWhere(
-        (e) => (e.cardId ?? '').isNotEmpty && e.cardId == deck.initialGoldCardId,
-        orElse: () => const DeckCardEntry(name: '', count: 0),
-      );
-    } else {
-      final target = deck.initialGoldName!.trim().toLowerCase();
-      initialEntry = deck.cards.firstWhere(
-        (e) => e.name.trim().toLowerCase() == target,
-        orElse: () => const DeckCardEntry(name: '', count: 0),
-      );
-    }
-
-    // Debe estar en el mazo
-    if (initialEntry.name.isEmpty) {
-      issues.add(const ValidationIssue(
-        "INITIAL_GOLD_NOT_IN_DECK",
-        "El Oro inicial debe estar incluido en el mazo.",
-      ));
-    } else {
-      // Debe ser de tipo "Oro" (por e.tipo o por catálogo)
-      bool isGold = _isGoldType(initialEntry.tipo);
-      if (!isGold) {
-        // intentar por catálogo (id o nombre)
-        final byId = (initialEntry.cardId != null) ? catalogById[initialEntry.cardId!] : null;
-        final byName = catalogByName[initialEntry.name];
-
-        final CardData? card = (byId is CardData)
-            ? byId
-            : (byName is CardData)
-                ? byName
-                : null;
-
-        if (card != null) {
-          isGold = _isGoldType(card.type);
-        }
-      }
-
-      if (!isGold) {
-        issues.add(const ValidationIssue(
-          "INITIAL_GOLD_NOT_GOLD",
-          "El Oro inicial seleccionado no es de tipo “Oro”.",
-        ));
-      }
-    }
+  final copyCounter = <String, int>{};
+  final sideCounter = <String, int>{};
+  final labelByKey = <String, String>{};
+  final limitByKey = <String, int>{};
+  for (final entry in configuredCards) {
+    final key = _keyFor(entry);
+    copyCounter[key] = (copyCounter[key] ?? 0) + entry.count;
+    labelByKey[key] = entry.name;
+    limitByKey[key] = _copyLimitForEntry(entry, copyLimitsByKey);
+  }
+  for (final entry in deck.sideboardCards) {
+    final key = _keyFor(entry);
+    sideCounter[key] = (sideCounter[key] ?? 0) + entry.count;
   }
 
-  // Límite de 3 copias por carta (sobre la suma agregada)
-  final copyCounter = <String, int>{}; // clave: (cardId??name).toLowerCase()
-  for (final e in deck.cards) {
-    final key = _keyFor(e);
-    copyCounter[key] = (copyCounter[key] ?? 0) + e.count;
-  }
-  copyCounter.forEach((_, c) {
-    if (c > 3) {
-      issues.add(const ValidationIssue(
-        "COPIES_LIMIT",
-        "No puedes tener más de 3 copias de una misma carta.",
-      ));
+  copyCounter.forEach((key, copies) {
+    final allowed = limitByKey[key] ?? 3;
+    if (copies > allowed) {
+      final label = labelByKey[key] ?? 'La carta';
+      if (allowed <= 0) {
+        issues.add(
+          ValidationIssue(
+            'BANNED_CARD',
+            "'$label' está prohibida por la Ban List.",
+          ),
+        );
+      } else {
+        // El límite suma mazo y side deck: decirlo evita pensar que es un error
+        // cuando las copias de más están en el side.
+        final enSide = sideCounter[key] ?? 0;
+        final detalle =
+            enSide > 0
+                ? ' (cuenta mazo y side deck: ${copies - enSide} en el mazo y $enSide en el side).'
+                : '.';
+        issues.add(
+          ValidationIssue(
+            'COPIES_LIMIT',
+            "'$label' supera el límite de $allowed copias permitido por la Ban List$detalle",
+          ),
+        );
+      }
     }
   });
 
-  // Reglas raciales/edición (observaciones en draft; bloquean publish)
-  if (deck.isRacial) {
-    for (final e in deck.cards) {
-      final card = (e.cardId != null)
-          ? catalogById[e.cardId!]
-          : catalogByName[e.name];
+  if (deck.isRacial && deck.format != DeckFormat.full) {
+    final isLibre = deck.format == DeckFormat.racialLibre;
 
-      // Si la carta no está en catálogo, lo permitimos (podría ser temporal en draft)
+    for (final entry in configuredCards) {
+      final rawCard =
+          entry.cardId != null
+              ? catalogById[entry.cardId!]
+              : catalogByName[entry.name] ??
+                  catalogByName[entry.name.trim().toLowerCase()];
+      final card = _cardDataFrom(rawCard);
+
       if (card == null) continue;
 
-      if (card is CardData) {
-        if (card.type == "Aliado") {
-          if (deck.race != null && card.race != deck.race) {
-            issues.add(ValidationIssue(
-              "RACE_MISMATCH",
-              "Aliado '${card.name}' no es de raza ${deck.race}.",
-            ));
-          }
-        }
+      // Aliados: siempre deben ser de la raza del mazo (ambos formatos)
+      if (card.type == 'Aliado' &&
+          deck.race != null &&
+          card.race != deck.race) {
+        issues.add(
+          ValidationIssue(
+            'RACE_MISMATCH',
+            "Aliado '${card.name}' no es de raza ${deck.race}.",
+          ),
+        );
+      }
 
-        if (["Oro", "Talismán", "Tótem", "Arma"].contains(card.type)) {
-          if (deck.edition != null && card.edition != deck.edition) {
-            issues.add(ValidationIssue(
-              "EDITION_MISMATCH",
-              "'${card.name}' no pertenece a la edición ${deck.edition}.",
-            ));
-          }
-        }
+      // Racial clásico: aliados Y soporte deben ser de la edición del mazo
+      // Racial Libre: aliados y soporte pueden ser de cualquier edición
+      if (!isLibre &&
+          ['Aliado', 'Oro', 'Talismán', 'Tótem', 'Arma'].contains(card.type) &&
+          deck.edition != null &&
+          card.edition != null &&
+          card.edition != deck.edition) {
+        issues.add(
+          ValidationIssue(
+            'EDITION_MISMATCH',
+            "'${card.name}' no pertenece a la edición ${deck.edition}.",
+          ),
+        );
+      }
+
+      // Cartas soloLibre solo pueden usarse en Racial Libre
+      if (!isLibre && card.soloLibre) {
+        issues.add(
+          ValidationIssue(
+            'SOLO_LIBRE',
+            "'${card.name}' solo puede usarse en formato Racial Libre.",
+          ),
+        );
       }
     }
   }
 
-  // Exigir 50 cartas para publicar (lo mostramos como observación en draft)
-  if (total != 50) {
-    issues.add(ValidationIssue(
-      "TOTAL_NOT_50",
-      "El mazo tiene $total cartas (debe tener 50 para publicar).",
-    ));
+  if (total != 49) {
+    issues.add(
+      ValidationIssue(
+        'TOTAL_NOT_49',
+        'El mazo tiene $total cartas (debe tener 49 para publicar).',
+      ),
+    );
+  }
+  if (sideboardTotal > 10) {
+    issues.add(
+      ValidationIssue(
+        'SIDEBOARD_OVER_10',
+        'El side deck tiene $sideboardTotal cartas (máximo 10).',
+      ),
+    );
+  }
+  if (sideboardTotal < 0 ||
+      deck.sideboardCards.any((entry) => entry.count <= 0)) {
+    issues.add(
+      const ValidationIssue(
+        'INVALID_SIDEBOARD_COUNT',
+        'El side deck contiene una cantidad inválida.',
+      ),
+    );
   }
 
-  // Cálculo de flags finales
-  final hasCopiesError = issues.any((i) => i.code == "COPIES_LIMIT");
-  final okForDraft = !hasCopiesError;      // draft solo bloquea si hay exceso de copias
-  final okForPublish = issues.isEmpty;     // publish requiere cero issues (incluye total=50 y oro inicial válido)
+  final hasDraftBlockingError = issues.any(
+    (issue) =>
+        issue.code == 'COPIES_LIMIT' ||
+        issue.code == 'BANNED_CARD' ||
+        issue.code == 'SIDEBOARD_OVER_10' ||
+        issue.code == 'INVALID_SIDEBOARD_COUNT',
+  );
 
   return ValidationResult(
-    okForDraft: okForDraft,
-    okForPublish: okForPublish,
+    okForDraft: !hasDraftBlockingError,
+    okForPublish: issues.isEmpty,
     issues: issues,
   );
 }
 
-/// Opcional: fijar edición automáticamente por raza
 String? getEditionForRace(String race) {
   const mapRaceEdition = {
-    "Eterno": "Dominios de Ra",
-    "Guerrero": "Encrucijada",
-    // agrega las tuyas…
+    'Eterno': 'Dominios de Ra',
+    'Guerrero': 'Encrucijada',
   };
   return mapRaceEdition[race];
 }

@@ -2,11 +2,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../data/pb_data.dart';
 import '../models/card_myl.dart';
+import '../services/drive_service.dart';
+import '../models/current_user.dart';
+import '../widgets/skeletons.dart';
+import '../utils/app_constants.dart';
+import '../utils/text_normalize.dart';
 import 'card_details_screen.dart';
 import 'new_card_screen.dart';
+import '../widgets/network_image.dart';
 
 class CardsCatalogScreen extends StatefulWidget {
   const CardsCatalogScreen({super.key});
@@ -19,12 +25,39 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
   final _searchCtrl = TextEditingController();
   Timer? _debounce;
 
-  String? _edicion; // null = todas
-  String? _tipo; // null = todos
-  String? _raza; // null = todas (solo si tipo == Aliado)
+  // ── estado de carga ─────────────────────────────────────────
+  final List<CardMyL> _allCards = [];
+  bool _initialLoading = true; // muestra spinner hasta tener datos
+  bool _refreshing = false; // refresco silencioso desde servidor
+  bool _enviandoLecturaMasiva = false;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _lecturaMasivaSub;
+  String? _lecturaMasivaRunId;
+  int _lecturaMasivaTotal = 0;
+  int _lecturaMasivaHechas = 0;
+  int _lecturaMasivaErrores = 0;
+  bool _modoSeleccionIa = false;
+  final Set<String> _seleccionIa = {};
+
+  bool get _lecturaMasivaActiva =>
+      _lecturaMasivaRunId != null && _lecturaMasivaHechas < _lecturaMasivaTotal;
+
+  // ── caché de características por carta ───────────────────────
+  final Map<String, List<String>> _caracCache = {};
+
+  // ── resultados filtrados (computados fuera del build) ────────
+  List<CardMyL> _filteredItems = [];
+  Map<String, int> _caracCounts = {};
+  List<String> _visibleCaracs = [];
+
+  // ── filtros ──────────────────────────────────────────────────
+  String? _edicion;
+  String? _tipo;
+  String? _raza;
+  bool _soloLibre = false;
+  bool _soloStubs = false; // filtro "solo incompletas"
+  bool _soloSinHabilidad = false;
   final Set<String> _caracFilter = {};
   List<String> _features = [];
-  static const String _ownerEmail = 'hecturnicolas@gmail.com';
 
   String _normalize(String s) {
     var t = s.trim().toLowerCase();
@@ -54,38 +87,342 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
   }
 
   Map<String, String> get _canon {
-  return {for (final k in _features) _normalize(k): k};
-}
+    return {for (final k in _features) _normalize(k): k};
+  }
 
   @override
   void initState() {
     super.initState();
-    _edicion = null;
-    _tipo = null;
-    _raza = null;
     _searchCtrl.addListener(_onSearchChanged);
     _loadFeaturesFromFirestore();
+    _loadAllCards();
+  }
+
+  /// Estrategia cache-first + carga progresiva:
+  /// 1. Muestra la caché local de Firestore al instante (si existe).
+  /// 2. Refresca desde el servidor EN CHUNKS paginados: las primeras cartas
+  ///    aparecen de inmediato en vez de esperar la colección completa.
+  Future<void> _loadAllCards() async {
+    final query = FirebaseFirestore.instance
+        .collection('cards')
+        .orderBy('nombre');
+
+    // — Paso 1: caché local (no hace red, es instantáneo) ————————
+    try {
+      final cacheSnap = await query.get(const GetOptions(source: Source.cache));
+      if (!mounted) return;
+      if (cacheSnap.docs.isNotEmpty) {
+        _allCards
+          ..clear()
+          ..addAll(cacheSnap.docs.map((d) => CardMyL.fromMap(d.data(), d.id)));
+        _caracCache.clear();
+        setState(() {
+          _initialLoading = false;
+          _refreshing = true; // indica al usuario que hay refresh silencioso
+          _recompute();
+        });
+      }
+    } catch (_) {
+      // Sin caché aún (primera apertura) → esperamos al servidor
+    }
+
+    // — Paso 2: servidor en chunks progresivos ———————————————————
+    try {
+      const chunkSize = 400;
+      final fresh = <CardMyL>[];
+      DocumentSnapshot<Map<String, dynamic>>? cursor;
+      final hadCache = _allCards.isNotEmpty;
+
+      while (true) {
+        var q = query.limit(chunkSize);
+        if (cursor != null) q = q.startAfterDocument(cursor);
+        final snap = await q.get(const GetOptions(source: Source.server));
+        if (!mounted) return;
+        if (snap.docs.isEmpty) break;
+
+        fresh.addAll(snap.docs.map((d) => CardMyL.fromMap(d.data(), d.id)));
+        cursor = snap.docs.last;
+
+        // Sin caché previa: pintar progresivamente cada chunk recibido.
+        if (!hadCache) {
+          _allCards
+            ..clear()
+            ..addAll(fresh);
+          _caracCache.clear();
+          setState(() {
+            _initialLoading = false;
+            _refreshing = true;
+            _recompute();
+          });
+        }
+        if (snap.docs.length < chunkSize) break;
+      }
+
+      if (!mounted) return;
+      _allCards
+        ..clear()
+        ..addAll(fresh);
+      _caracCache.clear();
+      setState(() {
+        _initialLoading = false;
+        _refreshing = false;
+        _recompute();
+      });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          _initialLoading = false;
+          _refreshing = false;
+        });
+    }
   }
 
   Future<void> _loadFeaturesFromFirestore() async {
-  final snap = await FirebaseFirestore.instance
-      .collection('card_custom_features') // o 'features' si usas esa
-      .orderBy('name')
-      .get();
+    final snap =
+        await FirebaseFirestore.instance
+            .collection('card_custom_features') // o 'features' si usas esa
+            .orderBy('name')
+            .get();
 
-  final list = <String>[];
-  for (final d in snap.docs) {
-    final name = (d.data()['name'] ?? '').toString().trim();
-    if (name.isNotEmpty) list.add(name);
+    final list = <String>[];
+    for (final d in snap.docs) {
+      // Las unificadas en una genérica ya no se ofrecen.
+      if (d.data()['unificadaEn'] != null) continue;
+      final name = (d.data()['name'] ?? '').toString().trim();
+      if (name.isNotEmpty) list.add(name);
+    }
+    if (!mounted) return;
+    setState(() {
+      _features = list;
+      _recompute();
+    });
   }
-  if (!mounted) return;
-  setState(() => _features = list);
-}
 
+  bool _tieneTextoHabilidad(Map<String, dynamic> data) {
+    for (final campo in ['habilidadTextoIA', 'habilidad']) {
+      final texto = '${data[campo] ?? ''}'.trim();
+      if (RegExp(r'\p{L}', unicode: true).allMatches(texto).length >= 8) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _cartaTieneTextoHabilidad(CardMyL carta) => _tieneTextoHabilidad({
+    'habilidadTextoIA': carta.habilidadTextoIA,
+    'habilidad': carta.habilidad,
+  });
+
+  /// Encola todo el catálogo en lotes de 60, el máximo seguro del worker.
+  /// Solo incluye cartas con imagen oficial y sin texto, por lo que repetir
+  /// esta acción no vuelve a gastar en las cartas ya leídas.
+  Future<void> _leerHabilidadesMasivamente({Set<String>? soloIds}) async {
+    final current = context.read<CurrentUser>();
+    if ((current.email ?? '').toLowerCase() != AppConstants.ownerEmail) return;
+
+    setState(() => _enviandoLecturaMasiva = true);
+    try {
+      final snap = await FirebaseFirestore.instance.collection('cards').get();
+      final ids = [
+        for (final doc in snap.docs)
+          if ((soloIds == null || soloIds.contains(doc.id)) &&
+              '${doc.data()['officialImageUrl'] ?? ''}'.trim().isNotEmpty &&
+              !_tieneTextoHabilidad(doc.data()))
+            doc.id,
+      ];
+      if (!mounted) return;
+      if (ids.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              soloIds == null
+                  ? 'No hay cartas con imagen pendientes de leer.'
+                  : 'Ninguna de las cartas seleccionadas necesita lectura.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final grupos = <List<String>>[
+        for (var i = 0; i < ids.length; i += 60)
+          ids.sublist(i, (i + 60).clamp(0, ids.length)),
+      ];
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: const Text('Leer catálogo con IA'),
+              content: Text(
+                'Se leerán ${ids.length} cartas con imagen oficial pero sin texto de habilidad. '
+                'Se enviarán ${grupos.length} lote(s) al worker local.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton.icon(
+                  onPressed: () => Navigator.pop(context, true),
+                  icon: const Icon(Icons.document_scanner_outlined),
+                  label: const Text('Empezar lectura'),
+                ),
+              ],
+            ),
+      );
+      if (confirmar != true || !mounted) return;
+
+      final uid = current.uid;
+      if (uid == null) return;
+      final runId = 'catalogo-${DateTime.now().toUtc().microsecondsSinceEpoch}';
+      await Future.wait(
+        grupos.map(
+          (lote) => FirebaseFirestore.instance.collection('card_ai_jobs').add({
+            'ownerUid': uid,
+            'tipo': 'leer',
+            'cardIds': lote,
+            'bulkRunId': runId,
+            'status': 'pending',
+            'createdAt': FieldValue.serverTimestamp(),
+          }),
+        ),
+      );
+      if (!mounted) return;
+      _observarLecturaMasiva(runId, ids.length);
+      setState(() {
+        _modoSeleccionIa = false;
+        _seleccionIa.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${ids.length} cartas enviadas en ${grupos.length} lote(s). El worker seguirá en segundo plano.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo iniciar la lectura masiva: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _enviandoLecturaMasiva = false);
+    }
+  }
+
+  void _observarLecturaMasiva(String runId, int total) {
+    _lecturaMasivaSub?.cancel();
+    setState(() {
+      _lecturaMasivaRunId = runId;
+      _lecturaMasivaTotal = total;
+      _lecturaMasivaHechas = 0;
+      _lecturaMasivaErrores = 0;
+    });
+    _lecturaMasivaSub = FirebaseFirestore.instance
+        .collection('card_ai_jobs')
+        .where('bulkRunId', isEqualTo: runId)
+        .snapshots()
+        .listen((snap) {
+          var hechas = 0;
+          var errores = 0;
+          for (final doc in snap.docs) {
+            final data = doc.data();
+            final ids = List<Object?>.from(
+              data['cardIds'] as List? ?? const [],
+            );
+            final resultados = Map<String, dynamic>.from(
+              data['resultados'] as Map? ?? const {},
+            );
+            hechas += resultados.length;
+            for (final resultado in resultados.values) {
+              if (resultado is Map && resultado['status'] == 'error') errores++;
+            }
+            // Si un lote falla antes de alcanzar cada carta, se cierra igual
+            // para que el contador no quede detenido indefinidamente.
+            if ((data['status'] == 'error' || data['status'] == 'blocked') &&
+                resultados.length < ids.length) {
+              hechas += ids.length - resultados.length;
+              errores += ids.length - resultados.length;
+            }
+          }
+          if (!mounted) return;
+          setState(() {
+            _lecturaMasivaHechas = hechas.clamp(0, total);
+            _lecturaMasivaErrores = errores;
+          });
+        }, onError: (_) {});
+  }
+
+  Widget _barraLecturaMasiva() {
+    final total = _lecturaMasivaTotal;
+    if (_lecturaMasivaRunId == null || total == 0)
+      return const SizedBox.shrink();
+    final hechas = _lecturaMasivaHechas.clamp(0, total);
+    final terminada = hechas >= total;
+    final progreso = total == 0 ? 0.0 : hechas / total;
+    return Container(
+      color: const Color(0xFF12262C),
+      padding: const EdgeInsets.fromLTRB(16, 10, 8, 12),
+      child: Row(
+        children: [
+          Icon(
+            terminada
+                ? Icons.check_circle_rounded
+                : Icons.document_scanner_outlined,
+            color:
+                terminada ? const Color(0xFF34D399) : const Color(0xFF7DD3FC),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  terminada
+                      ? 'Lectura del catálogo terminada'
+                      : 'Leyendo habilidades con IA',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                LinearProgressIndicator(
+                  value: progreso,
+                  minHeight: 7,
+                  borderRadius: BorderRadius.circular(8),
+                  color: const Color(0xFF7DD3FC),
+                  backgroundColor: Colors.white12,
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '$hechas / $total cartas · ${(progreso * 100).round()}%'
+                  '${_lecturaMasivaErrores > 0 ? ' · $_lecturaMasivaErrores con error' : ''}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          if (terminada)
+            IconButton(
+              tooltip: 'Cerrar progreso',
+              icon: const Icon(Icons.close, color: Colors.white54),
+              onPressed: () {
+                _lecturaMasivaSub?.cancel();
+                setState(() => _lecturaMasivaRunId = null);
+              },
+            )
+          else
+            const SizedBox(width: 48),
+        ],
+      ),
+    );
+  }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _lecturaMasivaSub?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -93,8 +430,40 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
   void _onSearchChanged() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 250), () {
-      setState(() {}); // dispara rebuild con nuevo término
+      if (mounted) setState(_recompute);
     });
+  }
+
+  // Recalcula filteredItems / caracCounts / visibleCaracs fuera del build
+  void _recompute() {
+    final q = normalizeSearch(_searchCtrl.text);
+
+    final preChar =
+        _allCards.where((c) {
+          if (q.isNotEmpty && !normalizeSearch(c.nombre).contains(q))
+            return false;
+          if (_soloStubs && !c.isStub) return false;
+          if (_edicion != null && c.edicion != _edicion) return false;
+          if (_tipo != null && c.tipo != _tipo) return false;
+          if (_raza != null) {
+            if (c.tipo.toLowerCase() != 'aliado') return false;
+            if ((c.raza ?? '') != _raza) return false;
+          }
+          if (_soloLibre && !c.soloLibre) return false;
+          if (_soloSinHabilidad && _cartaTieneTextoHabilidad(c)) return false;
+          return true;
+        }).toList();
+
+    final counts = <String, int>{for (final c in _features) c: 0};
+    for (final card in preChar) {
+      for (final name in _caracteristicasDe(card)) {
+        if (counts.containsKey(name)) counts[name] = counts[name]! + 1;
+      }
+    }
+
+    _caracCounts = counts;
+    _visibleCaracs = _features.where((c) => (counts[c] ?? 0) > 0).toList();
+    _filteredItems = preChar;
   }
 
   bool get _esAliado => (_tipo ?? '').toLowerCase() == 'aliado';
@@ -110,161 +479,340 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
       _edicion = null;
       _tipo = null;
       _raza = null;
+      _soloLibre = false;
+      _soloStubs = false;
+      _soloSinHabilidad = false;
       _caracFilter.clear();
       _searchCtrl.clear();
+      _recompute();
     });
+  }
+
+  Future<void> _quickAddCard() async {
+    final ctrl = TextEditingController();
+    final nombre = await showDialog<String>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A212C),
+            title: const Text(
+              'Agregar carta rápido',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Se crea con solo el nombre. Completá el resto después.',
+                    style: TextStyle(color: Colors.white54, fontSize: 13),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: ctrl,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.words,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Nombre de la carta',
+                      hintStyle: const TextStyle(color: Colors.white38),
+                      filled: true,
+                      fillColor: const Color(0xFF12161D),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onSubmitted: (v) {
+                      if (v.trim().isNotEmpty) Navigator.pop(ctx, v.trim());
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFF1D48B),
+                  foregroundColor: const Color(0xFF14181F),
+                ),
+                onPressed: () {
+                  final v = ctrl.text.trim();
+                  if (v.isEmpty) return;
+                  Navigator.pop(ctx, v);
+                },
+                child: const Text('Crear'),
+              ),
+            ],
+          ),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.dispose());
+    if (nombre == null || !mounted) return;
+
+    final cardId = nombre
+        .toLowerCase()
+        .replaceAll(RegExp(r'[áàä]'), 'a')
+        .replaceAll(RegExp(r'[éèë]'), 'e')
+        .replaceAll(RegExp(r'[íìï]'), 'i')
+        .replaceAll(RegExp(r'[óòö]'), 'o')
+        .replaceAll(RegExp(r'[úùü]'), 'u')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+
+    try {
+      final ref = FirebaseFirestore.instance.collection('cards').doc(cardId);
+      final existing = await ref.get();
+      if (existing.exists) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ya existe una carta con ID "$cardId"')),
+        );
+        return;
+      }
+      await ref.set({
+        'nombre': nombre,
+        'nombre_lower': nombre.toLowerCase(),
+        'tipo': '',
+        'edicion': '',
+        'coste': 0,
+        'rareza': '',
+        'habilidad': '',
+        'unica': false,
+        'caracteristicasRaw': [],
+        'status': 'stub',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ "$nombre" creada — completá el resto cuando puedas'),
+          action: SnackBarAction(
+            label: 'Completar ahora',
+            onPressed: () => _loadAllCards(),
+          ),
+        ),
+      );
+      _loadAllCards();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al crear: $e')));
+    }
+  }
+
+  InputDecoration _catalogInputDecoration({
+    String? hintText,
+    String? labelText,
+    Widget? prefixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      labelText: labelText,
+      prefixIcon: prefixIcon,
+      hintStyle: const TextStyle(color: Colors.white54),
+      labelStyle: const TextStyle(color: Colors.white70),
+      filled: true,
+      fillColor: const Color(0xFF12161D),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.white12),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.white12),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFFF1D48B)),
+      ),
+      isDense: true,
+    );
   }
 
   // ========================================
   // Características desde el modelo/Firestore
   // ========================================
-  /// Devuelve un mapa con conteos: { 'byEdition': {edicion: total}, 'byEditionType': {edicion: {tipo: count}}, 'total': int }
-Future<Map<String, dynamic>> _fetchCounts() async {
-  final snap = await FirebaseFirestore.instance.collection('cards').get();
-  final Map<String, int> byEdition = {};
-  final Map<String, Map<String, int>> byEditionType = {};
-  var total = 0;
+  /// Calcula conteos directamente desde las cartas ya cargadas en memoria.
+  /// Si aún hay páginas pendientes, muestra una nota al usuario.
+  Map<String, dynamic> _computeCounts() {
+    final Map<String, int> byEdition = {};
+    final Map<String, Map<String, int>> byEditionType = {};
 
-  for (final d in snap.docs) {
-    final m = d.data();
-    final ed = (m['edicion'] ?? 'Sin edición').toString();
-    final tipo = (m['tipo'] ?? 'Desconocido').toString();
+    for (final c in _allCards) {
+      final ed = c.edicion.isNotEmpty ? c.edicion : 'Sin edición';
+      final tipo = c.tipo.isNotEmpty ? c.tipo : 'Desconocido';
+      byEdition[ed] = (byEdition[ed] ?? 0) + 1;
+      byEditionType.putIfAbsent(ed, () => {})[tipo] =
+          (byEditionType[ed]![tipo] ?? 0) + 1;
+    }
 
-    // total
-    total++;
-
-    // por edición
-    byEdition[ed] = (byEdition[ed] ?? 0) + 1;
-
-    // por tipo dentro de edición
-    byEditionType.putIfAbsent(ed, () => {});
-    byEditionType[ed]![tipo] = (byEditionType[ed]![tipo] ?? 0) + 1;
+    return {
+      'total': _allCards.length,
+      'hasMore': _refreshing,
+      'byEdition': byEdition,
+      'byEditionType': byEditionType,
+    };
   }
 
-  return {
-    'total': total,
-    'byEdition': byEdition,
-    'byEditionType': byEditionType,
-  };
-}
+  /// Muestra diálogo con los conteos usando los datos ya cargados en memoria.
+  void _showCountsDialog(BuildContext context) {
+    final data = _computeCounts();
 
-/// Muestra diálogo con los conteos (usa FutureBuilder para mostrar loading mientras carga).
-void _showCountsDialog(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (ctx) => Dialog(
-      insetPadding: const EdgeInsets.all(12),
-      child: SizedBox(
-        width: 520,
-        height: 520,
-        child: FutureBuilder<Map<String, dynamic>>(
-          future: _fetchCounts(),
-          builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(),
-              ));
-            }
-            if (snap.hasError) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Error al calcular estadísticas', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Text('${snap.error}'),
-                    const SizedBox(height: 12),
-                    TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cerrar')),
-                  ],
-                ),
-              );
-            }
-
-            final data = snap.data!;
-            final int total = data['total'] as int;
-            final Map<String, int> byEdition = Map<String,int>.from(data['byEdition'] as Map);
-            final Map<String, Map<String, int>> byEditionType = (data['byEditionType'] as Map).map(
-              (k, v) => MapEntry(k as String, Map<String,int>.from(v as Map))
-            );
-
-            final editionsSorted = byEdition.keys.toList()
-              ..sort((a,b) => byEdition[b]!.compareTo(byEdition[a]!)); // descendente
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline),
-                      const SizedBox(width: 8),
-                      Text('Estadísticas — Total: $total', style: const TextStyle(fontWeight: FontWeight.w700)),
-                      const Spacer(),
-                      IconButton(onPressed: () => Navigator.of(ctx).pop(), icon: const Icon(Icons.close)),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    separatorBuilder: (_,__) => const SizedBox(height: 8),
-                    itemCount: editionsSorted.length,
-                    itemBuilder: (context, i) {
-                      final ed = editionsSorted[i];
-                      final edTotal = byEdition[ed] ?? 0;
-                      final types = byEditionType[ed] ?? {};
-                      // ordenar tipos por cantidad descendente
-                      final typesList = types.keys.toList()..sort((a,b) => types[b]!.compareTo(types[a]!));
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('$ed — $edTotal', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 6,
-                            children: typesList.map((t) {
-                              final cnt = types[t] ?? 0;
-                              return Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.6),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text('$t: $cnt', style: const TextStyle(fontWeight: FontWeight.w600)),
-                              );
-                            }).toList(),
-                          ),
-                        ],
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => Dialog(
+            insetPadding: const EdgeInsets.all(12),
+            child: SizedBox(
+              width: 520,
+              height: 520,
+              child: Builder(
+                builder: (context) {
+                  final int total = data['total'] as int;
+                  final Map<String, int> byEdition = Map<String, int>.from(
+                    data['byEdition'] as Map,
+                  );
+                  final Map<String, Map<String, int>> byEditionType =
+                      (data['byEditionType'] as Map).map(
+                        (k, v) => MapEntry(
+                          k as String,
+                          Map<String, int>.from(v as Map),
+                        ),
                       );
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    ),
-  );
-}
 
+                  final editionsSorted =
+                      byEdition.keys.toList()..sort(
+                        (a, b) => byEdition[b]!.compareTo(byEdition[a]!),
+                      ); // descendente
 
-List<String> _caracteristicasDe(CardMyL c) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                (data['hasMore'] as bool? ?? false)
+                                    ? 'Estadísticas — $total cargadas*'
+                                    : 'Estadísticas — Total: $total',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.all(12),
+                          separatorBuilder:
+                              (_, __) => const SizedBox(height: 8),
+                          itemCount: editionsSorted.length,
+                          itemBuilder: (context, i) {
+                            final ed = editionsSorted[i];
+                            final edTotal = byEdition[ed] ?? 0;
+                            final types = byEditionType[ed] ?? {};
+                            // ordenar tipos por cantidad descendente
+                            final typesList =
+                                types.keys.toList()..sort(
+                                  (a, b) => types[b]!.compareTo(types[a]!),
+                                );
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '$ed — $edTotal',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 6,
+                                  children:
+                                      typesList.map((t) {
+                                        final cnt = types[t] ?? 0;
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceVariant
+                                                .withOpacity(0.6),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '$t: $cnt',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+    );
+  }
+
+  List<String> _caracteristicasDe(CardMyL c) {
+    // Memoizado: si ya fue calculado para esta carta, devolver el cache
+    final cached = _caracCache[c.id];
+    if (cached != null) return cached;
+
     final dynamic raw = c.caracteristicasRaw;
     final Set<String> out = {};
-    if (raw == null) return const [];
+    if (raw == null) {
+      _caracCache[c.id] = const [];
+      return const [];
+    }
 
     if (raw is List) {
       for (final e in raw) {
         final base = _normalize(e);
         final canon = _canon[base];
-        if (canon != null) out.add(canon);
+        if (canon != null)
+          out.add(canon);
         else {
           // si no es canonical, quizá sea custom
           final s = e?.toString() ?? '';
@@ -276,7 +824,8 @@ List<String> _caracteristicasDe(CardMyL c) {
         if (v == true) {
           final base = _normalize(k);
           final canon = _canon[base];
-          if (canon != null) out.add(canon);
+          if (canon != null)
+            out.add(canon);
           else {
             final s = k.toString();
             if (s.isNotEmpty) out.add(s);
@@ -287,7 +836,8 @@ List<String> _caracteristicasDe(CardMyL c) {
       for (final part in raw.split(',')) {
         final base = _normalize(part);
         final canon = _canon[base];
-        if (canon != null) out.add(canon);
+        if (canon != null)
+          out.add(canon);
         else {
           final s = part.toString().trim();
           if (s.isNotEmpty) out.add(s);
@@ -295,40 +845,40 @@ List<String> _caracteristicasDe(CardMyL c) {
       }
     }
 
-    final list = out.toList()
-  ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-return list;
+    final list =
+        out.toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    _caracCache[c.id] = list;
+    return list;
   }
 
-  bool _pasaCaracteristicas(CardMyL c) {
-    if (_caracFilter.isEmpty) return true;
-    final mine = _caracteristicasDe(c).toSet();
-    for (final f in _caracFilter) {
-      if (!mine.contains(f)) return false;
-    }
-    return true;
-  }
-
-  // ===== función para eliminar carta (solo owner) =====
+  // ===== función para eliminar carta (solo administrador) =====
   Future<void> _confirmAndDeleteCard(String cardId) async {
-    final user = FirebaseAuth.instance.currentUser;
-    final isOwner = (user?.email?.toLowerCase() ?? '') == _ownerEmail;
-    if (!isOwner) return;
+    final isAdmin = context.read<CurrentUser>().isAdmin;
+    if (!isAdmin) return;
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar carta'),
-        content: Text('¿Seguro querés eliminar la carta "$cardId"? Se borrarán sus variantes también.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Eliminar carta'),
+            content: Text(
+              '¿Seguro querés eliminar la carta "$cardId"? Se borrarán sus variantes también.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Eliminar'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
 
     if (ok != true) return;
@@ -336,7 +886,9 @@ return list;
     setState(() {});
     final ScaffoldMessengerState sm = ScaffoldMessenger.of(context);
     try {
-      final cardRef = FirebaseFirestore.instance.collection('cards').doc(cardId);
+      final cardRef = FirebaseFirestore.instance
+          .collection('cards')
+          .doc(cardId);
 
       // eliminar variantes en batch (si existen)
       final variantsSnap = await cardRef.collection('variants').get();
@@ -348,7 +900,9 @@ return list;
       batch.delete(cardRef);
 
       await batch.commit();
-      sm.showSnackBar(const SnackBar(content: Text('Carta eliminada correctamente.')));
+      sm.showSnackBar(
+        const SnackBar(content: Text('Carta eliminada correctamente.')),
+      );
     } catch (e) {
       sm.showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
     } finally {
@@ -358,44 +912,75 @@ return list;
 
   @override
   Widget build(BuildContext context) {
-    final stream = FirebaseFirestore.instance.collection('cards').orderBy('nombre').snapshots();
+    final wide = MediaQuery.of(context).size.width >= 900;
+    final puedeLeerConIa =
+        (context.watch<CurrentUser>().email ?? '').toLowerCase() ==
+        AppConstants.ownerEmail;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0D1016),
+      // El buscador está en el AppBar (siempre visible arriba), así que el body
+      // no necesita redimensionarse al aparecer el teclado → evita relayout del grid.
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        backgroundColor: Colors.amber.shade300,
-        title: const Text('Catálogo — Primer Bloque'),
+        backgroundColor: const Color(0xFF14181F),
+        foregroundColor: Colors.white,
+        title: const Text('Catálogo'),
         centerTitle: true,
         actions: [
+          if (puedeLeerConIa)
+            IconButton(
+              tooltip: 'Leer habilidades pendientes con IA',
+              icon:
+                  _enviandoLecturaMasiva
+                      ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : const Icon(Icons.document_scanner_outlined),
+              onPressed:
+                  _enviandoLecturaMasiva ||
+                          _lecturaMasivaActiva ||
+                          _modoSeleccionIa
+                      ? null
+                      : _leerHabilidadesMasivamente,
+            ),
+          if (puedeLeerConIa)
+            IconButton(
+              tooltip:
+                  _modoSeleccionIa
+                      ? 'Cancelar selección de lectura'
+                      : 'Seleccionar cartas para leer',
+              icon: Icon(
+                _modoSeleccionIa
+                    ? Icons.playlist_remove_rounded
+                    : Icons.checklist_rounded,
+              ),
+              onPressed:
+                  _lecturaMasivaActiva
+                      ? null
+                      : () => setState(() {
+                        _modoSeleccionIa = !_modoSeleccionIa;
+                        if (!_modoSeleccionIa) _seleccionIa.clear();
+                      }),
+            ),
           IconButton(
-  tooltip: 'Estadísticas (por edición / tipo)',
-  icon: const Icon(Icons.info_outline),
-  onPressed: () => _showCountsDialog(context),
-),
-          IconButton(
-            tooltip: 'Nueva carta',
-            icon: const Icon(Icons.add_card),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const NewCardScreen()),
-              );
-            },
+            tooltip: 'Agregar carta rápido (solo nombre)',
+            icon: const Icon(Icons.bolt_rounded),
+            onPressed: _quickAddCard,
           ),
-          Builder(
-            builder: (ctx) => IconButton(
+          IconButton(
+            tooltip: 'Estadísticas (por edición / tipo)',
+            icon: const Icon(Icons.info_outline),
+            onPressed: () => _showCountsDialog(context),
+          ),
+          if (!wide && _caracFilter.isNotEmpty)
+            IconButton(
               tooltip: 'Filtrar por características',
               icon: const Icon(Icons.tune),
-              onPressed: () {
-                final width = MediaQuery.of(ctx).size.width;
-                if (width >= 900) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('El panel de características ya está a la derecha.')),
-                  );
-                } else {
-                  _openCaracFilterSheet(ctx);
-                }
-              },
+              onPressed: () => _openCaracFilterSheet(context),
             ),
-          ),
           IconButton(
             tooltip: 'Limpiar filtros',
             onPressed: _clearFilters,
@@ -403,334 +988,446 @@ return list;
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(80),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  // 🔍 Buscador
-                  SizedBox(
-                    width: 220,
-                    child: TextField(
-                      controller: _searchCtrl,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        hintText: 'Buscar…',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // 📀 Edición
-                  SizedBox(
-                    width: 180,
-                    child: DropdownButtonFormField<String>(
-                      value: _edicion,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Edición',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('Todas'),
+          preferredSize: Size.fromHeight(wide ? 64 : 118),
+          child: Container(
+            color: const Color(0xFF14181F),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+            child:
+                wide
+                    ? _buildFiltersRow()
+                    : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: _searchCtrl,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _catalogInputDecoration(
+                            prefixIcon: const Icon(
+                              Icons.search,
+                              color: Colors.white70,
+                            ),
+                            hintText: 'Buscar carta...',
+                          ),
                         ),
-                        ...PBData.ediciones.map((e) => DropdownMenuItem(value: e, child: Text(e))),
+                        const SizedBox(height: 6),
+                        _buildFiltersRow(),
                       ],
-                      onChanged: (v) => setState(() {
-                        _edicion = v;
-                        if (_raza != null && !_razasDeEdicion.contains(_raza)) {
-                          _raza = null;
-                        }
-                      }),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // 🧾 Tipo
-                  SizedBox(
-                    width: 160,
-                    child: DropdownButtonFormField<String>(
-                      value: _tipo,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Tipo',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      items: const [
-                        DropdownMenuItem<String>(value: null, child: Text('Todos')),
-                        DropdownMenuItem(value: 'Aliado', child: Text('Aliado')),
-                        DropdownMenuItem(value: 'Talismán', child: Text('Talismán')),
-                        DropdownMenuItem(value: 'Tótem', child: Text('Tótem')),
-                        DropdownMenuItem(value: 'Arma', child: Text('Arma')),
-                        DropdownMenuItem(value: 'Oro', child: Text('Oro')),
-                      ],
-                      onChanged: (v) => setState(() {
-                        _tipo = v;
-                        if (!_esAliado) _raza = null;
-                      }),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // 🧬 Raza (si corresponde)
-                  if (_esAliado && _edicion != null)
-                    SizedBox(
-                      width: 160,
-                      child: DropdownButtonFormField<String>(
-                        value: _raza,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Raza',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: [
-                          const DropdownMenuItem<String>(value: null, child: Text('Todas')),
-                          ..._razasDeEdicion.map((r) => DropdownMenuItem(value: r, child: Text(r))),
-                        ],
-                        onChanged: (v) => setState(() => _raza = v),
-                      ),
-                    ),
-                ],
-              ),
-            ),
           ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: stream,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(child: Text('Error: ${snap.error}'));
-          }
-          final docs = snap.data?.docs ?? [];
-
-          // Mapeamos a modelos
-          final allCards = docs.map((d) => CardMyL.fromMap(d.data(), d.id)).toList();
-
-          // Lista canónica base (ahora incluye lo que cargamos en _customFeatures en init)
-          final List<String> allCaracs = List.of(_features);
-
-          // Filtros en cliente
-          final q = _searchCtrl.text.trim().toLowerCase();
-          final preCharFiltered = allCards.where((c) {
-            if (q.isNotEmpty && !c.nombre.toLowerCase().contains(q)) return false;
-            if (_edicion != null && c.edicion != _edicion) return false;
-            if (_tipo != null && c.tipo != _tipo) return false;
-            if (_raza != null) {
-              if (c.tipo.toLowerCase() != 'aliado') return false;
-              if ((c.raza ?? '') != _raza) return false;
-            }
-            return true;
-          }).toList();
-
-          // Contadores por característica (previos a aplicar _caracFilter)
-          final Map<String, int> caracCounts = {for (final c in allCaracs) c: 0};
-          for (final card in preCharFiltered) {
-            final set = _caracteristicasDe(card).toSet();
-            for (final name in allCaracs) {
-              if (set.contains(name)) {
-                caracCounts[name] = (caracCounts[name] ?? 0) + 1;
-              }
-            }
-          }
-
-          // Mostrar solo características con conteo > 0
-          final List<String> visibleCaracs = allCaracs.where((c) => (caracCounts[c] ?? 0) > 0).toList();
-
-          // Aplicar filtro por características (AND)
-          final items = preCharFiltered.where(_pasaCaracteristicas).toList();
-
-          final wide = MediaQuery.of(context).size.width >= 900;
-
-          if (items.isEmpty) {
-            return wide
-                ? Row(
-                    children: [
-                      const Expanded(child: _EmptyResultHint()),
-                      _RightPanel(
-                        allCaracs: visibleCaracs,
-                        caracCounts: caracCounts,
-                        selected: _caracFilter,
-                        onToggle: (name, v) => setState(() {
-                          if (v) {
-                            _caracFilter.add(name);
-                          } else {
-                            _caracFilter.remove(name);
-                          }
-                        }),
-                        onClear: () => setState(_caracFilter.clear),
-                      ),
-                    ],
-                  )
-                : const _EmptyResultHint();
-          }
-
-          final user = FirebaseAuth.instance.currentUser;
-          final isOwnerGlobal = (user?.email?.toLowerCase() ?? '') == _ownerEmail;
-
-          final list = ListView.separated(
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, i) {
-              final card = items[i];
-              final caracs = _caracteristicasDe(card);
-
-              return ListTile(
-                leading: _VariantThumbFromCard(cardId: card.id, fallbackTipo: card.tipo),
-                title: Text(card.nombre),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${card.tipo}'
-                      ' · ${card.edicion}'
-                      ' · ${card.rareza}'
-                      '${card.esAliado && card.fuerza != null ? ' · Fuerza ${card.fuerza}' : ''}'
-                      ' · Coste ${card.coste}'
-                      '${card.esAliado && (card.raza?.isNotEmpty ?? false) ? ' · ${card.raza}' : ''}',
-                    ),
-                    if (caracs.isNotEmpty) const SizedBox(height: 4),
-                    if (caracs.isNotEmpty)
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: -6,
-                        children: caracs
-                            .map((c) => Chip(
-                                  label: Text(c),
-                                  visualDensity: VisualDensity.compact,
-                                ))
-                            .toList(),
-                      ),
-                  ],
-                ),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => CardDetailsScreen(card: card)),
-                  );
-                },
-                trailing: isOwnerGlobal
-                    ? IconButton(
-                        tooltip: 'Eliminar carta',
-                        icon: const Icon(Icons.delete_forever, color: Colors.redAccent),
-                        onPressed: () => _confirmAndDeleteCard(card.id),
-                      )
-                    : null,
-              );
-            },
-          );
-
-          if (!wide) {
-            // Vista móvil (sin panel lateral visible)
-            return Column(
-              children: [
-                if (_caracFilter.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Wrap(
-                        spacing: 6,
-                        runSpacing: -6,
-                        children: [
-                          ..._caracFilter.map(
-                            (c) => InputChip(
-                              label: Text(c),
-                              onDeleted: () => setState(() => _caracFilter.remove(c)),
-                            ),
-                          ),
-                          TextButton.icon(
-                            onPressed: () => setState(_caracFilter.clear),
-                            icon: const Icon(Icons.clear_all),
-                            label: const Text('Limpiar características'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                Expanded(child: list),
-              ],
-            );
-          }
-
-          // Vista ancha con panel lateral
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: list),
-              _RightPanel(
-                allCaracs: visibleCaracs,
-                caracCounts: caracCounts,
-                selected: _caracFilter,
-                onToggle: (name, v) => setState(() {
-                  if (v) {
-                    _caracFilter.add(name);
-                  } else {
-                    _caracFilter.remove(name);
-                  }
-                }),
-                onClear: () => setState(_caracFilter.clear),
-              ),
-            ],
-          );
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Nueva carta',
+        backgroundColor: const Color(0xFFF1D48B),
+        foregroundColor: const Color(0xFF14181F),
+        onPressed: () {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const NewCardScreen()));
         },
+        child: const Icon(Icons.add),
+      ),
+      body: Column(
+        children: [_barraLecturaMasiva(), Expanded(child: _buildBody(wide))],
       ),
     );
   }
 
+  Widget _buildFiltersRow() {
+    final wide = MediaQuery.of(context).size.width >= 900;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          if (wide)
+            SizedBox(
+              width: 220,
+              child: TextField(
+                controller: _searchCtrl,
+                style: const TextStyle(color: Colors.white),
+                decoration: _catalogInputDecoration(
+                  prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                  hintText: 'Buscar...',
+                ),
+              ),
+            ),
+          if (wide) const SizedBox(width: 8),
+          SizedBox(
+            width: 150,
+            child: DropdownButtonFormField<String>(
+              value: _edicion,
+              dropdownColor: const Color(0xFF14181F),
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              iconEnabledColor: Colors.white70,
+              isExpanded: true,
+              decoration: _catalogInputDecoration(labelText: 'Edición'),
+              items: [
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('Todas'),
+                ),
+                ...PBData.ediciones.map(
+                  (e) => DropdownMenuItem(value: e, child: Text(e)),
+                ),
+              ],
+              onChanged:
+                  (v) => setState(() {
+                    _edicion = v;
+                    if (_raza != null && !_razasDeEdicion.contains(_raza)) {
+                      _raza = null;
+                    }
+                    _recompute();
+                  }),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 130,
+            child: DropdownButtonFormField<String>(
+              value: _tipo,
+              dropdownColor: const Color(0xFF14181F),
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              iconEnabledColor: Colors.white70,
+              isExpanded: true,
+              decoration: _catalogInputDecoration(labelText: 'Tipo'),
+              items: const [
+                DropdownMenuItem<String>(value: null, child: Text('Todos')),
+                DropdownMenuItem(value: 'Aliado', child: Text('Aliado')),
+                DropdownMenuItem(value: 'Talismán', child: Text('Talismán')),
+                DropdownMenuItem(value: 'Tótem', child: Text('Tótem')),
+                DropdownMenuItem(value: 'Arma', child: Text('Arma')),
+                DropdownMenuItem(value: 'Oro', child: Text('Oro')),
+              ],
+              onChanged:
+                  (v) => setState(() {
+                    _tipo = v;
+                    if (!_esAliado) _raza = null;
+                    _recompute();
+                  }),
+            ),
+          ),
+          if (_esAliado && _edicion != null) ...[
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 130,
+              child: DropdownButtonFormField<String>(
+                value: _raza,
+                dropdownColor: const Color(0xFF14181F),
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                iconEnabledColor: Colors.white70,
+                isExpanded: true,
+                decoration: _catalogInputDecoration(labelText: 'Raza'),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('Todas'),
+                  ),
+                  ..._razasDeEdicion.map(
+                    (r) => DropdownMenuItem(value: r, child: Text(r)),
+                  ),
+                ],
+                onChanged:
+                    (v) => setState(() {
+                      _raza = v;
+                      _recompute();
+                    }),
+              ),
+            ),
+          ],
+          const SizedBox(width: 8),
+          FilterChip(
+            label: const Text('Libre', style: TextStyle(fontSize: 12)),
+            selected: _soloLibre,
+            onSelected:
+                (v) => setState(() {
+                  _soloLibre = v;
+                  _recompute();
+                }),
+            selectedColor: const Color(0x33C084FC),
+            checkmarkColor: const Color(0xFFC084FC),
+            labelStyle: TextStyle(
+              color: _soloLibre ? const Color(0xFFC084FC) : Colors.white70,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+            side: BorderSide(
+              color: _soloLibre ? const Color(0xFFC084FC) : Colors.white24,
+            ),
+            backgroundColor: const Color(0xFF12161D),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+            ),
+            visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            avatar: const Icon(Icons.warning_amber_rounded, size: 14),
+            label: const Text('Incompletas', style: TextStyle(fontSize: 12)),
+            selected: _soloStubs,
+            onSelected:
+                (v) => setState(() {
+                  _soloStubs = v;
+                  _recompute();
+                }),
+            selectedColor: const Color(0x33F59E0B),
+            checkmarkColor: const Color(0xFFF59E0B),
+            avatarBoxConstraints: const BoxConstraints(
+              maxWidth: 20,
+              maxHeight: 20,
+            ),
+            labelStyle: TextStyle(
+              color: _soloStubs ? const Color(0xFFF59E0B) : Colors.white70,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+            side: BorderSide(
+              color: _soloStubs ? const Color(0xFFF59E0B) : Colors.white24,
+            ),
+            backgroundColor: const Color(0xFF12161D),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+            ),
+            visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            avatar: const Icon(Icons.document_scanner_outlined, size: 14),
+            label: const Text(
+              'Sin texto de habilidad',
+              style: TextStyle(fontSize: 12),
+            ),
+            selected: _soloSinHabilidad,
+            onSelected:
+                (v) => setState(() {
+                  _soloSinHabilidad = v;
+                  _recompute();
+                }),
+            selectedColor: const Color(0x337DD3FC),
+            checkmarkColor: const Color(0xFF7DD3FC),
+            labelStyle: TextStyle(
+              color:
+                  _soloSinHabilidad ? const Color(0xFF7DD3FC) : Colors.white70,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+            side: BorderSide(
+              color:
+                  _soloSinHabilidad ? const Color(0xFF7DD3FC) : Colors.white24,
+            ),
+            backgroundColor: const Color(0xFF12161D),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+            ),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(bool wide) {
+    if (_initialLoading) {
+      return const SkeletonCatalogGrid();
+    }
+
+    final items = _filteredItems;
+    final showLegacyFeatures = _caracFilter.isNotEmpty;
+    final puedeSeleccionarIa =
+        (context.read<CurrentUser>().email ?? '').toLowerCase() ==
+        AppConstants.ownerEmail;
+
+    void onToggleCarac(String name, bool v) => setState(() {
+      if (v)
+        _caracFilter.add(name);
+      else
+        _caracFilter.remove(name);
+      _recompute();
+    });
+    void onClearCarac() => setState(() {
+      _caracFilter.clear();
+      _recompute();
+    });
+
+    final grid = LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final maxExtent =
+            width >= 1400
+                ? 250.0
+                : width >= 1000
+                ? 220.0
+                : 190.0;
+        return GridView.builder(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: maxExtent,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: .62,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, i) {
+            final card = items[i];
+            return _CatalogGridCard(
+              card: card,
+              caracs: const [],
+              selectionMode: _modoSeleccionIa,
+              selected: _seleccionIa.contains(card.id),
+              onTap: () {
+                if (_modoSeleccionIa) {
+                  setState(() {
+                    if (!_seleccionIa.add(card.id))
+                      _seleccionIa.remove(card.id);
+                  });
+                  return;
+                }
+                if (card.isStub) {
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (_) => NewCardScreen(initial: card),
+                        ),
+                      )
+                      .then((_) => _loadAllCards());
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CardDetailsScreen(card: card),
+                    ),
+                  );
+                }
+              },
+              onLongPress:
+                  !puedeSeleccionarIa || _lecturaMasivaActiva
+                      ? null
+                      : () => setState(() {
+                        _modoSeleccionIa = true;
+                        _seleccionIa.add(card.id);
+                      }),
+            );
+          },
+        );
+      },
+    );
+
+    // Barra de estado: chips de filtros activos + pills de conteo + spinner de refresh
+    Widget statusBar = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (_caracFilter.isNotEmpty) ...[
+                  ..._caracFilter.map(
+                    (c) => InputChip(
+                      label: Text(c),
+                      onDeleted:
+                          () => setState(() {
+                            _caracFilter.remove(c);
+                            _recompute();
+                          }),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: onClearCarac,
+                    icon: const Icon(Icons.clear_all, size: 16),
+                    label: const Text('Limpiar'),
+                  ),
+                ],
+                _CatalogInfoPill(label: 'Resultados', value: '${items.length}'),
+                _CatalogInfoPill(label: 'Total', value: '${_allCards.length}'),
+                if (_modoSeleccionIa)
+                  ActionChip(
+                    avatar: const Icon(Icons.check_circle_outline, size: 17),
+                    label: Text(
+                      '${_seleccionIa.length} seleccionadas · Leer IA',
+                    ),
+                    onPressed:
+                        _seleccionIa.isEmpty || _lecturaMasivaActiva
+                            ? null
+                            : () => _leerHabilidadesMasivamente(
+                              soloIds: _seleccionIa.toSet(),
+                            ),
+                  ),
+                if (_modoSeleccionIa && _seleccionIa.isEmpty)
+                  const Chip(label: Text('Toca cartas para seleccionarlas')),
+              ],
+            ),
+          ),
+          if (_refreshing)
+            const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (items.isEmpty) {
+      return wide && showLegacyFeatures
+          ? Row(
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    statusBar,
+                    const Expanded(child: _EmptyResultHint()),
+                  ],
+                ),
+              ),
+              _RightPanel(
+                allCaracs: _visibleCaracs,
+                caracCounts: _caracCounts,
+                selected: _caracFilter,
+                onToggle: onToggleCarac,
+                onClear: onClearCarac,
+              ),
+            ],
+          )
+          : Column(
+            children: [statusBar, const Expanded(child: _EmptyResultHint())],
+          );
+    }
+
+    if (!wide || !showLegacyFeatures) {
+      return Column(children: [statusBar, Expanded(child: grid)]);
+    }
+
+    // Vista ancha con panel lateral
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: Column(children: [statusBar, Expanded(child: grid)])),
+        _RightPanel(
+          allCaracs: _visibleCaracs,
+          caracCounts: _caracCounts,
+          selected: _caracFilter,
+          onToggle: onToggleCarac,
+          onClear: onClearCarac,
+        ),
+      ],
+    );
+  }
+
   void _openCaracFilterSheet(BuildContext context) {
+    // Usa los datos ya calculados en memoria (_visibleCaracs, _caracCounts)
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
       isScrollControlled: false,
       builder: (ctx) {
-        final stream = FirebaseFirestore.instance.collection('cards').orderBy('nombre').snapshots();
-
-        return SafeArea(
-          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: stream,
-            builder: (context, snap) {
-              final docs = snap.data?.docs ?? [];
-              final allCards = docs.map((d) => CardMyL.fromMap(d.data(), d.id)).toList();
-              final List<String> allCaracs = List.of(_features);
-
-              final q = _searchCtrl.text.trim().toLowerCase();
-              final preCharFiltered = allCards.where((c) {
-                if (q.isNotEmpty && !c.nombre.toLowerCase().contains(q)) return false;
-                if (_edicion != null && c.edicion != _edicion) return false;
-                if (_tipo != null && c.tipo != _tipo) return false;
-                if (_raza != null) {
-                  if (c.tipo.toLowerCase() != 'aliado') return false;
-                  if ((c.raza ?? '') != _raza) return false;
-                }
-                return true;
-              }).toList();
-
-              final Map<String, int> caracCounts = {for (final c in allCaracs) c: 0};
-              for (final card in preCharFiltered) {
-                final set = _caracteristicasDe(card).toSet();
-                for (final name in allCaracs) {
-                  if (set.contains(name)) {
-                    caracCounts[name] = (caracCounts[name] ?? 0) + 1;
-                  }
-                }
-              }
-
-              final List<String> visibleCaracs =
-                  allCaracs.where((c) => (caracCounts[c] ?? 0) > 0).toList();
-
-              return Padding(
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -739,12 +1436,20 @@ return list;
                       children: [
                         const Icon(Icons.tune),
                         const SizedBox(width: 8),
-                        const Text('Filtrar por características',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        const Text(
+                          'Filtrar por características',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         const Spacer(),
                         TextButton.icon(
                           onPressed: () {
-                            setState(_caracFilter.clear);
+                            setState(() {
+                              _caracFilter.clear();
+                              _recompute();
+                            });
                             Navigator.pop(context);
                           },
                           icon: const Icon(Icons.clear_all),
@@ -757,7 +1462,7 @@ return list;
                       child: ListView(
                         shrinkWrap: true,
                         children: [
-                          for (final name in visibleCaracs)
+                          for (final name in _visibleCaracs)
                             CheckboxListTile(
                               value: _caracFilter.contains(name),
                               onChanged: (bool? v) {
@@ -767,14 +1472,16 @@ return list;
                                   } else {
                                     _caracFilter.remove(name);
                                   }
+                                  _recompute();
                                 });
+                                setSheetState(() {});
                               },
                               dense: true,
                               title: Text(name),
                               secondary: CircleAvatar(
                                 radius: 12,
                                 child: Text(
-                                  (caracCounts[name] ?? 0).toString(),
+                                  (_caracCounts[name] ?? 0).toString(),
                                   style: const TextStyle(fontSize: 12),
                                 ),
                               ),
@@ -793,9 +1500,9 @@ return list;
                     ),
                   ],
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -829,6 +1536,278 @@ class _EmptyResultHint extends StatelessWidget {
   }
 }
 
+class _CatalogInfoPill extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _CatalogInfoPill({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0x1AF1D48B),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0x33F1D48B)),
+      ),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(fontFamily: 'inherit'),
+          children: [
+            TextSpan(
+              text: '$label ',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            TextSpan(
+              text: value,
+              style: const TextStyle(
+                color: Color(0xFFF1D48B),
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogFeaturePill extends StatelessWidget {
+  final String label;
+
+  const _CatalogFeaturePill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A212C),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogGridCard extends StatelessWidget {
+  final CardMyL card;
+  final List<String> caracs;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final bool selectionMode;
+  final bool selected;
+
+  const _CatalogGridCard({
+    required this.card,
+    required this.caracs,
+    required this.onTap,
+    this.onLongPress,
+    this.selectionMode = false,
+    this.selected = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          decoration: BoxDecoration(
+            color:
+                card.isStub ? const Color(0xFF1A1400) : const Color(0xFF12161D),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color:
+                  selected
+                      ? const Color(0xFF7DD3FC)
+                      : card.isStub
+                      ? const Color(0x66F59E0B)
+                      : Colors.white10,
+              width: selected ? 2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(.24),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: SizedBox.expand(
+                          child: _CatalogCardImage(card: card),
+                        ),
+                      ),
+                      if (card.soloLibre)
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1A0D2E),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: const Color(0xFFC084FC),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: const Text(
+                              'LIBRE',
+                              style: TextStyle(
+                                color: Color(0xFFC084FC),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: .6,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (selectionMode)
+                        Positioned(
+                          top: card.soloLibre ? 38 : 6,
+                          right: 6,
+                          child: CircleAvatar(
+                            radius: 14,
+                            backgroundColor:
+                                selected
+                                    ? const Color(0xFF7DD3FC)
+                                    : const Color(0xCC101820),
+                            child: Icon(
+                              selected
+                                  ? Icons.check_rounded
+                                  : Icons.add_rounded,
+                              size: 18,
+                              color:
+                                  selected
+                                      ? const Color(0xFF102027)
+                                      : Colors.white70,
+                            ),
+                          ),
+                        ),
+                      if (card.isStub)
+                        Positioned(
+                          top: 6,
+                          left: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2A1A00),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: const Color(0xFFF59E0B),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: const Text(
+                              'INCOMPLETA',
+                              style: TextStyle(
+                                color: Color(0xFFF59E0B),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: .6,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  card.nombre,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                if (caracs.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 54,
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children:
+                          caracs
+                              .take(4)
+                              .map((c) => _CatalogFeaturePill(label: c))
+                              .toList(),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogCardImage extends StatelessWidget {
+  final CardMyL card;
+
+  const _CatalogCardImage({required this.card});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(color: Color(0xFF0E1117)),
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: 220,
+          height: 308,
+          child: VariantThumbFromCard(
+            cardId: card.id,
+            fallbackTipo: card.tipo,
+            size: 220,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RightPanel extends StatelessWidget {
   final List<String> allCaracs;
   final Map<String, int> caracCounts;
@@ -850,8 +1829,8 @@ class _RightPanel extends StatelessWidget {
     return Container(
       width: 280,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.6),
-        border: Border(left: BorderSide(color: Theme.of(context).dividerColor)),
+        color: const Color(0xFF12161D),
+        border: const Border(left: BorderSide(color: Colors.white10)),
       ),
       child: Column(
         children: [
@@ -860,14 +1839,23 @@ class _RightPanel extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Row(
               children: [
-                const Icon(Icons.bolt_outlined),
+                const Icon(Icons.bolt_outlined, color: Color(0xFFF1D48B)),
                 const SizedBox(width: 8),
-                const Text('Características', style: TextStyle(fontWeight: FontWeight.w600)),
+                const Text(
+                  'Características',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: onClear,
-                  icon: const Icon(Icons.clear_all),
-                  label: const Text('Limpiar'),
+                  icon: const Icon(Icons.clear_all, color: Color(0xFFF1D48B)),
+                  label: const Text(
+                    'Limpiar',
+                    style: TextStyle(color: Color(0xFFF1D48B)),
+                  ),
                 ),
               ],
             ),
@@ -877,15 +1865,25 @@ class _RightPanel extends StatelessWidget {
               children: [
                 for (final name in allCaracs)
                   CheckboxListTile(
+                    activeColor: const Color(0xFFF1D48B),
+                    checkColor: const Color(0xFF14181F),
                     value: selected.contains(name),
                     onChanged: (v) => onToggle(name, v ?? false),
                     dense: true,
-                    title: Text(name),
+                    title: Text(
+                      name,
+                      style: const TextStyle(color: Colors.white),
+                    ),
                     secondary: CircleAvatar(
                       radius: 12,
+                      backgroundColor: const Color(0xFF1A212C),
                       child: Text(
                         (caracCounts[name] ?? 0).toString(),
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFF1D48B),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -903,14 +1901,25 @@ class _RightPanel extends StatelessWidget {
 /// - official == true
 /// - luego isBase == true
 /// - luego la primera por name
-class _VariantThumbFromCard extends StatelessWidget {
+class VariantThumbFromCard extends StatelessWidget {
   final String cardId;
   final String fallbackTipo;
-  const _VariantThumbFromCard({required this.cardId, required this.fallbackTipo});
+  final double size;
+  const VariantThumbFromCard({
+    super.key,
+    required this.cardId,
+    required this.fallbackTipo,
+    this.size = 56,
+  });
+
+  static String? _safe(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.contains('drive.google.com')) return DriveService.webSafeUrl(url);
+    return url;
+  }
 
   // ---- URL desde el doc principal (cards/{id}) ----
   String? _pickFromDoc(Map<String, dynamic> m) {
-    // comunes en tu base (según screenshot)
     for (final key in [
       'officialImageUrl',
       'imageUrl',
@@ -919,16 +1928,14 @@ class _VariantThumbFromCard extends StatelessWidget {
       'img',
       'url',
     ]) {
-      final v = m[key];
-      if (v is String && v.isNotEmpty) return v;
+      final v = _safe(m[key]?.toString());
+      if (v != null) return v;
     }
-
-    // anidados típicos
     final images = m['images'];
     if (images is Map) {
       for (final k in ['front', 'anverso']) {
-        final v = images[k];
-        if (v is String && v.isNotEmpty) return v;
+        final v = _safe(images[k]?.toString());
+        if (v != null) return v;
       }
     }
     return null;
@@ -938,12 +1945,22 @@ class _VariantThumbFromCard extends StatelessWidget {
   String? _pickFromVariant(Map<String, dynamic> m) {
     final thumbs = m['thumbs'];
     if (thumbs is Map) {
-      for (final k in ['56x56', '64x64', '72x72', '80x80', '96x96', 'small', 'thumb', 's']) {
-        final v = thumbs[k];
-        if (v is String && v.isNotEmpty) return v;
+      for (final k in [
+        '56x56',
+        '64x64',
+        '72x72',
+        '80x80',
+        '96x96',
+        'small',
+        'thumb',
+        's',
+      ]) {
+        final v = _safe(thumbs[k]?.toString());
+        if (v != null) return v;
       }
       for (final v in thumbs.values) {
-        if (v is String && v.isNotEmpty) return v;
+        final s = _safe(v?.toString());
+        if (s != null) return s;
       }
     }
     for (final key in [
@@ -957,14 +1974,14 @@ class _VariantThumbFromCard extends StatelessWidget {
       'img',
       'url',
     ]) {
-      final v = m[key];
-      if (v is String && v.isNotEmpty) return v;
+      final v = _safe(m[key]?.toString());
+      if (v != null) return v;
     }
     final images = m['images'];
     if (images is Map) {
       for (final k in ['front', 'anverso']) {
-        final v = images[k];
-        if (v is String && v.isNotEmpty) return v;
+        final v = _safe(images[k]?.toString());
+        if (v != null) return v;
       }
     }
     return null;
@@ -983,18 +2000,23 @@ class _VariantThumbFromCard extends StatelessWidget {
           topUrl = _pickFromDoc(docSnap.data!.data()!);
         }
         if (topUrl != null && topUrl.isNotEmpty) {
-          return _CardThumb(url: topUrl, fallbackTipo: fallbackTipo);
+          return _CardThumb(
+            url: topUrl,
+            fallbackTipo: fallbackTipo,
+            size: size,
+          );
         }
 
         // 2) Si no hubo URL en el doc, cae a variants.
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: cardRef
-              .collection('variants')
-              .orderBy('official', descending: true)
-              .orderBy('isBase', descending: true)
-              .orderBy('name')
-              .limit(6)
-              .snapshots(),
+          stream:
+              cardRef
+                  .collection('variants')
+                  .orderBy('official', descending: true)
+                  .orderBy('isBase', descending: true)
+                  .orderBy('name')
+                  .limit(6)
+                  .snapshots(),
           builder: (context, varSnap) {
             String? vurl;
             if (varSnap.hasData && varSnap.data!.docs.isNotEmpty) {
@@ -1003,7 +2025,11 @@ class _VariantThumbFromCard extends StatelessWidget {
                 if (vurl != null && vurl.isNotEmpty) break;
               }
             }
-            return _CardThumb(url: vurl, fallbackTipo: fallbackTipo);
+            return _CardThumb(
+              url: vurl,
+              fallbackTipo: fallbackTipo,
+              size: size,
+            );
           },
         );
       },
@@ -1014,7 +2040,12 @@ class _VariantThumbFromCard extends StatelessWidget {
 class _CardThumb extends StatelessWidget {
   final String? url;
   final String fallbackTipo;
-  const _CardThumb({required this.url, required this.fallbackTipo});
+  final double size;
+  const _CardThumb({
+    required this.url,
+    required this.fallbackTipo,
+    this.size = 56,
+  });
 
   Color _colorPorTipo(String t) {
     t = t.toLowerCase();
@@ -1028,18 +2059,16 @@ class _CardThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const double size = 56;
-
     Widget fallback() => Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: _colorPorTipo(fallbackTipo).withOpacity(0.15),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: const Icon(Icons.image_not_supported, size: 22),
-        );
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: _colorPorTipo(fallbackTipo).withOpacity(0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      alignment: Alignment.center,
+      child: const Icon(Icons.image_not_supported, size: 22),
+    );
 
     if (url == null || url!.isEmpty) return fallback();
 
@@ -1048,20 +2077,18 @@ class _CardThumb extends StatelessWidget {
       child: SizedBox(
         width: size,
         height: size,
-        child: Image.network(
-          url!,
+        child: MylNetworkImage(
+          imageUrl: url!,
           fit: BoxFit.cover,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return const Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+          placeholder:
+              (_, __) => const Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               ),
-            );
-          },
-          errorBuilder: (_, __, ___) => fallback(),
+          errorWidget: (_, __, ___) => fallback(),
         ),
       ),
     );

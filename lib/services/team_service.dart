@@ -41,23 +41,171 @@ class TeamService {
     return ref.id;
   }
 
+  Future<void> ensureOwnerMembership(String teamId) async {
+    final teamRef = _db.collection('teams').doc(teamId);
+    final team = await teamRef.get();
+    final ownerId =
+        (team.data()?['ownerId'] ?? team.data()?['adminUid'] ?? '').toString();
+    if (ownerId != uid) return;
+    final user = _auth.currentUser!;
+    final memberRef = teamRef.collection('members').doc(uid);
+    if ((await memberRef.get()).exists) return;
+    final batch = _db.batch();
+    batch.set(memberRef, {
+      'role': 'owner',
+      'displayName': user.displayName ?? user.email ?? 'Jugador',
+      'photoUrl': user.photoURL ?? '',
+      'email': user.email ?? '',
+      'joinedAt': FieldValue.serverTimestamp(),
+    });
+    batch.set(
+      _db.collection('users').doc(uid).collection('teams').doc(teamId),
+      {'role': 'owner', 'joinedAt': FieldValue.serverTimestamp()},
+    );
+    await batch.commit();
+  }
+
+  Future<void> addMember(String teamId, String userId) async {
+    final userDoc = await _db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      throw StateError('El usuario seleccionado ya no existe.');
+    }
+    final data = userDoc.data();
+    if (data == null) throw StateError('No se pudo leer el usuario.');
+    final memberRef = _db
+        .collection('teams')
+        .doc(teamId)
+        .collection('members')
+        .doc(userId);
+    if ((await memberRef.get()).exists) {
+      throw StateError('El usuario ya pertenece al team.');
+    }
+    final batch = _db.batch();
+    batch.set(memberRef, {
+      'role': 'member',
+      'displayName':
+          (data['displayName'] ?? data['username'] ?? 'Jugador').toString(),
+      'photoUrl': (data['photoUrl'] ?? '').toString(),
+      'email': (data['email'] ?? '').toString(),
+      'joinedAt': FieldValue.serverTimestamp(),
+    });
+    batch.set(
+      _db.collection('users').doc(userId).collection('teams').doc(teamId),
+      {'role': 'member', 'joinedAt': FieldValue.serverTimestamp()},
+    );
+    await batch.commit();
+  }
+
+  Future<void> changeMemberRole(
+    String teamId,
+    String memberUid,
+    String role,
+  ) async {
+    if (!const ['admin', 'captain', 'member'].contains(role)) {
+      throw ArgumentError.value(role, 'role', 'Rol no permitido');
+    }
+    final batch = _db.batch();
+    batch.update(
+      _db.collection('teams').doc(teamId).collection('members').doc(memberUid),
+      {'role': role},
+    );
+    batch.set(
+      _db.collection('users').doc(memberUid).collection('teams').doc(teamId),
+      {'role': role},
+      SetOptions(merge: true),
+    );
+    await batch.commit();
+  }
+
+  Future<void> removeMember(String teamId, String memberUid) async {
+    final member =
+        await _db
+            .collection('teams')
+            .doc(teamId)
+            .collection('members')
+            .doc(memberUid)
+            .get();
+    if (member.data()?['role'] == 'owner') {
+      throw StateError('Transfiere la propiedad antes de quitar al owner.');
+    }
+    final batch = _db.batch();
+    batch.delete(member.reference);
+    batch.delete(
+      _db.collection('users').doc(memberUid).collection('teams').doc(teamId),
+    );
+    await batch.commit();
+  }
+
+  Future<void> transferOwnership(String teamId, String newOwnerUid) async {
+    final teamRef = _db.collection('teams').doc(teamId);
+    final team = await teamRef.get();
+    final oldOwnerUid =
+        (team.data()?['ownerId'] ?? team.data()?['adminUid'] ?? '').toString();
+    if (oldOwnerUid != uid) {
+      throw StateError('Solo el propietario puede transferir el team.');
+    }
+    final newOwnerRef = teamRef.collection('members').doc(newOwnerUid);
+    if (!(await newOwnerRef.get()).exists) {
+      throw StateError('El nuevo propietario debe ser miembro del team.');
+    }
+    final batch = _db.batch();
+    batch.update(teamRef, {'ownerId': newOwnerUid, 'adminUid': newOwnerUid});
+    batch.update(newOwnerRef, {'role': 'owner'});
+    batch.set(
+      _db.collection('users').doc(newOwnerUid).collection('teams').doc(teamId),
+      {'role': 'owner'},
+      SetOptions(merge: true),
+    );
+    if (oldOwnerUid.isNotEmpty && oldOwnerUid != newOwnerUid) {
+      batch.set(teamRef.collection('members').doc(oldOwnerUid), {
+        'role': 'admin',
+      }, SetOptions(merge: true));
+      batch.set(
+        _db
+            .collection('users')
+            .doc(oldOwnerUid)
+            .collection('teams')
+            .doc(teamId),
+        {'role': 'admin'},
+        SetOptions(merge: true),
+      );
+    }
+    await batch.commit();
+  }
+
   Future<String?> joinByCode(String code) async {
     code = code.trim().toUpperCase();
-    final q = await _db.collection('teams').where('inviteCode', isEqualTo: code).limit(1).get();
+    final q =
+        await _db
+            .collection('teams')
+            .where('inviteCode', isEqualTo: code)
+            .limit(1)
+            .get();
     if (q.docs.isEmpty) return null;
     final teamId = q.docs.first.id;
 
     // ya es miembro?
-    final isMember = await _db.collection('teams').doc(teamId).collection('members').doc(uid).get();
+    final isMember =
+        await _db
+            .collection('teams')
+            .doc(teamId)
+            .collection('members')
+            .doc(uid)
+            .get();
     if (isMember.exists) return teamId;
 
     final user = _auth.currentUser!;
-    await _db.collection('teams').doc(teamId).collection('members').doc(uid).set({
-      'role': 'member',
-      'displayName': user.displayName ?? '',
-      'photoUrl': user.photoURL ?? '',
-      'joinedAt': FieldValue.serverTimestamp(),
-    });
+    await _db
+        .collection('teams')
+        .doc(teamId)
+        .collection('members')
+        .doc(uid)
+        .set({
+          'role': 'member',
+          'displayName': user.displayName ?? '',
+          'photoUrl': user.photoURL ?? '',
+          'joinedAt': FieldValue.serverTimestamp(),
+        });
     await _db.collection('users').doc(uid).collection('teams').doc(teamId).set({
       'role': 'member',
       'joinedAt': FieldValue.serverTimestamp(),
@@ -74,7 +222,12 @@ class TeamService {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> members(String teamId) {
-    return _db.collection('teams').doc(teamId).collection('members').orderBy('joinedAt').snapshots();
+    return _db
+        .collection('teams')
+        .doc(teamId)
+        .collection('members')
+        .orderBy('joinedAt')
+        .snapshots();
   }
 
   Future<void> leaveTeam(String teamId) async {
@@ -94,12 +247,22 @@ class TeamService {
       }
       // si está solo, permitir borrar el team
       await memRef.delete();
-      await _db.collection('users').doc(uid).collection('teams').doc(teamId).delete();
+      await _db
+          .collection('users')
+          .doc(uid)
+          .collection('teams')
+          .doc(teamId)
+          .delete();
       await teamRef.delete();
       return;
     }
 
     await memRef.delete();
-    await _db.collection('users').doc(uid).collection('teams').doc(teamId).delete();
+    await _db
+        .collection('users')
+        .doc(uid)
+        .collection('teams')
+        .doc(teamId)
+        .delete();
   }
 }

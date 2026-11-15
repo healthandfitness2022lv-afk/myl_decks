@@ -9,8 +9,7 @@ class PBData {
   };
 
   /// Lista cómoda para dropdown (ordena por nombre).
-  static List<String> get ediciones =>
-      edicionToExpansion.keys.toList()..sort();
+  static List<String> get ediciones => edicionToExpansion.keys.toList()..sort();
 
   /// Razas por edición (solo aplican a Tipo = Aliado).
   static const Map<String, List<String>> razasPorEdicion = {
@@ -19,6 +18,15 @@ class PBData {
     'Hijos de Daana': ['Defensor', 'Desafiante', 'Sombra'],
     'Dominios de Ra': ['Eterno', 'Sacerdote', 'Faraón'],
   };
+
+  /// Todas las razas de todas las ediciones (sin duplicados, ordenadas).
+  static List<String> get todasLasRazas {
+    final all = <String>{};
+    for (final list in razasPorEdicion.values) {
+      all.addAll(list);
+    }
+    return all.toList()..sort();
+  }
 
   /// Tipos de carta más comunes en PB.
   static const List<String> tipos = [
@@ -30,9 +38,5 @@ class PBData {
   ];
 
   /// Rarezas típicas en PB (puedes adaptar).
-  static const List<String> rarezas = [
-    'Real',
-    'Vasallo',
-    'Cortesano',
-  ];
+  static const List<String> rarezas = ['Real', 'Vasallo', 'Cortesano'];
 }

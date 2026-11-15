@@ -1,0 +1,2040 @@
+
+===== PAGINA 1 =====
+ 
+ 
+DOCUMENTO ACTUALIZADO DE 
+REGLAS (D.A.R.) Versión 1.0 
+ 
+MITOS Y LEYENDAS 
+FORMATO PRIMER BLOQUE  
+JULIO 2021  
+ 
+ 
+ 
+
+
+===== PAGINA 2 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+2 
+INDICE 
+ 
+1.- INTRODUCCIÓN ...................................................................................................................................................... 4 
+2.- CARTAS PROHIBIDAS .......................................................................................................................................... 4 
+3.- EDICIONES DE PRIMER BLOQUE ...................................................................................................................... 5 
+4.- CLARIFICACIÓN DE CONCEPTOS DE JUEGO Y JUGABILIDAD DE CARTAS ....................................... 6 
+4.1 Elementos que componen una carta ............................................................................................................................. 6 
+4.1.1 Nombre ............................................................................................................................................................................ 6 
+4.1.2 Coste de Oro .................................................................................................................................................................. 6 
+4.1.3 Símbolo de carta ........................................................................................................................................................... 6 
+4.1.4 Caja de texto .................................................................................................................................................................. 6 
+4.1.5 Raza .................................................................................................................................................................................. 6 
+4.1.6 Frecuencia ...................................................................................................................................................................... 7 
+4.1.7 Texto épico ..................................................................................................................................................................... 7 
+4.1.8 Código de coleccionista .............................................................................................................................................. 8 
+4.2 Tipos de Cartas ................................................................................................................................................................... 8 
+4.2.1 Aliados ............................................................................................................................................................................. 8 
+4.2.2 Armas ............................................................................................................................................................................. 10 
+4.2.2.1 Armas en Línea de Apoyo .............................................................................................................................. 11 
+4.2.3 Talismanes.................................................................................................................................................................... 11 
+4.2.4 Tótems ........................................................................................................................................................................... 11 
+4.2.5 Oros ................................................................................................................................................................................ 12 
+4.3 Zonas de Juego ................................................................................................................................................................ 13 
+4.3.1 Mazo Castillo ................................................................................................................................................................ 13 
+4.3.2 Reserva de Oro ............................................................................................................................................................ 13 
+4.3.3 Zona de Oro Pagado................................................................................................................................................... 13 
+4.3.4 Línea de Defensa ......................................................................................................................................................... 14 
+4.3.5 Línea de Ataque ........................................................................................................................................................... 14 
+4.3.6 Línea de Apoyo ............................................................................................................................................................ 14 
+4.3.7 Cementerio ................................................................................................................................................................... 14 
+4.3.8 Zona de Destierro........................................................................................................................................................ 14 
+4.3.9 Zona de Efectos Permanentes ................................................................................................................................. 14 
+4.3.10 Mano ......................................................................................................................................................................... 15 
+4.4 Controlador y Dueño ....................................................................................................................................................... 15 
+4.4.1 Controlador .................................................................................................................................................................. 15 
+4.4.2 Dueño ............................................................................................................................................................................. 15 
+4.4.3 Cambiar una carta de Controlador ......................................................................................................................... 15 
+4.5 Bajar / Poner en juego / Jugar ....................................................................................................................................... 16 
+4.5.1 Bajar / Poner en juego ............................................................................................................................................... 16 
+4.5.2 Jugar .............................................................................................................................................................................. 16 
+4.5.3 Pasos para jugar una carta ....................................................................................................................................... 17 
+
+===== PAGINA 3 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+3 
+4.5.4 Objetivo ......................................................................................................................................................................... 18 
+4.6 Habilidades y Efectos ...................................................................................................................................................... 19 
+4.6.1 Composición de una habilidad ................................................................................................................................ 19 
+4.6.1.1 Restricciones de Activación ............................................................................................................................... 19 
+4.6.2 Pasos para utilizar una Habilidad ........................................................................................................................... 19 
+4.6.3 Habilidades Activadas ............................................................................................................................................... 20 
+4.6.4 Habilidades Disparadas ............................................................................................................................................. 20 
+4.6.5 Habilidades Continuas ............................................................................................................................................... 20 
+4.6.6 Prioridades ................................................................................................................................................................... 21 
+4.6.7 Resolución de múltiples Habilidades ..................................................................................................................... 21 
+4.6.8 Tipos de Efectos.......................................................................................................................................................... 24 
+4.6.8.1 Efectos Dirigidos .............................................................................................................................................. 24 
+4.6.8.2 Efectos Universales ......................................................................................................................................... 24 
+4.6.9 Resolución de los Efectos ........................................................................................................................................ 24 
+4.6.10 Duración de un Efecto .......................................................................................................................................... 26 
+4.6.11 Auto-Referencia ..................................................................................................................................................... 27 
+4.7 Anulación ........................................................................................................................................................................... 28 
+4.8 Cancelación ....................................................................................................................................................................... 28 
+4.9 Redirección ........................................................................................................................................................................ 30 
+4.10 Prevención ......................................................................................................................................................................... 30 
+4.11 En respuesta ...................................................................................................................................................................... 31 
+4.11.1 En respuesta a una Fase de juego .................................................................................................................... 32 
+4.12 Afectar ................................................................................................................................................................................. 32 
+4.12.1 Afectar a un jugador ............................................................................................................................................. 32 
+4.13 Condición de tener en juego solo una copia de una carta ..................................................................................... 33 
+4.14 Regla de Oro ...................................................................................................................................................................... 33 
+5.- FASES DEL JUEGO.............................................................................................................................................. 34 
+5.1 Fase de Agrupación ......................................................................................................................................................... 34 
+5.2 Fase de Vigilia ................................................................................................................................................................... 34 
+5.3 Batalla Mitológica ............................................................................................................................................................. 35 
+5.3.1 Declaración de Ataque ............................................................................................................................................... 35 
+5.3.2 Declaración de Bloqueo ............................................................................................................................................ 35 
+5.3.3 Guerra de Talismanes ................................................................................................................................................ 35 
+5.3.4 Asignación de Daño ................................................................................................................................................... 36 
+5.4 Fase Final ........................................................................................................................................................................... 37 
+5.5 Final del Turno .................................................................................................................................................................. 37 
+6.- GLOSARIO.............................................................................................................................................................. 38 
+  
+
+===== PAGINA 4 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+4 
+1.- INTRODUCCIÓN 
+ 
+El Documento Actualizado de Reglas (DAR) es un archivo de reglas elaborado por la  Comunidad de Primer 
+Bloque, cuya finalidad es aclarar dudas y explicar conceptos referentes al Formato Primer Bloque de  Mitos y 
+Leyendas, pasando a ser una guía de reglas tanto para jueces como para jugadores . Por lo tanto, puede ser 
+usado como base para resolver cualquier posible conflicto de reglas.  
+En este documento se aclarará cómo se utilizarán las Habilidades y eventos que suceden durante los duelos, 
+usando como base la forma de jugar las cartas como originalmente se hacía entre los años 2003 a 2005, además 
+de utilizar como guía base el DAR publicado en abril de 2005. Todo esto en conveniencia de un juego más 
+equilibrado y sano para la Comunidad de Primer Bloque de Mitos y Leyendas, ya sea de manera competitiva o 
+casual.  
+También se mostrará la forma en que se utilizarán ciertas mecáni cas, considerando la manera en que 
+antiguamente se utilizaban ciertas Habilidades y erratas.  Además, se tomará paralelamente como base el 
+Oráculo 2021, el cual se enfocará en la clarificación de cartas en que su Habilidad o forma de jugar lo requieran.  
+ 
+2.- CARTAS PROHIBIDAS  
+ 
+No existen cartas prohibidas dentro del Formato Primer Bloque. Se estará revisando continuamente si en algún 
+momento es necesario incluir alguna carta en esta lista. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGINA 5 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+5 
+3.- EDICIONES DE PRIMER BLOQUE  
+ 
+El Formato Primer Bloque abarca solo las ediciones y expansiones especificadas dentro de esta Sección, por 
+lo que se entiende que pueden usarse todas las cartas detalladas para el Formato Primer Bloque, y excluye el 
+resto de las cartas que no esté dentro del mismo. Las ediciones que conforman el Formato de Primer Bloque 
+son las siguientes:   
+• ES : Espada Sagrada 
+• CR : Cruzadas 
+• HE : Helénica 
+• IM : Imperio 
+• HD : Hijos de Daana 
+• TA : Tierras Altas 
+• DR : Dominios de Ra 
+• EN : Encrucijada  
+• PE : Carta Promocional  
+ 
+Además, se incluye la siguiente lista de Cartas Promocionales oficiales de Primer Bloque  en la cual, luego del 
+nombre de cada carta , le sigue la ed ición a la que pertenecen , y se consideran “Carta Única” (sólo puede 
+incluirse una copia de estas cartas en la construcción de un Mazo). 
+• PE – 001 Cruz Templaria – Cruzadas 
+• PE – 002 Simón de Montfort – Cruzadas  
+• PE – 003 Federico Barbarroja – Cruzadas  
+• PE – 004 Maza de Guerra – Cruzadas 
+• PE – 005 Mensajero de la Libertad – Espada Sagrada 
+• PE – 006 Cruzada de los Niños – Cruzadas 
+• PE – 007 Espada Sagrada – Espada Sagrada 
+• PE – 008 Cruzadas – Cruzadas  
+• PE – 009 Helénica – Helénica  
+• PE – 010 Imperio – Imperio 
+• PE – 011 Micenas – Helénica 
+• PE – 012 Fundación de Thebas – Helénica 
+• PE – 013 Hijos de Daana – Hijos de Daana 
+• PE – 014 Tuatha de Danaan – Hijos de Daana 
+• PE – 015 Bran – Hijos de Daana 
+• PE – 016 Letanía – Tierras Altas 
+• PE – 017 Tierras Altas – Tierras Altas 
+• PE – 018 Minas de Gruash – Tierras Altas  
+• PE – 019 Dominios de Ra – Dominios de Ra  
+• PE – 020 Dendera – Dominios de Ra 
+• PE – 021 Relámpago Arcano – Dominios de Ra 
+• PE – 022 Colosos Hititas – Dominios de Ra 
+• PE – 023 Seshat – Dominios de Ra 
+• PE – 024 Encrucijada - Encrucijada 
+• PE – 025 Abismo - Encrucijada 
+• PE – 026 Consumir las Aguas - Encrucijada 
+• PE – 027 Escudo Celestial – Encrucijada  
+Sumado a lo anterior, las cartas de  productos especiales como Caballo de Troya, Líber Dominus Arcano, 
+Pirámide del Ka, las ediciones Compendium CO & ECO y las reediciones de Primer Bloque desde el año 2019 
+en adelante, respetarán las aclaraciones del Oráculo 2021. A su vez, las cartas que no están mencionadas en 
+dicho documento respetarán las características originales de sus respectivas ediciones.   
+
+===== PAGINA 6 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+6 
+4.- CLARIFICACIÓN DE CONCEPTOS DE JUEGO Y 
+JUGABILIDAD DE CARTAS 
+ 
+4.1 Elementos que componen una carta 
+ 
+4.1.1 Nombre  
+ 
+El nombre de la carta está impreso en el costado izquierdo de ella. Al hacer referencia al concepto de “Nombrar 
+una carta” se refiere a usar específicamente el nombre impreso en una carta.  
+ 
+4.1.2 Coste de Oro  
+ 
+Corresponde al número impreso en la esquina superior derecha de la carta. Representa la cantidad de Oros 
+necesarios para pagar el Coste de una carta.  
+• Si una Habilidad o efecto dice “reduce el Coste de X ”, esta reducción de Coste sólo se aplica al 
+momento de jugar la carta. Las cartas entran en juego con su Coste impreso.  
+• En cualquier zona de juego y fuera de él, las cartas mantienen su Coste impreso, a menos que una 
+Habilidad o efecto especifique lo contrario.  
+• Una Habilidad o efecto de Reducción de Coste no puede reducir el Coste de una carta a menos de 0. 
+Para efectos de juego, 0 es un Coste válido tanto para jugar cartas de Coste 0 como para utilizar 
+Habilidades que indiquen Costes.  
+ 
+4.1.3 Símbolo de carta  
+ 
+El símbolo de una carta se define con el ícono impreso en la esquina superior izquierda  de la carta, que a su 
+vez señala el tipo de carta (Aliado, Arma, Talismán, Tótem) . El símbolo de las cartas de Oro, en cambio, se 
+ubica en la esquina superior derecha de la carta.  
+Solo las cartas de Aliado tienen un valor numérico impreso dentro del ícono de Aliado.  
+ 
+4.1.4 Caja de texto  
+ 
+Contiene la Habilidad de las cartas. Cuando se quita o elimina la Habilidad de una carta por un efecto o 
+Habilidad, se trata como si ésta estuviese en blanco, a menos que alguna carta especifique lo contrario.  
+ 
+4.1.5 Raza  
+ 
+La Raza sólo la pueden tener impresa las cartas de Aliado, y se encuentra descrita bajo el ícono de Fuerza.  
+Cuando una carta se “considera” de una Raza, especificada por alguna Habilidad o efecto, esta nueva Raza es 
+adicional a la primera, quedando esta carta con 2 Razas. Solo podría reemplazar su Raza original si una carta 
+o efecto lo indica expresamente en su Habilidad.  
+
+===== PAGINA 7 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+7 
+ 
+Ejemplo 1:  
+Murallas de Adriano (C: 2, Tótem. Mientras tengas Murallas de Adriano en juego, 
+en tu Fase de Vigilia, una vez por turno, puedes nombrar una Raza de Aliado que 
+tengas en juego. Durante el turno todos tus Aliados serán de esa Raza).  
+Murallas de Adriano especifica que, al nombrar una Raza, todos los Aliados de su 
+Controlador adquieren una nueva Raza hasta la Fase Final, independiente de su 
+Raza original. Por consiguiente, esto significa que también adquieren atribuciones 
+asociadas a la Raza nombrada. 
+ 
+4.1.6 Frecuencia  
+ 
+La frecuencia que tienen las cartas se expresa en el rango que presenta cada carta. Estos rangos , que se 
+especifican con un color de símbolo de frecuencia ubicado al costado derecho de la caja de texto de una carta, 
+son los siguientes:  
+• Vasallos: Son cartas comunes, con el ícono azul o verde impreso en la carta.  
+• Cortesanos: Son cartas infrecuentes, con el ícono rojo impreso en la carta.  
+• Reales: Son cartas raras, que tienen un ícono dorado impreso en la carta.  
+Cabe destacar que todas las cartas promocionales (también llamadas “cartas promo”) se consideran como Carta 
+Única. Además, mantienen su frecuencia original.  
+ 
+ 
+Ejemplo 2:  
+Simón de Montfort (C: 3, F: 2, Aliado, Raza: Caballero. En tu Fase de Vigilia y una 
+vez por turno, genera 2 Oros para pagar el Coste de un Tótem).  
+Esta carta fue impresa 2 veces en la extensión Cruzadas: con frecuencia Cortesano 
+y como carta promocional. Por tanto, para efectos de juego se considera como Carta 
+Única y mantiene su frecuencia original (Cortesano). 
+ 
+Además, toda edición o reedición posterior de una carta, mantendrá la frecuencia original de la primera edición 
+de dicha carta, a menos que se especifique lo contrario.  
+ 
+ 
+Ejemplo 3:  
+Tótem de Nwyre (C: 3, Tótem. Paga 1 de Oro y Roba una carta).  
+Algunas cartas como Tótem de Nwyre  fueron impresas durante el año 2020 con 
+una versión real (foil) de ellas. Sin embargo, para efectos de juego mantiene su 
+frecuencia original (Cortesano). 
+ 
+ 
+4.1.7 Texto épico  
+ 
+Se ubica dentro de la ilustración de la carta . No tiene incidencia en el juego . Contiene leyendas relacionadas 
+con la carta y la sitúan dentro de un contexto histórico, mítico o legendario.  
+
+
+===== PAGINA 8 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+8 
+4.1.8 Código de coleccionista  
+ 
+El código de coleccionista impreso en la carta está dividido en 3 partes, conformado por la siguiente forma:  
+• XX – YY / ZZZ EDICIÓN  
+El detalle para identificar una carta está basado en el número de colección, donde:  
+• XX: Es el número de la carta dentro de la edición.  
+• YY: Es el número total de cartas dentro de la edición.  
+• ZZZ EDICIÓN:  Indica la edición de la carta. Ejemplos: Primera Edición, Segunda Edición, Edición 
+Especial, etc.  
+Las cartas promocionales están descritas de una forma distinta, especificadas como:  
+• CARTA PROMO  
+• CARTA PROMOCIONAL 2° ERA  
+ 
+4.2 Tipos de Cartas 
+ 
+4.2.1 Aliados  
+ 
+Se identifican por el símbolo de Fuerza, y son la base de la batalla dentro del juego. Los Aliados mantienen su 
+Fuerza impresa en cualquier zona fuera del juego (Mazo Castillo, Cementerio y Zona de Destierro).  
+Un Aliado, para ser declarado atacante, debe moverse desde la Línea de Defensa a la Línea de Ataque. 
+Además, como requisito principal debe haber estado en juego bajo el control del jugador desde el principio de 
+su última Fase de Agrupación. La excepción a esta regla se especifica por la Habilidad que omite esta restricción 
+para ser declarado atacante descrita, por ejemplo, como: “Puede atacar el turno que entra en juego”.  
+ 
+Ejemplo 4:  
+Oseye (C: 2, F: 3, Aliado, Raza: Sacerdote. Oseye no puede ser anulado. Puede 
+atacar el turno que entra en juego. Puedes pagar el Coste de Osete para prevenir que 
+sea Destruido o Desterrado y subirlo a tu Mano).  
+Oseye al indicar en su Habilidad que puede atacar el turno que entra en juego, hace 
+excepción a la regla de que un Aliado debe estar bajo el control del jugador desde el 
+principio de su última Fase de Agrupación para ser declarado atacante. 
+Cuando una carta se “Considera” un Aliado, no implica que esté entrando en juego, y desde ese momento es 
+afectada por las mismas restricciones que cualquier Aliado para ser declarado atacante . Es decir, si esa carta 
+no estuvo en juego desde el comienzo de la última Fase de Agrupación de su Controlador, no puede ser 
+declarada atacante, a menos que su Habilidad especifique lo contrario. 
+Cuando una carta se “Considera” un Aliado, ésta se mueve a la Línea de Defensa de su Controlador. Una vez 
+concluye el efecto, la carta vuelve a su tipo original y regresa a la Línea de Apoyo , en caso de ser Tótem ; en 
+caso de ser Oro, regresa a la Zona de Oro Pagado; y en caso de ser Arma, regresa a su portador (o a la Línea 
+de Apoyo, según lo indique el Arma).  
+
+
+===== PAGINA 9 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+9 
+ 
+Ejemplo 5:  
+Transmutación (C: 3, Talismán. En tu Fase de Vigilia, tus Tótems pierden su 
+Habilidad y se consideran Aliados con Fuerza igual a su Coste hasta la Fase Final).  
+Transmutación permite al Jugador Activo “Considerar” todos sus Tótems como 
+Aliados con Fuerza igual a su Coste (además de perder sus Habilidades), 
+brindándoles todos los atributos y restricciones que afectan a los Aliados. 
+ 
+La Fuerza imp resa de un Aliado puede ser cambiada por un efecto llamado Modificador de Fuerza , que se 
+refiere a aquellas Habilidades o efectos que alteren la Fuerza impresa de uno o más Aliados, teniendo los 
+siguientes casos:  
+• Aumentar: Referido a cualquier efecto que aumente la Fuerza de una carta.  
+ 
+Ejemplo 6:  
+Ofrenda a los Dioses  (Oro. Si Ofrenda a los Dioses está en tu Reserva de Oro, 
+todos tus Aliados de Raza Olímpico ganan 1 a la Fuerza).  
+Corresponde a un Modificador de Fuerza que, estando en la Reserva de Oro de su 
+Controlador, sus Aliados de Raza Olímpico aumentarán 1 a su Fuerza. Este 
+Modificador se pierde si el Controlador decide pagar Ofrenda a los Dioses, es decir, 
+mover este Oro a la Zona de Oro Pagado. 
+• Disminuir: Referido a cualquier efecto que disminuya la Fuerza de una carta.  
+ 
+Ejemplo 7:  
+Dardos Envenenados (C: 1, Arma. En tu Fase de Vigilia, su portador gana -1 a la 
+Fuerza permanentemente).  
+Corresponde a un Modificador de Fuerza que, en cada Fase de Vigilia del 
+Controlador del Arma, su portador disminuirá su Fuerza en 1 permanentemente, 
+hasta un mínimo de 0. 
+• Duplicar: Referido a un efecto que exactamente duplique la Fuerza actual de una carta.  
+ 
+Ejemplo 8:  
+Tancredo (C: 3, F: 2, Aliado, Raza: Caballero. Si Tancredo es declarado atacante, 
+duplica su Fuerza).  
+Corresponde a un Modificador de Fuerza que, al momento de declarar ataque, se 
+dispara la Habilidad de Tancredo, duplicando su Fuerza actual hasta la Fase Final. 
+• Establecer: Referido a un efecto que cambia a un número especifico la Fuerza de una carta. Sin 
+embargo, después de esto puede continuar Modificando su Fuerza nuevamente.  
+
+
+===== PAGINA 10 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+10 
+ 
+Ejemplo 9:  
+Org, el Hechicero  (C: 2, F: 0, Aliado, Raza: Dragón. En Guerra de Talismanes, 
+puedes pagar 2 Oros para que un Aliado oponente tenga Fuerza 0 hasta la Fase 
+Final).  
+Misil Mágico (C: 2, Talismán. En Guerra de Talismanes, elige entre Robar 2 cartas o 
+que un Aliado gane +2 a la Fuerza hasta la Fase Final).  
+Org, el Hechicero corresponde a un Modificador de Fuerza que, en Guerra de 
+Talismanes, su Controlador puede pagar 2 de Oro para establecer la Fuerza de un 
+Aliado oponente en 0. No obstante, dicho A liado oponente puede volver a Modificar 
+su Fuerza mediante jugar una carta o la utilización de alguna Habilidad que así lo 
+permita, como por ejemplo jugando Misil Mágico, teniendo la posibilidad de aumentar 
+la Fuerza del Aliado en 2 hasta la Fase Final, o hasta que se juegue una carta y/o se 
+utilice una Habilidad que modifique nuevamente la Fuerza de dicho Aliado oponente.  
+ 
+ 
+ 
+ 
+4.2.2 Armas  
+ 
+Son cartas que entregan , por lo general,  Modificadores de Fuerza y/o nuevas Habilidades a los Aliados. Al 
+jugarlas requieren un Aliado como Objetivo válido para ser cargadas o portadas a él. Si no existe un Aliado que 
+sea un portador válido, el Arma no puede ser jugada. 
+Los Aliados solo pueden portar un Arma, a menos que una Habilidad indique lo contrario. 
+El Aliado, para ser un portador válido, debe cumplir algunos requisitos básicos:  
+• En caso de ser otro tipo de carta, ésta debe Considerarse un Aliado.  
+• Cumplir requerimientos de Raza, en caso de que existan.  
+• Cumplir requerimientos de Fuerza o Coste, en caso de que existan.  
+Si un Arma, en algún momento del juego, está anexada a un portador no válido, el Arma es puesta en el 
+Cementerio de su Dueño. Para efectos de juego, se considera que “sale del juego”.  
+ 
+Ejemplo 10:  
+Ser de Arena (C: 2, Talismán. Elige un Oro de tu Reserva de Oro y ponlo en tu Línea 
+de Defensa, este Oro pierde su Habilidad hasta la Fase Final y se Considera un Aliado 
+con Fuerza igual al número de Oros en tu Reserva de Oro. En la Fase Final, si 
+permanece en juego, ponlo en tu Reserva de Oro).  
+Al jugar Ser de Arena, su Controlador elige uno de sus Oros en su Reserva de Oro 
+para que se Considere un Aliado con Fuerza igual al número de Oros que tenga en 
+su Reser va de Oro. Si jugó este Talismán en su Fase de Vigilia, entonces el Oro 
+Considerado como Aliado pasa a ser portador válido para cargar un Arma en dicho 
+Oro. Si este Oro permanece en juego en la Fase Final, entonces el Oro regresa a la 
+Reserva de Oro de su Controlador, y el Arma es puesta en el Cementerio de su 
+Dueño, debido a que el Oro ya dejó de Considerarse un Aliado, por lo que ya no es 
+portador válido del Arma.  
+En caso de que un Aliado que puede portar más de un Arma, si ya tiene anexadas 2 o más Armas a él, y por 
+alguna Habilidad o efecto de otra carta  pierde su Habilidad, el Controlador del Aliado portador debe elegir una 
+de las Armas para que quede portada al Aliado, y el resto deben ser puestas en el Cementerio de su Dueño.  
+
+
+===== PAGINA 11 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+11 
+Si una Habilidad o efecto de una carta hace que un Aliado que porte una o más Armas pierda su Habilidad, solo 
+el Aliado se verá afectado . S in embargo, el Arma seguirá entregándole sus  Modificadores de Fuerza  y/o 
+Habilidades propias debido a que, para efectos de juego, son Habilidades independientes.  
+Cuando un Aliado portador sale del juego hacia cualquier zona, todas las Armas portadas en él son enviadas a 
+la misma zona que el portador del Arma.  
+Las Armas son el único tipo de carta que pueden ser jugadas directamente en un Aliado oponente, sin que la 
+carta lo especifique. De esta manera, su Controlador puede utilizar su Habilidad.  
+ 
+4.2.2.1 Armas en Línea de Apoyo  
+ 
+Existen Armas que pueden ser jugadas en la Línea de Apoyo, tal como los Tótems, incluso si el jugador no 
+posee Aliados en juego. Las Habilidades de las Armas jugadas en la Línea de Apoyo solo pueden ser utilizadas 
+si su Controlador tiene al menos un Aliado en su zona de juego. Si no tiene Aliados, el Arma queda en juego en 
+la Línea de Apoyo, pero su Habilidad no puede ser utilizada hasta que tenga al menos un Aliado en juego. Por 
+regla general, no se pueden jugar Armas en la Línea de Apoyo, a no ser que una Habilidad lo permita.  
+Las Armas que se juegan en Línea de Apoyo solo pueden ser jugadas en el campo de su Dueño.  
+ 
+4.2.3 Talismanes  
+ 
+Son cartas con variados efectos y que, al ser jugadas, se resuelven y son puestas en el Cementerio. 
+Algunos Talismanes requieren de Objetivos de cartas en juego para ser jugados , debido a que esta es su 
+condición de juego , por lo que deben poder seleccionarse estos Objetivos para poder jugar el Talismán 
+(siguiendo los pasos descritos en el punto 4.5.3 Pasos para Jugar una carta). De lo contrario, el Talismán no 
+puede ser jugado y permanece en su zona de origen.  
+Para jugar un Talismán deben cumplirse el 100% de sus requisitos, lo que no implica que se deba resolver el 
+100% de sus efectos, y ponerse en el Cementerio automáticamente por lo que , al final de su resolución, se 
+considera que la carta ya se encuentra en el Cementerio. 
+Los Talismanes se resuelven durante la transición de la Mano al Cementerio, es decir, si un Talismán dice  
+“Baraja tu Cementerio con tu Mazo Castillo”, ese Talismán no será Barajado en el Mazo Castillo, ya que primero 
+se debe resolver el efecto (en la medida de lo posible) y luego se pone en el Cementerio.  
+ 
+4.2.4 Tótems  
+ 
+Son cartas que aplican ciertas condiciones al desarrollo del juego, afectando a cartas y/o jugadores.  
+Los Tótems siguen los mismos pasos explicados en el punto 4.5.3 Pasos para Jugar una carta, y entran en 
+juego en la Línea de Apoyo de su Controlador. 
+Cuando un Tótem se Considera un Aliado, debe ser ubicado en la Línea de Defensa de su Controlador, y se 
+rige bajo las mismas restricciones a las que se someten los Aliados. Es decir, si ese Tótem (ya Considerado un 
+Aliado) no estuvo en juego desde el comienzo de la última Fase de Agrupación de su Controlador, no puede 
+ser declarado atacante. Cuando el efecto termina, y si permanece en juego, el Tótem es ubicado de regreso en 
+la Línea de Apoyo de su Controlador.  
+ 
+ 
+
+===== PAGINA 12 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+12 
+4.2.5 Oros  
+ 
+Los Oros son el recurso básico del juego y con el que se pagan los Costes de cartas o Habilidades. Solo se 
+puede jugar un Oro por turno, al inicio de la Fase de Vigilia. Sin embargo, si el jugador utiliza alguna Habilidad 
+que permita jugar más Oros, puede hacerlo. 
+El Oro inicial con el que se comienza el juego debe ser un Oro sin Habilidad. 
+Para efectos de juego, existen tres tipos de Oro:  
+• Oros sin Habilidad: Son aquellos Oros que no tienen caja de texto de Habilidad. Pueden utilizarse 
+hasta tres copias de un Oro sin Habilidad  en la construcción del Mazo Castillo , como cualquier carta 
+que no especifique ser Carta Única.  
+• Oros con Habilidad: Son aquellos Oros que tienen una caja de texto con una Habilidad determinada. 
+Como toda carta, solo pueden utilizarse hasta tres copias de un Oro con Habilidad en la construcción 
+del Mazo Castillo, a excepción de los Oros que especifiquen ser Carta Única.  
+• Oros Virtuales: Estos Oros son generados por Habilidades y/o efectos. No se consideran cartas en 
+juego y no existen en ninguna zona de juego. Los Oros Virtuales no pueden ser Destruidos , ni 
+Desterrados por Habilidades o efectos, ni tampoco para pagar Costes que requieran “Destruir un Oro” 
+o “Desterrar un Oro”. Toda Habilidad o efecto que mencione el concepto de “generar”, se refiere a Oros 
+Virtuales, y se pueden pagar como el jugador estime conveniente.  
+Los Oros se consideran cartas sin Coste. Debido a lo anterior, los Oros no son Objetivo válido para Habilidades 
+que hagan referencia a Coste de cartas.  
+ 
+ 
+Ejemplo 11:  
+Afrodita (C: 3, F: 1, Aliado, Raza: Olímpico. En tu Fase de Vigilia y una vez por turno, 
+nombra un tipo de carta que no sea Talismán. A continuación, mira la primera carta 
+de tu Mazo Castillo y, si es de ese tipo, juégala sin pagar su Coste. Si no lo es, Barájala 
+en el Mazo Castillo).  
+Afrodita indica que, al jugar una carta sin pagar su Coste, las cartas de Oro no pueden 
+ser jugadas debido a que no poseen Coste.  
+ 
+Ejemplo 12:  
+Relámpago Arcano (C: 1, Talismán. Redirige un efecto oponente que afecte una de 
+tus cartas a otra carta en juego. Tu oponente Bota tantas cartas como Coste tenga la 
+nueva carta afectada).  
+Relámpago Arcano permite redirigir un efecto a otra carta en juego, siempre y 
+cuando la nueva carta sea un Objetivo válido para ello. Por tanto, la nueva carta 
+afectada no puede ser una carta de Oro debido a que no posee Coste.  
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+===== PAGINA 13 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+13 
+4.3 Zonas de Juego 
+ 
+En Mitos y Leyendas, el jueg o utiliza espacios definidos para cada carta . Estos espacios son conocidos como 
+Zonas de Juego. Cada zona de juego cumple una función específica que se detalla a continuación.  
+ 
+ 
+Figura 1: Zonas de Juego.  
+ 
+4.3.1 Mazo Castillo  
+ 
+Es el conjunto de cartas que compone el Mazo de los jugadores . Contiene las cartas que necesitar án para 
+desarrollar la estrategia de cada uno de ellos , y recibe el Daño de los ataques oponentes. Un Mazo Castillo 
+debe estar compuesto por 50 cartas, incluido el Oro inicial.  
+Si en algún momento del juego un jugador no tiene cartas en su Mazo Castillo, perderá el juego.  
+ 
+4.3.2 Reserva de Oro  
+ 
+En esta zona se juegan los Oros que se utilizar án para pagar el Coste de cartas y Habilidades. Cada jugador 
+comienza el juego con un Oro sin Habilidad en su Reserva de Oro, y podrán ir agregando Oros turno tras turno.  
+ 
+4.3.3 Zona de Oro Pagado  
+ 
+Es la zona hacia donde se mueven los Oros que se pagan , o son movidos a esta zona por algún efecto o 
+Habilidad de otra carta, y permanecen allí hasta la siguiente Fase de Agrupación.  
+ 
+
+
+===== PAGINA 14 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+14 
+4.3.4 Línea de Defensa  
+ 
+En esta zona de juego se encuentran los Aliados que entran en juego cada turno, y desde allí pueden bloquear 
+los ataques oponentes.  
+ 
+4.3.5 Línea de Ataque  
+ 
+Durante la Batalla Mitológica, los Aliados declarados atacantes se mueven a esta zona para diferenciarlos de 
+los Aliados que no lo hacen. Además, los Aliados en la Línea de Ataque no pueden bloquear ataques oponentes. 
+En cada Fase de Agrupación, los Aliados en la Línea de Ataque vuelven a la Línea de Defensa.  
+ 
+4.3.6 Línea de Apoyo  
+ 
+En esta zona de juego se encuentran los Tótems y Armas que entran en juego , y permanecen allí hasta que 
+alguna Habilidad o efecto de carta haga que salgan del juego, o cambien de Controlador o de zona.  
+ 
+4.3.7 Cementerio  
+ 
+El Cementerio reúne las cartas que son Puestas, Destruidas, Descartadas, y las cartas que Bota un jugador 
+desde el Mazo Castillo, ya sea por efecto de cartas y/o Habilidades, o por Daño de Combate.  
+El Cementerio es una zona de juego de conocimiento público, por lo que puede ser revisado por todos los 
+jugadores.  
+ 
+4.3.8 Zona de Destierro  
+ 
+Algunos efectos de cartas o Habilidades pueden enviar cartas a esta zona, ya sea desde el Mazo Castillo, Mano, 
+Cementerio o alguna de las zonas de juego. También es de conocimiento público.  
+ 
+4.3.9 Zona de Efectos Permanentes  
+ 
+Esta zona se considera parte del Cementerio del jugador, no una zona en sí misma. Es un área donde están 
+las cartas que tienen efectos permanentes en juego, y existe principalmente para recordar los efectos de cartas 
+que ya han salido del juego, pero que lo continúan afectando.  
+De la misma manera que el Cementerio, todas las cartas en la Zona de Efectos Permanentes se colocan boca 
+arriba.  
+ 
+Ejemplo 13:  
+Tethra (C: 4, F: 2, Aliado, Raza: Sombra. En respuesta a que Tethra sea Destruido, 
+no se podrán jugar Armas ni Tótems por el resto del juego).  
+Tethra al ser Destruido, se envía a la Zona de Efectos Permanentes, principalmente 
+para recordar a los jugadores que su efecto permanente estará vigente por el resto 
+del juego, por lo que no se podrán jugar Armas, ni Tótems hasta que se juegue una 
+carta o utilice una Habilidad que revierta dicho efecto permanente. Aunque Tethra se 
+ubique en esta zona, igualmente se considera como parte del Cementerio de su 
+Dueño.  
+ 
+
+
+===== PAGINA 15 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+15 
+4.3.10 Mano  
+ 
+Es el conjunto de cartas con las que los jugadores comienzan la partida, y es donde se ubican las cartas que 
+se roban a lo largo de la partida. Además, es una Zona fuera del juego y es de información privada. 
+ 
+4.4 Controlador y Dueño 
+ 
+4.4.1 Controlador  
+ 
+El concepto de Controlador se menciona para mejorar la comprensión de algunas interacciones dentro del juego. 
+Las cartas que un jugador controla son todas aquellas que están en cualquiera de sus zonas de juego, es decir, 
+su Línea de Defensa, Línea de Ataque, Línea de Apoyo, Reserva de Oro o Zona de Oro Pagado. Por tanto, solo 
+se controlan las cartas en juego. 
+Para efectos de juego, cualquier carta en una zona de juego de un jugador se considera de ese jugador, es 
+decir, todas las cartas en zonas de juego oponentes se consideran como cartas oponentes y todas las cartas 
+en zonas de juego propias se consideran como propias.  
+ 
+4.4.2 Dueño  
+ 
+El Dueño de una carta es aquel jugador que comenzó la partida con dicha carta en su Mazo Castillo, incluido el 
+Oro inicial. 
+Cuando una carta sale del juego, es enviada a la zona de juego respectiva de su Dueño.   
+• Una carta Destruida es enviada al Cementerio de su Dueño.  
+• Una carta Desterrada es enviada a la Zona de Destierro de su Dueño.  
+• Una carta Barajada es enviada al Mazo Castillo de su Dueño.  
+• Una carta que es Subida a la Mano es enviada a la Mano de su Dueño.  
+ 
+4.4.3 Cambiar una carta de Controlador  
+ 
+Dentro del juego existen cartas que permiten cambiar el Controlador de las cartas. Cuando se gana el control 
+de una carta, ésta siempre será ubicada en la zona de juego de su nuevo Controlador. Si es un Aliado, se 
+ubicará en la Línea de Defensa del nuevo Controlador; si es un Tótem, se ubicará en la Línea de Apoyo del 
+nuevo Controlador, y si es un Oro se ubicará en la Reserva de Oro del nuevo Controlador, a menos que se 
+especifique lo contrario.  
+ 
+ 
+Ejemplo 14:  
+Haquika (C: 3, F: 2, Aliado, Raza: Sacerdote. Indestructible. Cuando Haquika entra 
+en juego, puedes elegir un Aliado oponente y ponerlo en tu Línea de Defensa. Si 
+Haquika sale del juego, el Aliado vuelve a la Línea de Defensa oponente).  
+Haquika permite a un jugador ganar el control de un Aliado oponente, ubicándolo en 
+su Línea de Defensa.  
+
+
+===== PAGINA 16 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+16 
+ 
+Ejemplo 15:  
+Joyero (C: 4, Talismán. Un Oro oponente pasa a tu Reserva de Oro hasta salir del 
+juego).  
+Joyero permite a un jugador ganar el control de un Oro oponente, ubicándolo en su 
+Reserva de Oro.  
+ 
+En el caso de las Armas jugadas sobre un Aliado oponente, es el oponente quien pasa a ser el Controlador del 
+Arma. Por lo tanto, es él quién se ve afectado por su Habilidad.  
+ 
+ 
+Ejemplo 16:  
+Sedienta (C: 2, Arma. El portador de Sedienta pierde su Habilidad y no puede recibir 
+Modificadores de Fuerza).  
+Sedienta, portada en un Aliado oponente, hará que el oponente sea el nuevo 
+Controlador del Arma, lo que implica que dicho Aliado se verá afectado con la pérdida 
+de su Habilidad y la imposibilidad de recibir Modificadores de Fuerza.  
+ 
+ 
+4.5 Bajar / Poner en juego / Jugar 
+ 
+4.5.1 Bajar / Poner en juego  
+ 
+Bajar una carta tiene el mismo significado que ponerla en juego, es decir, colocar la carta en cualquiera de estas 
+zonas de juego: Línea de Ataque, Línea de Defensa, Línea de Apoyo, Zona de Oro Pagado o Reserva de Oro. 
+Cualquier referencia que se haga a bajar una carta, quiere decir que la carta está siendo puesta en juego. Este 
+concepto exceptúa a los Talismanes, ya que no entran en juego.  
+ 
+4.5.2 Jugar  
+ 
+Jugar una carta implica la acción de mostrar la carta al oponente y pagar su Coste, para luego cumplir sus 
+Habilidades, si es que la tiene. Siempre que una carta sea jugada, se debe pagar su Coste sin importar desde 
+qué zona sea jugada, a menos que se especifique lo contrario.  
+Si la carta es un Aliado,  Oro, Arma o Tótem, después de jugarla, es puesta en juego, y permanece en juego 
+hasta que una condición de juego y/o efecto de otra carta o Habilidad haga que salga del juego, ya sea 
+Destruyéndola, Desterrándola, Barajándola, Subiéndola a la Mano o Poniéndola en el Cementerio.  
+ 
+ 
+ 
+
+
+===== PAGINA 17 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+17 
+4.5.3 Pasos para jugar una carta  
+ 
+Para jugar una carta, se deben seguir los siguientes pasos, en orden correlativo:  
+1. El jugador muestra y declara de forma verbal la carta que quiere jugar.  
+2. Se deben cumplir los requisitos que especifica la carta para ser jugada. En el caso de los Talismanes, 
+deben definir el Objetivo si es una carta en juego , con el fin de comprobar los requisitos para ser 
+jugados. 
+3. Paga el Coste de Oro y cualquier Coste adicional que requiera la carta. Si una Habilidad permite jugar 
+una carta “sin pagar su Coste”, los Costes adicionales deben ser pagados aun así para poder jugar 
+esa carta. 
+Si por alguna Habilidad o efecto la carta tiene Coste reducido, se reduce su Coste dependiendo de lo 
+que indique dicha Habilidad o efecto (hasta un mínimo de 0). 
+Cuando dos o más Habilidades o efectos alteran el Coste de la carta que se quiere jugar , los Costes 
+adicionales positivos (ejemplo: “cuesta un Oro más”) se suman al total de Oro a pagar. Luego se restan 
+los Costes adicionales negativos ( ejemplo: “cuesta un Oro menos”). El monto final es la cantidad de 
+Oro a pagar. 
+4. En este momento la carta se considera jugada para todos los efectos de juego , y se disparan y 
+resuelven todas las Habilidades en juego que se disparan al jugar una carta. 
+5. El oponente tiene la opción de realizar solo una de las siguientes 3 acciones: 
+ 
+- Jugar una carta de anulación para anular la carta jugada. 
+- Activar una Habilidad de Anulación para anular la carta jugada. 
+- Jugar cartas con Habilidades “en respuesta” a jugar una carta. 
+Luego el jugador activo tiene la opción de realizar una de las mismas 3 opciones mencionadas.  
+6. Si la carta no es anulada, es puesta en juego y si ningún jugador Cancela la Habilidad, para evitar que 
+la carta jugada utilice su habilidad disparada, en caso de que la tenga, esta se considera utilizada. Y 
+en el caso de un Talismán, se resuelve su efecto y es puesto en el Cementerio de su Dueño  (La 
+habilidad de los talismanes no puede ser cancelada).  
+7. Luego el efecto se resuelve, cumpliéndose entre un 0 a un 100%, en medida de lo posible. Desde este 
+momento se consideran afectadas las cartas por el efecto de la habilidad, en caso de que sean cartas 
+en juego. 
+8. En este punto se puede jugar solo una carta en respuesta o utilizar una habilidad en respuesta, a que 
+la carta entre en juego, en el caso de que la carta jugada no sea un talismán.  
+9. Se pueden jugar cartas o activar habilidades de redirección, en caso de que la carta jugada sea un 
+objetivo válido y se vea afectada por alguna habilidad que tenga algún nuevo objetivo disponible para 
+redirigir.  
+10. Por último, se pueden jugar cartas o activar habilidades de prevención, para evitar que la carta jugada 
+sea afectada por alguna carta o habilidad en juego, que no sea una habilidad continua. 
+Para el caso de jugar un Arma, si se juega sobre un a carta considerada como Aliado, el Arma permanece 
+portada en esa carta mientras sea un Aliado. Cuando la carta pierda la condición de Aliado, el Arma es puesta 
+en el Cementerio de su Dueño ya que la carta es un portador no válido.  
+Si una Habilidad o efecto permite “jugar una carta sin pagar su Coste” y existe una restricción para que no se 
+juegue dicha carta, esa carta no podrá ser jugada y permanece en su zona de origen (a menos que la Habilidad 
+o efecto especifique lo contrario).  
+ 
+ 
+ 
+ 
+ 
+
+===== PAGINA 18 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+18 
+4.5.4 Objetivo 
+ 
+Las cartas como Armas y algunos Talismanes, así como algunas Habilidades Activadas y Disparadas, requieren 
+que exista un Objetivo válido para poder ser jugada o utilizada . Un Objetivo válido es aquel que cumple con 
+todos los requisitos para ser seleccionados.  
+El Objetivo válido sólo se chequea para jugar la carta, pero en la resolución del efecto de la carta, puede 
+resolverse incluso en un 0% según las Habilidades de ese Objetivo.  
+ 
+ 
+Ejemplo 17:  
+Bola de Fuego (C: 2, Talismán. Destruye una carta en juego, que no sea un Oro).  
+Bola de Fuego debe definir un Objetivo válido, para comprobar su requisito de juego, 
+al momento de jugar el Talismán, independiente si la carta es anulada o no. Para este 
+caso, su Controlador debe definir como Objetivo una carta en juego que no sea Oro y 
+que pueda ser destruida.    
+ 
+Ejemplo 18:  
+Flecha Ácida (C: 2, Talismán. Destruye un Aliado oponente de Fuerza 2 o menos. 
+Luego, Roba 1 carta).  
+Flecha Ácida  debe definir un Objetivo válido, al momento de jugar el Talismán, 
+independiente si la carta es anulada o no. Para este caso, su Controlador debe definir 
+como Objetivo un Aliado de Fuerza 2 o menos. Al resolver el efecto del Talismán, se 
+puede dar el caso que el jugador oponente prevenga que su Aliado de Fuerza 2 o 
+menos sea Destruido; sin embargo, no impide que el Controlador de Flecha Ácida 
+Robe 1 carta. 
+ 
+Ejemplo 19:  
+Sombras Areneras (C: 3, Talismán. Baraja uno de tus Aliados de Raza Eterno para 
+Barajar 2 Aliados oponentes en su Mazo Castillo. Tu oponente puede anular esta 
+Habilidad pagando 3 Oros).  
+Sombras Areneras debe definir un Objetivo válido, para comprobar su requisito de 
+juego, al momento de jugar el Talismán, independiente si la carta es anula da o no. 
+Para este caso, su Controlador debe definir como Objetivos un Aliado de Raza Eterno 
+en su zona de juego y 2 Aliados oponentes para que, al resolver su efecto, sean 
+Barajados.    
+ 
+Algunos Talismanes y Habilidades  de cartas no requieren Objetivos para poder ser jugados o utilizados. En 
+estos casos, la resolución de esos Talismanes es de un 0 a un 100% en medida de lo posible.  
+ 
+Ejemplo 20:  
+Ma’arrat An-Numan (C: 6, Talismán. Destierra todos los Aliados en juego).  
+Ma’arrat An-Numan no requiere Objetivos dirigidos para ser jugado, ya que afectará 
+a todos los Aliados en juego. Si algún Aliado es Indesterrable, entonces no se verá 
+afectado por dicho efecto, resolviéndose de 0 a 100%, en medida de lo posible.    
+ 
+
+
+===== PAGINA 19 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+19 
+4.6 Habilidades y Efectos 
+ 
+4.6.1 Composición de una habilidad  
+ 
+Habilidad: Es todo el contenido escrito en la caja de texto de la carta , la cual indica los requisitos necesarios 
+para su uso (Si es que los tiene), los costes de activación (Si es que los tiene) y los efectos que puede generar, 
+luego de ser utilizada.  
+Una habilidad se puede componer de tres elementos: Requisitos, Coste de Activación y Efecto.  
+Requisitos: Son las circunstancias o acciones de juego necesarias para usar una habilidad, los requisitos solo 
+se verifican con cartas en juego, o sea con las cartas que se encuentran en alguna de las siguientes zonas de 
+juego Línea de Defensa, Línea de Ataque, Línea de Apoyo, Reserva de Oro o Zona de Oro Pagado.  
+Coste de Activación: Es un requerimiento de recursos (cartas del Mazo, cartas de la Mano, Oros, cartas del 
+Cementerio, cartas en juego, entre otros recursos).  
+Efecto: Es el resultado del uso de una Habilidad, que se define por las siguientes palabras o frases, o cualquier 
+combinación de ellas: Destruir, Desterrar, Barajar, Descartar, Subir, Botar, Robar, Buscar, Mirar /Ver, Modificar 
+Fuerza, Modificar Coste, Considerar, Generar, Cambiar de Controlador, Anular, Cancelar, Redirigir, Prevenir, 
+Jugar otra carta, Quitar/Perder Habilidad, Utilizar efectos permanentes, Saltar Fases, Asignar, Resolver, Cargar, 
+Portar, o cualquier otro efecto que puedan tener algunas cartas que no se encuentren descritos en esta lista.  
+Cabe mencionar que existen también costes  de activación  y requisitos de juego para jugar cartas y que 
+funcionan de la misma forma, así como efectos que vienen directamente de jugar una carta y no de usar una 
+habilidad, como es el caso de los Talismanes. Un efecto puede provenir de una habilidad resuelta o un Talismán 
+resuelto. 
+ 
+4.6.1.1 Restricciones de Activación  
+ 
+La cantidad de veces que una Habilidad puede usarse está indicada en el texto de juego de la carta. En el caso 
+de las Habilidades Activadas, puede no estar especificada la cantidad de veces que pueda utilizarse. En esos 
+casos, la Habilidad en cuestión puede ser utilizada tantas veces como el Coste de Activación pueda ser pagado.  
+ 
+4.6.2 Pasos para utilizar una Habilidad  
+ 
+Para utilizar una Habilidad se deben seguir los siguientes pasos en orden correlativo:  
+1. Se declara la acción de la Habilidad que se quiere utilizar (en caso de ser una Habilidad Activada), 
+teniendo en cuenta que se debe cumplir con cualquier requerimiento que tenga la Habilidad para poder 
+activarla. En caso de las Habilidades Disparadas, éstas se disparan sin voluntad de su Controlador.  
+2. Se selecciona(n) el(los) Objetivo(s) del efecto, si es que la habilidad de la carta lo(s) tuviera.  
+3. Pagar cualquier Coste que tenga la Habilidad, en el caso que la tuviera. Este Coste puede ser un 
+requisito para utilizar la Habilidad o una acción obligatoria.  
+4. En este momento cualquier jugador puede Cancelar la Habilidad.  
+5. Si ningún jugador Cancela la Habilidad, ésta se considera utilizada  y desde este momento se 
+consideran afectadas las cartas por el efecto de la habilidad, en caso de que sean cartas en juego. 
+6. El efecto se resuelve, cumpliéndose entre un 0 a un 100%, en medida de lo posible.  
+7. Se pueden jugar cartas o utilizar Habilidades en respuesta a la resolución del efecto.  
+8. Cualquier jugador puede jugar cartas o activar habilidades de redirección, para Redirigir el Objetivo del 
+efecto a otro Objetivo válido condicionado por la Fuente.  
+9. Por último, cualquier jugador puede jugar cartas o activar habilidades de prevención, para Prevenir el 
+efecto sobre el Objetivo seleccionado.  
+
+===== PAGINA 20 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+20 
+4.6.3 Habilidades Activadas  
+ 
+Son aquellas Habilidades que requieren el pago de un Coste o la activación de un jugador para utilizarlas, siendo 
+el Controlador el que paga el Coste o declara la acción activadora. 
+Las Habilidades Activadas solo pueden ser utilizadas en la Fase de Vigilia de su Controlador o en Guerra de 
+Talismanes de ambos jugadores, a menos que la carta indique lo contrario, y su uso es opcional. 
+Una Habilidad Activada se identifica generalmente por la palabra “Puedes”, el Coste de Activación o la 
+restricción de veces por turno que se puede activar la Habilidad (X veces por turno). 
+ 
+ 
+Ejemplo 21:  
+Fergus (C: 2, F: 1, Aliado, Raza: Defensor. En tu Fase de Vigilia y una vez por turno, 
+puedes destruir el Aliado oponente de mayor Fuerza).  
+Fergus posee en su Habilidad la palabra “puedes”, dándole el carácter opcional de 
+su uso. Además, su restricción se limita a utilizarse en la Fase de Vigilia de su 
+Controlador y una vez por turno, y su Coste de Activación es mencionar la activación 
+de su Habilidad.  
+ 
+4.6.4 Habilidades Disparadas  
+ 
+Son aquellas Habilidades que se disparan cuando se cumple la Condición disparadora, la cual se trata de  un 
+evento que no depende del Controlador de la carta, y que dispara la Habilidad sin que medie la voluntad de su 
+Controlador. Una Habilidad Disparada se identifica a través de las palabras “Si” y “Cuando”.  
+ 
+ 
+Ejemplo 22:  
+Sir Persival (C: 3, F: 2, Aliado, Raza: Caballero. Cuando Sir Persival entra en juego, 
+Baraja un Aliado oponente).  
+Sir Persival cumple su Habilidad después de que entra en juego. Por lo tanto, si el 
+oponente no posee Aliados en juego, Sir Persival entra en juego de todas maneras 
+ya que el efecto se dispara después de haber entrado en juego, sin que m edie la 
+voluntad de su Controlador.  
+ 
+4.6.5 Habilidades Continuas  
+ 
+Son aquellas Habilidades cuyo efecto es constante , y afectan el juego de manera continua mientras se 
+encuentre en juego la carta que es Fuente de la Habilidad.  
+La manera de identificar una Habilidad Continua es generalmente a través de la palabra “Mientras”, que hace 
+referencia a las condiciones necesarias para que funcione la Habilidad.  
+La condición básica para que funcione una Habilidad es que la carta esté en juego y cumpla los requisitos para 
+mantenerse activa.  
+Los requisitos de las Habilidades Continuas se chequean cada vez que se cede prioridad entre jugadores y al 
+finalizar cada paso del juego. En caso de que, en un chequeo de Habilidad no se cumplan los requisitos para 
+mantener activa la Habilidad, ésta cesa de aplicarse al juego hasta que vuelvan a cumplirse los requisitos 
+activadores.  
+
+
+===== PAGINA 21 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+21 
+ 
+Ejemplo 23:  
+Apophis (C: 5, F: 4, Aliado, Raza: Eterno. Única. Todos los demás Aliados pierden 
+su Habilidad. Cada vez que tu oponente juegue una carta que no sea Oro, debe Botar 
+3 cartas).  
+Apophis mantendrá su Habilidad mientras esté en juego haciendo que, además de 
+hacer perder la Habilidad de todos los demás Aliados en juego, los que entren en 
+juego lo harán sin su Habilidad.  
+ 
+4.6.6 Prioridades  
+ 
+El Jugador Activo tendrá la prioridad de jugar cartas y/o utilizar Habilidades ante cualquier situación, 
+exceptuando la fase de Guerra de Talismanes, en la que el jugador defensor es el que pasa a tener la prioridad.  
+Existen cartas que permiten jugar cartas y/o utilizar Habilidades de manera simultánea. Para el caso de jugar 2 
+o más cartas al mismo tiempo mediante el efect o de una carta, cada jugador puede jugar cartas y/o utilizar 
+Habilidades de anulación como dispongan, 1 a 1 partiendo por el jugador oponente, intercalándose con el 
+Controlador del efecto hasta que ya no puedan o no quieran jugar cartas y/o utilizar Habilidades de anulación. 
+Si las cartas jugadas de manera simultánea son Aliados, Oros, Armas o Tótems, éstas entran en juego.  
+Sumado a lo anterior, s egún el tipo de Habilidad, éstas también tienen una prioridad para su uso en el juego, 
+comenzando por:  
+1. Habilidades Continuas.  
+2. Habilidades Disparadas.  
+3. Habilidades Activadas.  
+Para el caso de las Habilidades Disparadas simultáneas, éstas se disparan 1 a 1, donde el jugador que controle 
+la Habilidad de la carta a resolver tiene la prioridad de disparar alguna Habilidad, y luego continúa el jugador 
+oponente, intercalándose entre ellos hasta que ya no puedan disparar más Habilidades.  
+Si una carta que fu e jugada con otras cartas de manera simultánea , dispara su Habilidad  y puede también 
+afectar a otra carta que entro en juego junto con el mismo efecto simultáneo (de igual manera, puede afectar a 
+cartas que previamente ya estaban en juego) , ya que estas cartas entran en juego al mismo tiempo . Debido a 
+lo anterior, se declara la utilización de las Habilidades Disparadas de dos o más Aliados 1 a 1 , siguiendo el 
+orden de prioridades de uso de Habilidades descrito anteriormente . Sin embargo, éstas no se resuelv en 
+inmediatamente, sino que se resuelven una vez que todas las Habilidades Disparadas hayan sido declaradas.  
+ 
+4.6.7 Resolución de múltiples Habilidades  
+ 
+Si en algún momento del juego interactúan múltiples tipos de Habilidades simultáneamente, comienzan por 
+resolverse las Habilidades Continuas, y luego las Habilidades Disparadas. Primero se resuelven los efectos 
+controlados por el Jugador Activo, y posteriormente se resuelven los efectos de cartas controladas por el jugador 
+inactivo, intercalando una Habilidad entre cada jugador. En caso de que se disparen dos o más efectos 
+controlados por un mismo jugador, éste ordena la resolución de dichos efectos a su el ección (según las 
+prioridades de Habilidades).  
+ 
+ 
+ 
+ 
+
+
+===== PAGINA 22 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+22 
+Ejemplo 24: 
+ 
+Hogar de Demonios  (C: 6, 
+Talismán. Todos los Aliados en 
+ambas Zonas de Destierro son 
+jugados sin pagar su Coste). 
+ 
+Felipe II (C: 4, F: 2, Aliado, Raza: 
+Caballero. Cada vez que Felipe II 
+entre y salga del juego, Destruye 
+una carta Oro oponente. Carta 
+Única).  
+ 
+Gruagash (C: 5, F: 2, Aliado, 
+Raza: Sombra. Cuando Gruagash 
+entra en juego, todos los demás 
+Aliados pierden su Habilidad y son 
+Barajados).  
+ 
+Las Erinias  (C: 4, F: 1, Aliado, 
+Raza: Olímpico. Cuando Las 
+Erinias entra en juego, Destruye el 
+Aliado oponente de mayor 
+Fuerza).  
+ 
+Takelot (C: 3, F: 2, Aliado, Raza: Sacerdote. Cuando Takelot entra en 
+juego, nombra una carta para que ésta y sus copias pierdan su 
+Habilidad mientras Takelot esté en juego. Puedes pagar 2 Oros para 
+prevenir que Takelot sea Destruido o Desterrado por una Habilidad 
+oponente). 
+ 
+Hogar de Demonios dispara su Habilidad para ambos jugadores. Para este efecto, si bien es cierto que los 
+Aliados se juegan al mismo tiempo, ambos jugadores pueden jugar tantas cartas y/o utilizar Habilidades de 
+anulación como dispongan, 1 a 1 partiendo por el jugador opone nte, para evitar que un (o más) Aliado(s) 
+entre(n) en juego. Luego, la prioridad de utilizar las Habilidades de Aliados jugados desde la Zona de 
+Destierro la tiene el Controlador del efecto de Hogar de Demonios, siguiendo el orden de prioridades de uso 
+de Habilidades descrito anteriormente. 
+ 
+Las Habilidades que resolverán primero su efecto son las Habilidades Continuas. Un ejemplo de ello, si el 
+Controlador del efecto del Talismán juega a Apophis, su Habilidad Continua hará que los demás Aliados 
+entren en juego sin sus Habilidades (el jugador oponente no deberá Botar 3 cartas de su Mazo Castillo por 
+cada Aliado jugado, ya que fueron jugados al mismo tiempo que Apophis). En caso de que el Controlador del 
+efecto del Talismán no juegue Aliados con Habilidade s Continuas, y el jugador oponente juegue a Apophis, 
+se resolverá primero esa Habilidad. 
+ 
+Luego, se deben resolver las Habilidades Disparadas. Sin embargo, estas Habilidades no se resolverán 
+inmediatamente, ya que primero se deben declarar todas las Habili dades Disparadas a resolver, y una vez 
+hecho lo anterior, se resolverán en el orden declarado, comenzando por el Controlador del efecto de Hogar 
+de Demonios. 
+ 
+El Controlador del efecto del Talismán juega a Felipe II y Gruagash, mientras que el jugador oponente juega 
+a Takelot y Las Erinias desde sus respectivas Zonas de Destierro. 
+ 
+Ante esta situación, el Controlador del efecto de Hogar de Demonios decide declarar primero la Habilidad 
+de Felipe II, y afectar al Oro Inicial del jugador oponente. Luego, este último decide declarar primero la 
+Habilidad de Takelot, nombrando a Gruagash. 
+ 
+A continuación, el Controlador del efecto del Talismán declara la Habilidad de Gruagash para afectar a todos 
+los demás Aliados en juego. Finalmente, el jugador oponente declara la Habilidad de Las Erinias , 
+designando a Gruagash como Objetivo. 
+ 
+
+
+===== PAGINA 23 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+23 
+Con esto se declararon todas las Habilidades Disparadas, y se procede entonces a resolver cada efecto en 
+el orden declarado, cumpliéndose todas y cada una de ellas, independiente de que el Aliado afectado salga 
+del juego, ya que todos los Aliados entraron en juego al mismo tiempo. 
+ 
+Como resultado de lo anterior, pasa lo siguiente: 
+ 
+1) Felipe II Destruye el Oro Inicial del jugador oponente. 
+ 
+2) Takelot, si bien es cierto que nombró a Gruagash, no evitará que éste entre en juego sin su 
+Habilidad debido a que los Aliados jugados por Hogar de Demonios entraron en juego al mismo 
+tiempo. Por lo tanto, solo afectaría a las demás copias de Gruagash que fuesen jugadas 
+posteriormente a esta interacción (si es que Takelot sigue en juego). 
+ 
+3) Gruagash hará que los demás Aliados en juego pierdan sus Habilidades, y posteriormente los 
+Barajará. 
+ 
+4) Las Erinias Destruye a Gruagash. 
+ 
+Al final de la interacción, ninguno de los Aliados seguirá en juego. Es decir, Takelot, Felipe II y Las Erinias 
+terminarán en el Mazo Castillo de su Dueño, mientras que Gruagash irá al Cementerio de su Dueño. 
+Además, el Oro Inicial destruido también irá al Cementerio del jugador oponente. 
+ 
+ 
+Ejemplo 25:  
+Tumulario (C: 4, F: 1, Aliado, Raza: Sombra. Cuando Tumulario entra en juego, 
+ambos jugadores pueden jugar un Aliado de su Cementerio en su Línea de Defensa 
+sin pagar su Coste).  
+Tumulario tiene una mecánica de juego similar a Hogar de Demonio s, con la 
+diferencia de que solo se juega 1 Aliado por cada jugador.  
+ 
+Existen cartas que, al resolver su efecto, afectan a todos los jugadores, por lo que su efecto se resuelve de 
+manera simultánea. Este tipo de situaciones aplica tanto para Robar como para Botar cartas. 
+ 
+Ejemplo 26:  
+La Ira de Tifón (C: 4, Talismán. Ambos jugadores se Descartan de toda su Mano, y 
+luego Roban 4 cartas).  
+La Ira de Tifón  dispara su Habilidad para ambos jugadores. Para este efecto, los 
+jugadores deben Descartar su Mano y Robar 4 cartas al mismo tiempo , de una en 
+una. Si al hacer este robo de una carta en una, uno de los jugadores queda sin cartas 
+en su Mazo Castillo, perderá el duelo.  
+Se puede dar el caso de que ambos jugadores tengan la misma cantidad de cartas 
+en su Mazo Castillo, y si esta cantidad es de 4 o menos, el duelo termina en empate.  
+ 
+Ejemplo 27:  
+Producir Terremoto (C: 3, Talismán. Cada jugador Bota 3 cartas. Producir Terremoto 
+no puede ser anulado).  
+Producir Terremoto dispara su Habilidad para ambos jugadores. Para este efecto, 
+los jugadores deben Botar 3 cartas al mismo tiempo, de una en una. Si al Botar cartas 
+una en una, uno de los jugadores queda sin cart as en su Mazo Castillo, perderá el 
+duelo.  
+Se puede dar el caso de que ambos jugadores tengan 3 o menos cartas en su Mazo 
+Castillo y si es la misma cantidad, el duelo termina en empate.  
+
+
+===== PAGINA 24 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+24 
+4.6.8 Tipos de Efectos  
+ 
+4.6.8.1 Efectos Dirigidos  
+ 
+Son un tipo de efecto que afecta a cartas específicas, y no a todas las cartas de un tipo. Un efecto dirigido puede 
+tener muchos Objetivos, pero esos Objetivos tienen que estar definidos en el texto de juego.  
+Cuando se cancela o anula un efecto dirigido, se cancela o anula la totalidad del efecto, aunque tenga más de 
+un Objetivo.  
+ 
+Ejemplo 28:  
+Dragón de Magma  (C: 4, F: 3, Aliado, Raza: Dragón. Cuando entra en juego, 
+Destruye un Aliado oponente).  
+Dragón de Magma tiene un efecto dirigido ya que, si bien puede Destruir cualquier 
+Aliado oponente, sólo puede ser uno.   
+  
+ 
+Ejemplo 29:  
+Aed (C: 5, F: 2, Aliado, Raza: Defensor. Cuando entra en juego, puedes Subir a la 
+Mano de tu oponente 2 de sus Aliados).  
+Aed también tiene un efecto dirigido, ya que, si bien sube a la Mano 2 Aliados 
+oponentes, esos Aliados tienen que especificarse al momento en que la carta entra 
+en juego.   
+ 
+4.6.8.2 Efectos Universales  
+ 
+Este tipo de efectos afectan a todas las cartas en juego, a todas las cartas de un Tipo(s), o a todos los jugadores, 
+zona de juego o fase(s) del juego. Debido a lo anterior, los efectos universales no hacen Objetivo(s).  
+Cuando se cancela o anula un efecto universal, se cancela o anula la totalidad del efecto.  
+ 
+Ejemplo 30:  
+Eolo (C: 6, F: 1, Aliado, Raza: Olímpico. Cuando entra en juego, Destruye todas las 
+cartas en juego a excepción de Eolo).  
+Eolo afecta a todas las cartas en juego, a excepción de Eolo, por lo que no hace 
+Objetivo(s) a una (o más) carta(s) en juego.   
+ 
+4.6.9 Resolución de los Efectos  
+ 
+Para que una Habilidad pueda ser utilizada, se deben cumplir todos los requisitos establecidos en el texto de 
+juego. Después de esto, una Habilidad puede ser utilizada, sin perjuicio de que pueda o no tener efecto.  
+Los efectos de Habilidades y cartas se resuelven de un 0% a 100% en medida de lo posible, es decir, el efecto 
+debe resolverse en su mayor cantidad posible.  
+
+
+===== PAGINA 25 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+25 
+Por tanto, las Habilidades deben cumplir el 100% de sus requisitos, lo que no implica que se deban cumplir el 
+100% de sus efectos.  
+ 
+ 
+Ejemplo 31:  
+Plaga (C: 5, Talismán. Destruye 2 Aliados oponentes).  
+Plaga debe cumplir con el 100% de sus requisitos para poder utilizar su Habilidad, es 
+decir, el jugador oponente debe tener al menos 2 Aliados en juego que puedan ser 
+destruidos para poder ser Objetivo s de su efecto. Si alguno de dichos Objetivos no 
+sale del jue go por una Habilidad de prevención, no se cumplirá el 100% de sus 
+efectos, resolviéndose en medida de lo posible.   
+  
+ 
+Ejemplo 32:  
+El Juicio de Dios  (C: 3, Talismán. Cada jugador Destruye, a su elección, 2 cartas 
+que tenga en juego. El Juicio de Dios no afecta Oros).  
+El Juicio de Dios debe cumplir con el 100% de los requisitos para poder utilizar su 
+Habilidad, es decir, que ambos jugadores tengan, al menos, 2 cartas en juego que no 
+sean Oro y que puedan ser destruidas para poder ser Objetivos de su efecto. Si alguno 
+de dichos Objetivos no sale del juego por una Habilidad de prevención, no se cumplirá 
+el 100% de sus efectos, resolviéndose en medida de lo posible.   
+ 
+Ejemplo 33: 
+   
+Antropófagos (C: 4, Talismán. 
+Un Aliado oponente en juego pasa 
+a tu Línea de Defensa y al final del 
+turno debe ser Destruido).  
+Águila Imperial  (Oro. Mientras 
+Águila Imperial esté en tu Reserva 
+de Oro, los Aliados de Fuerza 1 
+pierden su Habilidad).  
+Baal-Zaphon (C: 1, F: 1, Aliado, 
+Raza: Eterno.  Indestructible. 
+Indesterrable. Solo puedes tener 
+un Baal -Zaphon en juego. En su 
+Fase de Vigilia, solo una vez por 
+turno, cada jugador puede Barajar 
+3 cartas de su Cementerio en su 
+Mazo Castillo).  
+ 
+Antropófagos tiene como requisito que el jugador oponent e tenga al menos 1 Aliado que pueda ser 
+Destruido para ser Objetivo de su efecto. Por ejemplo, si se da el caso de que hay una copia de Águila 
+Imperial en la Reserva de Oro del Controlador del Talismán, y el jugador oponente tiene una copia de Baal-
+Zaphon en juego, esto implica que Baal-Zaphon deja de ser Indestructible e Indesterrable, debido a que en 
+ese momento del juego se encuentra sin su Habilidad.  Por lo tanto, puede ser Objetivo válido del Talismán. 
+Además, si el Controlador del Talismán decide pagar la copia de Águila Imperial, entonces Baal-Zaphon 
+recuperará su Habilidad, por lo que ésta se antepondrá al efecto de ser Destruido al final del turno, quedando 
+bajo el control del jugador que jugó Antropófagos. 
+ 
+
+
+===== PAGINA 26 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+26 
+ 
+Ejemplo 34:  
+Levantar a los Muertos  (C: 4, Talismán. En respuesta a la Declaración de Ataque 
+oponente, puedes jugar Levantar a los Muertos para buscar en tu Cementerio un 
+Aliado y jugarlo en tu Línea de Defensa sin pagar su Coste. Este Aliado debe ser 
+declarado bloqueador).  
+Levantar a los Muertos permite al Controlador jugar un Aliado desde su Cementerio 
+sin pagar su Coste, debiendo ser declarado bloqueador. Sin embargo, si solo atacan 
+aliados imbloqueables, Levantar a los Muertos  no puede ser jugado debido a que 
+no cumple con el segundo requisito de su Habilidad, ya que el Aliado que se quiere 
+jugar no podrá ser declarado bloqueador.   
+ 
+Cuando una Habilidad o efecto contiene la pa labra “Hasta”, el Controlador de es a Habilidad o  efecto puede 
+realizar tantas acciones como quiera con un máximo determinado por la misma Habilidad.  
+ 
+Ejemplo 35:  
+El Gran Zeus (C: 5, F: 5. Aliado, Raza: Olímpico. Única. Indestructible. En tu Fase de 
+Vigilia, solo una vez por turno, puedes Robar hasta 2 cartas).  
+El Gran Zeus  permite a su Controlador activar su Habilidad para elegir Robar 2, o 
+incluso 1 carta en su Fase de Vigilia.   
+ 
+4.6.10 Duración de un Efecto  
+ 
+La duración de los efectos de una Habilidad generalmente es hasta la Fase Final, pero existen excepciones 
+donde la carta especifica la duración de estos efectos.  
+ 
+Ejemplo 36:  
+Ramsés II  (C: 4, F: 6. Aliado, Raza: Faraón. Ramsés II no puede ser declarado 
+bloqueador. En tu Fase de Vigilia y una vez por turno, puedes Descartar una carta 
+para que Ramsés II sea Indestructible e Indesterrable hasta tu próxima Fase de 
+Vigilia. En respuesta a qu e sea bloqueado, puedes elegir que haga daño al Mazo 
+Castillo oponente como si no hubiese sido bloqueado. Carta Única).  
+El Controlador de Ramsés II puede activar su Habilidad para ganar una Habilidad 
+Continua, cuyo efecto dura hasta la próxima Fase de Vig ilia de su Controlador. En 
+caso de que Ramsés II pierda su Habilidad por efecto de otra carta, no pierde la 
+Habilidad Continua de este efecto.  
+ 
+Por regla general, los efectos de Modificación de Fuerza se consideran de duración “Hasta la Fase Final” , a 
+menos que sean Habilidades Continuas o se especifique lo contrario.  
+ 
+ 
+ 
+ 
+ 
+
+
+===== PAGINA 27 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+27 
+4.6.11 Auto-Referencia  
+ 
+La Auto-Referencia está relacionada con los conceptos de Fuente del Efecto y Objetivo(s) del Efecto.  
+Fuente del Efecto: Es la carta cuya Habilidad está siendo utilizada con el fin de cumplir dicho efecto.  
+Objetivo(s) del Efecto:  Es(son) la(s) carta(s) en  juego, la(s) carta(s) de uno o más Tipos, a uno o más 
+jugadores, zona(s) de juego o fase(s) de juego que está(n) siendo afectada(s) por dicho efecto.  
+La regla de Auto-Referencia indica que la Fuente del efecto nunca puede ser Objetivo del mismo efecto.  
+Por ejemplo, una carta no puede ser Objetivo de su propia Habilidad , a menos que la carta especifique lo 
+contrario, ya que las cartas que se indiquen a sí mismas para u tilizar su Habilidad no  se considera que  son 
+afectadas y, por tanto, no se considera un problema de Auto-Referencia.  
+Las Habilidades Continuas no se rigen bajo la regla de Auto-Referencia.  
+ 
+ 
+Ejemplo 37:  
+Morgana (C: 4, F: 2, Aliado, Raza: Faerie. Solo puedes tener una Morgana en juego. 
+En tu Fase de Vigilia y una vez por turno, puedes Destruir uno de tus Aliados para 
+Desterrar un Aliado oponente).  
+El Controlador de Morgana, al activar su Habilidad, no puede seleccionar a la misma 
+copia de Morgana para Destruirla y luego Desterrar un Aliado oponente. Esto debido 
+a que la Fuente del efecto no puede ser Objetivo de su mismo efecto, por regla de 
+Auto-Referencia.   
+ 
+ 
+Ejemplo 38:  
+Guiza (C: 5, Tótem. Cuando Guiza entra en juego, todos los Aliados pierden su 
+Habilidad y son Barajados. Mientras esté en juego, no se pueden jugar Aliados. En su 
+Fase de Vigilia, cualquier jugador puede pagar 3 Oros para que uno de sus Tótems 
+se considere un Aliado con Fuerza igual a su Coste hasta la Fase Final. Carta Única).  
+El Controlador de Guiza, al activar su Habilidad, no puede pagar 3 Oros en su Fase 
+de Vigilia para considerar a la misma copia de Guiza como Aliado, por la misma razón 
+del ejemplo anterior.    
+ 
+Ejemplo 39: 
+Qer-Her (C: 3, F: 2, Aliado, Raza: Sacerdote. Puedes Destruir a Qer-Her para subir a 
+la Mano un Aliado oponente. En tu Fase de Vigilia, si Qer-Her está en tu Cementerio, 
+puedes pagar 3 Oros para jugarlo sin pagar su Coste).  
+Qer-Her está indicando en su Habilidad que el requisito para utilizarla es 
+precisamente Destruirse a sí mismo para Subir un Aliado oponente a su Mano, por lo 
+que cumple dicho criterio de la regla de Auto-Referencia.    
+ 
+Ejemplo 40:  
+Duque Godofredo (C: 2, F: 2, Aliado, Raza: Caballero. Mientras Duque Godofredo 
+esté en juego, todos tus Caballeros ganan +1 a la Fuerza).  
+Duque Godofredo, al poseer una Habilidad Continua, no se rige por la regla de Auto-
+Referencia, por lo que todos los Caballeros de su  Controlador ganan +1 a la Fuerza, 
+incluyendo a Duque Godofredo.    
+
+
+===== PAGINA 28 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+28 
+4.7 Anulación 
+ 
+Para anular una carta que está siendo jugada, se debe hacer luego de que se hayan pagado sus Costes (Según 
+el punto 4.5.3 Pasos para jugar una carta o 4.6.2 Pasos para utilizar una Habilidad). 
+Cuando se anula una carta, se evita que ésta entre en juego y, en el caso de los Talismanes, que se resuelvan 
+sus efectos. Las cartas anuladas son enviadas al Cementerio de su Dueño, siempre que no se especifique de 
+otra forma.  
+ 
+Ejemplo 41:  
+Duque Enrico Dandolo (C: 3, F: 2, Aliado, Raza: Caballero. En respuesta a que tu 
+oponente juegue un Talismán, puedes Desterrar a Duque Enrico Dandolo para anular 
+a ese Talismán).  
+Duque Enrico Dandolo permite activar su Habilidad en respuesta a que un Talismán 
+haya sido jugado (habiendo cumplido previamente todos sus requisitos para jugarlo) 
+para anular. De esta manera, su efecto no se resuelve.    
+ 
+4.8 Cancelación 
+ 
+Es la acción de evitar que una carta cumpla el efecto de su Habilidad. Al Cancelar una carta, ninguno de los 
+efectos de la Habilidad cancelada se cumple, y ninguna Habilidad que se relacione con el efecto cancelado 
+puede utilizarse. La cancelación solo funciona para Habilidades Disparadas o Habilidades Activadas de cartas 
+en juego. (Según el punto 4.5.3 Pasos para jugar una carta o 4.6.2 Pasos para utilizar una Habilidad). 
+ 
+La cancelación de una carta funciona sobre la Fuente del efecto, es decir, la Habilidad. En cambio, la prevención 
+funciona sobre el Objetivo del efecto, es decir, la carta afectada.  
+ 
+ 
+ 
+Ejemplo 42:  
+Maldición Danaan (C: 3, Talismán. En respuesta a que un Aliado oponente utilice su 
+Habilidad, puedes jugar Maldición Danaan para Cancelar esa Habilidad. Tu oponente 
+debe Descartar una carta).  
+Tritón (C: 3, F: 1, Aliado, Raza: Olímpico. Cada vez que Tritón entre y salga del juego, 
+puedes Robar 1 carta).  
+Cruz Templaria (Oro. En tu Fase de Vigilia, puedes Desterrar a Cruz Templaria para 
+buscar una carta de Aliado en tu Mazo Castillo y jugarla pagando su Coste. En la Fase 
+Final, ese Aliado debe ser Desterrado).  
+Maldición Danaan permite al jugador Cancelar una Habilidad Disparada o Activada 
+por un Aliado oponente, evitando que se resuelva el efecto de su Habilidad. Se tienen 
+diversas situaciones con el uso de esta carta, las cuales se describen a continuación.  
+Si el Jugador Activo decide Desterrar a Cruz Templaria para buscar a Tritón en su 
+Mazo Castillo y jugarlo pagando su Coste, luego entra en juego, el Jugador Inactivo 
+puede jugar Maldición Danaan en el momento en que Tritón dispara su Habilidad, 
+para cancelar el efecto de Ro bar 1 carta. Sin embargo, Maldición Danaan  solo 
+cancelará ese efecto, y no el efecto que se produce de la Habilidad Disparada de 
+Tritón al salir del juego debido a la Habilidad de Cruz Templaria, es decir, el Jugador 
+Activo podrá Robar la carta cuando Tritón sale del juego.  
+ 
+ 
+
+
+===== PAGINA 29 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+29 
+ 
+ 
+Ejemplo 43:  
+Visir (C: 2, F: 1, Aliado, Raza: Faraón. Cuando Visir entra en juego, puedes Barajar 
+uno de tus Aliados de Raza Faraón para Robar 2 cartas).  
+Amyrteos (C: 2, F: 1, Aliado, Raza: Faraón. Si Amyrteos sale del juego, puedes 
+buscar un Oro en tu Mazo Castillo y ponerlo en juego).  
+Si el Jugador Activo tiene a Amyrteos en juego, juega a Visir, y éste entra en juego, 
+podrá utilizar su Habilidad para Barajar a Amyrteos, y luego podrá escoger el orden 
+entre Robar 2 cartas o buscar el Oro en su Mazo Castillo y jugarlo. Sin embargo, el 
+Jugador Inactivo puede jugar Maldición Danaan  en el momento que el Jugador 
+Activo baraje a Amyrteos para cancelar el efecto de Robar 2 cartas, pero no evitará 
+que el Jugador Activo pueda buscar un Oro en su Mazo Castillo y jugarlo. De igual 
+forma, si el Jugador Inactivo desea cancelar el efecto de buscar un Oro en el Mazo 
+Castillo y jugarlo, no evitará que el Jugador Activo pueda Robar 2 cartas.   
+ 
+Cuando se cancela un ataque, los Aliados atacantes vuelven a la Línea de Defensa y se cancela la Fase de 
+Batalla Mitológica completa.  
+ 
+ 
+Ejemplo 44:  
+Bran (C: 4, F: 3, Aliado, Raza: Defensor. En respuesta al ataque oponente, puedes 
+subir a Bran a tu Mano para cancelarlo, y Descarta al azar una carta de la Mano de 
+tu oponente. Carta Única).  
+Si el Jugador Inactivo tiene a Bran en juego, y el Jugador Activo declara ataque, el 
+Jugador Inactivo podrá utilizar la Habilidad de Bran para intentar cancelar el ataque 
+subiéndolo a su Mano. Si esta habilidad no es cancelada, se resuelve su efecto, el 
+cual cancela el ataque oponente, devolviendo los aliados atacantes a la línea de 
+defensa oponente y además descarta una carta al azar de la mano del jugador activo. 
+Luego se termina la fase de batalla mitológica, ya que al cancelar el ataque oponente 
+es como si este no se hubiera realizado, y por lo tanto la batalla mitológica no alcanza 
+a ocurrir.  
+Cuando se cancela el ataque de un solo Aliado, y este Aliado es el único que fue declarado atacante, no implica 
+que se cancele la Fase de Batalla Mitológica completa, sino que continuará con sus pasos de juego descritos 
+en el punto 5.3 Batalla Mitológica. Estas cancelaciones hacen referencia a un (o más) Aliado(s) en particular, 
+y no a la Declaración de Ataque en su totalidad. 
+ 
+ 
+ 
+Ejemplo 45: 
+ 
+Puck (C: 4, F: 2, Aliado, Raza: Faerie. En respuesta a la Declaración de Ataque 
+oponente y una vez por turno, puedes pagar 1 Oro para cancelar el ataque de un 
+Aliado oponente. En respuesta a la Declaración de Bloqueo oponente y una vez por 
+turno, puedes pagar 1 Oro para cancelar el bloqueo de un Aliado oponente). 
+ 
+Templo del Desierto (C: 3, Tótem. Mientras Templo del Desierto esté en juego, solo 
+se puede declarar un Aliado atacante por Turno). 
+ 
+Estando Templo del Desierto  en juego, condicionará a los jugadores a declarar 
+atacante solo uno de sus Aliados. Si el Jugador Activo declara ataque con uno de sus 
+Aliados, el Controlador de Puck podrá utilizar su Habilidad en respuesta a la 
+Declaración de Ataque  oponente, pagando 1 Oro para cancelar el ataque de dicho 
+Aliado. Sin embargo, como la Habilidad de Puck hace referencia a la cancelación de 
+ataque de un solo Aliado oponente en particular, no implica que se haya cancelado la 
+Declaración de Ataque en su totalidad y, por tanto, la Batalla Mitológica completa; sino 
+que la Batalla Mitológica continuará con sus pasos de juego correspondientes, es 
+decir, Declaración de Bloqueo, Guerra de Talismanes y Asignación de Daño. 
+
+
+===== PAGINA 30 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+30 
+4.9 Redirección 
+ 
+Es una acción que permite cambiar el Objetivo de un efecto dirigido. La Habilidad de Redirigir se juega al 
+momento en que se elige(n) el(los) Objetivo(s) para este tipo de efectos, justo antes de la resolución del efecto 
+(Según el punto 4.5.3 Pasos para jugar una carta o 4.6.2 Pasos para utilizar una Habilidad). Solo puede ser 
+usada una Habilidad de este tipo mientras haya un Objetivo válido, el cual cumpla al 100% el efecto redirigido. 
+Es decir, el nuevo Objetivo debe seguir siendo válido.  
+ 
+Ejemplo 46:  
+Zazamoukh (C: 3, F: 2, Aliado, Raza: Sacerdote . En respuesta a que tu oponente 
+juegue alguna Habilidad que afecte a uno de tus Aliados, puedes dirigir esa Habilidad 
+a Zazamoukh. En tu Fase de Vigilia, si Zazamoukh está en tu Cementerio, puedes 
+pagar 3 Oros para jugarlo sin pagar su Coste).  
+¡Desleal! (C: 3, Talismán. Destierra un Aliado oponente).  
+El Controlador de Zazamoukh puede activar su Habilidad en respuesta cuando el 
+jugador oponente resuelve el efecto de ¡Desleal!, es decir, redirigir el efecto del 
+Talismán a Zazamoukh, siendo Desterrado.  
+ 
+ 
+4.10 Prevención 
+ 
+Es la acción de evitar que un efecto se cumpla sobre una (o más) carta(s) en juego, un (o más) tipo(s) de carta, 
+un (o más) jugador(es), zona de juego o fase(s) del juego. Sin embargo, la Habilidad de Prevenir no impide que 
+la carta utilice sus demás Habilidades, que estén separadas por punto aparte o seguido (Según el punto 4.5.3 
+Pasos para jugar una carta  o 4.6.2 Pasos para utilizar una Habilidad) . Por ejemplo, las habilidades que  
+dicen “luego”, “para”, “y”, etc., en las cuales la segunda parte del efecto depende de la primera parte del efecto, 
+no podrán utilizar esa Habilidad. Prevenir funciona como una especie de “escudo” que protege a su Objetivo.  
+Solo se puede jugar una carta o utilizar una Habilidad de prevención para cada carta que se vea afectada por 
+algún efecto.  
+ 
+Ejemplo 47:  
+La Traición de MacAlpin (C: 1, Talismán. Prevén que uno de tus Aliados salga del 
+juego).  
+La Traición de MacAlpin permite al jugador evitar que uno de sus Aliados salga del 
+juego ante un efecto dirigido o universal. Si una copia de este Talismán es anulada, 
+no se puede volver a jugar otra copia sobre el mismo Aliado nuevamente ante la 
+misma resolución del efecto dirigido o universal. Sin embargo, si se trata de la 
+resolución de un efecto universal o de un efecto dirigido de 2 o más Objetivos, pueden 
+jugarse más copias de este Talismán, solo 1 por cada Aliado.     
+ 
+Ejemplo 48:  
+Consumir las Aguas  (C: 3, Talismán. No puede ser anulado. Elige: Destruye un 
+Tótem para buscar una carta de Tótem en tu Mazo Castillo y ponerlo en tu Mano; o 
+Destruye un Orbe para buscar en tu Mazo Castillo una carta de Orbe y ponerla en tu 
+Mano).  
+De acuerdo con las reglas, si se previene que dicho Tótem sea Destruido, el jugador 
+no podrá buscar la carta de Tótem en su Mazo Castillo, ya que el requisito para poder 
+buscarla es precisamente Destruir un Tótem en juego.    
+
+
+===== PAGINA 31 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+31 
+4.11 En respuesta 
+ 
+Muchas cartas tienen en su texto de juego la frase “en respuesta”, que se puede resumir con una de las 
+siguientes tres frases para facilitar su comprensión: 
+• Si “ocurre X evento”. 
+• Cuando “ocurre X evento”. 
+• Cada vez que “ocurra X evento”. 
+Las Habilidades de estas cartas solo pueden utilizarse cuando se resuelve el evento que permite su activación, 
+que es la frase siguiente a en respuesta, y éstas siempre son opcionales, es decir, deben ser declaradas por su 
+Controlador (Según el punto 4.5.3 Pasos para jugar una carta o 4.6.2 Pasos para utilizar una Habilidad). 
+Las Habilidades en respuesta siguen el orden de prioridades establecido en el punto 4.6.6 Prioridades. 
+ 
+ 
+Ejemplo 49:  
+Aulladores Blancos  (C: 2, Talismán. En respuesta a que una de tus cartas sea 
+Destruida, Destruye una carta oponente del mismo tipo).  
+Aulladores Blancos solo puede ser jugado cuando una de las cartas del Controlador 
+del Talismán haya sido Destruida. Hab iéndose cumplido dicha condición, el jugador 
+puede jugar Aulladores Blancos para Destruir una carta oponente del mismo tipo.      
+  
+ 
+ 
+ 
+ 
+ 
+ 
+Ejemplo 50: 
+ 
+Oengus (C: 2, F: 1, Aliado, Raza: Sombra. En Guerra de Talismanes, puedes Destruir 
+a Oengus para que tu oponente Bote 2 cartas de su Mazo Castillo. En tu Fase de 
+Vigilia, si Oengus está en tu Cementerio, puedes pagar 2 Oros para jugarlo sin pagar 
+su Coste). 
+ 
+País Sin Luz (C: 2, Tótem. En respuesta a que uno de tus Aliados de Raza Sombra 
+sea Destruido o Desterrado, puedes Robar tantas cartas como Coste tenga el Aliado). 
+ 
+Wyrm Abismal (C: 4, F: 4, Aliado, Raza: Sombra. Mientras Wyrm Abismal esté en 
+juego, en respue sta a que uno de tus Aliados de Raza Sombra sea Destruido, tu 
+oponente debe Destruir uno de sus Aliados a su elección). 
+ 
+Si el Jugador Activo que controla a Oengus, a País Sin Luz  y a Wyrm Abismal 
+declara ataque, y el jugador oponente decide no jugar Talis manes ni utilizar 
+Habilidades en Guerra de Talismanes, el Jugador Activo puede entonces utilizar la 
+Habilidad de Oengus y, por tanto, lo Destruye para que el jugador oponente Bote 2 
+cartas. Y en respuesta a este evento, el Jugador Activo puede utilizar la Habilidad de 
+Wyrm Abismal y/o de País Sin Luz . Si utiliza ambas Habilidades en respuesta, el 
+Jugador Activo Roba 2 cartas y/o hará que el jugador oponente Destruya uno de sus 
+Aliados (en caso de controlar alguno), en el orden que estime conveniente. 
+ 
+ 
+
+
+===== PAGINA 32 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+32 
+4.11.1 En respuesta a una Fase de juego  
+ 
+Respecto a las Habilidades que se juegan en respuesta a una Fase , éstas se juegan de acuerdo con las 
+siguientes reglas:  
+Algunos Talismanes o Habilidades de cartas  tienen la Habilidad de jugarse  o utilizarse “en respuesta a”  una 
+determinada fase de juego . Estas cartas deben jugarse y resolverse después de aquell a condición a la que 
+responden.  
+Se específica a continuación con qué evento o acción comienza cada fase o paso del juego para jugar una carta 
+o utilizar una Habilidad “en respuesta a” una fase:  
+• Fase de Agrupación: Luego de agrupar las cartas.  
+• Fase de Vigilia: Luego de jugar el Oro del turno, o antes de jugar la primera carta que no sea Oro, o 
+antes de realizar alguna acción de dicha fase.  
+• Batalla Mitológica:  
+o Declaración de Ataque: Luego de declarar los Aliados atacantes.  
+o Declaración de Bloqueo: Luego de declarar los Aliados bloqueadores.  
+o Guerra de Talismanes: Al iniciar este paso de juego.  
+o Asignación de Daño: Inmediatamente antes de asignar el Daño al Mazo Castillo del jugador 
+bloqueador.  
+• Fase Final: Antes de Robar la carta que indica el Final del Turno.  
+• Final del Turno: Después de Robar la carta que indica el Final del Turno.  
+ 
+4.12 Afectar 
+ 
+Una carta es afectada cuando cualquiera de sus condiciones originales ( lo que indica la carta impresa) se ve 
+alterada por efecto de otra carta (ver definición de Efecto en el punto 4.5 Habilidades y Efectos ). Al afectar, 
+la(s) carta(s) que está(n) siendo afectada(s) debe(n) ser un Objetivo válido en el caso de los efectos dirigidos.  
+El afectar una carta incluye que esta cambie de zona de juego, por efecto de cualquier carta o habilidad, siendo 
+Destruida, Desterrada, Barajada, subida a la mano de su dueño o que cambie de Controlador, etc. 
+ 
+4.12.1 Afectar a un jugador 
+ 
+Afectar a un jugador significa limitar o forzar sus acciones de las siguientes maneras; obligar a atacar o bloquear, 
+restringir a jugar o utilizar cartas, impedir declarar ataque o bloqueo, forzar a Destruir, Desterrar, Barajar o subir 
+una carta a su mano, o alterar las Zonas de juego de información privada (Mano o Mazo Castillo) ya sea, mirando 
+o descartando cartas de la mano, botando cartas del mazo castillo, desterrando cartas del mazo castillo, etc. 
+Cuando un jugador es Objetivo, ya sea de un Talismán o habilidad, no se considera que está siendo afectado. 
+Sólo al resolver e l efecto de ese  Talismán o habilidad, si se limitan o fuerzan sus acciones o se alteran sus 
+Zonas de juego de información privada, se considerará que está siendo afectado. 
+Este tipo de habilidad si hace que el jugador objetivo realice alguna acción sobre una de sus cartas en juego, 
+en la cual termine afectando a esta carta, se considera que la carta fue afectada por su controlador y no por el 
+jugador oponente. 
+ 
+ 
+ 
+
+===== PAGINA 33 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+33 
+4.13 Condición de tener en juego solo una copia de una carta 
+ 
+Existen cartas que, ya sea por su propia Habilidad , o por alguna Habilidad o efecto de otra carta, tienen la 
+condición de que solo una copia de dicha carta pueda estar en juego. Estas cartas poseen en su Habilidad los 
+textos “solo puedes tener una copia de esta carta en juego”, “no puedes tener más de una copia de esta carta 
+en juego”, “solo puedes tener una “nombre carta” en juego”, entre otros similares. Todos estos textos hacen 
+referencia a tener solo una copia de esta carta en juego, por lo que el Controlador de aquella carta con dicha 
+Habilidad no puede jugar ni ganar el control de otra copia de la misma carta.  
+Si en algún momento del juego se controlan 2 o más copias de una car ta con el mismo nombre y que posean 
+dicha Habilidad, el Controlador deberá resolver inmediatamente esta acción dejando 1 copia en juego y poner 
+en el Cementerio de su Dueño las copias restantes.  Para efectos de juego, se considera que dichas copias 
+restantes “salen del juego ”, por lo que pueden utilizar sus Habilidades cuando salen del juego, en caso de 
+tenerlas.  
+ 
+Ejemplo 51:  
+Rey Arturo Pendragón  (C: 5, F: 2, Aliado, Raza: Caballero. Solo puedes tener en 
+juego a un Rey Arturo Pendragón. Mientras esté en juego, tus Caballeros ganan +1 a 
+la Fuerza y tu oponente Bota 2 cartas en cada Fase de Agrupación. Puedes Descartar 
+2 cartas para prevenir que sea Destruido).  
+Rey Arturo Pendragón  no puede tener otra de sus copias compartiendo la misma 
+zona de juego de un jugador, por lo que su Controlador no puede jugar otra copia de 
+Rey Arturo Pendragón, ni ganar el control de una copia de Rey Arturo Pendragón 
+oponente. Si Rey Arturo Pendragón pierde su Habilidad, su Controlador puede jugar 
+otra copia o ganar el control de una copia de Rey Arturo Pendragón oponente. Sin 
+embargo, cuando Rey Arturo Pendragón recupera su Habilidad, su Controlador debe 
+elegir una de sus copias para que permanezca en j uego, y las demás copias debe 
+ponerlas en el Cementerio de su respectivo Dueño. 
+ 
+4.14 Regla de Oro 
+ 
+Existen algunos casos en que las Habilidades de las cartas contradicen las reglas de este documento. En tales 
+casos, el texto de la carta tiene siempre preferencia y se sobrepone a las reglas . Este concepto es el llamado 
+Regla de Oro. Sin embargo, para una mejor compresión de este tipo de cartas, se usará el Oráculo 2021 para 
+la aclaración de ellas.  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+===== PAGINA 34 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+34 
+5.- FASES DEL JUEGO 
+ 
+Cada turno se divide en Fases de Juego, donde se realizan acciones en específico. Se detallan a continuación. 
+ 
+5.1 Fase de Agrupación 
+ 
+En esta fase, las cartas de Aliado que están en  la Línea de Ataque se mueven a la Línea de Defensa y las 
+cartas de Oro en la Zona de Oro Pagado se mueven a la Reserva de Oro. El Controlador puede o no agrupar 
+sus cartas, pero si decide no hacerlo, no puede agrupar ninguna de las cartas que se encuentren en la zona no 
+agrupada. Por ejemplo, si tiene 3 Oros en la Zona de Oro Pagado, no puede elegir no agrupar 1 o 2 de esos 
+Oros; sino que puede elegir agrupar o no agrupar los 3 Oros que tiene en esa zona. Para el caso de los Aliados, 
+aplica el mismo ejemplo anterior, y ambas zonas son independientes entre ellas para el tema de la Agrupación. 
+Es decir, puede elegir agrupar o no la totalidad de sus Aliados y/u Oros.  
+Las acciones de esta fase son los siguientes:  
+• Se agrupan las cartas del Jugador Activo (esta acción es opcional).  
+• Se juegan cartas o se utilizan Habilidades “en respuesta a la Fase de Agrupación”.  
+• Se juegan cartas y/o se utilizan Habilidades durante la Fase de Agrupación.  
+ 
+5.2 Fase de Vigilia 
+ 
+Durante la Fase de Vigilia, el Jugador Activo se prepara para la batalla, y para ello puede jugar cartas y/o utilizar 
+Habilidades de cartas.  
+La primera acción en la Fase de Vigilia del Jugador Activo es jugar una carta de Oro en su Reserva de Oro, 
+siendo ésta una acción opcional. Sin embargo, si no juega un Oro en ese momento, no podrá hacerlo en otro 
+paso de juego dentro del turno, a menos que una carta indique lo contrario.  
+Para los Aliados, Armas y Tótems, por regla básica solo pueden jugarse en esta fase (a menos que una  
+Habilidad o efecto indiquen lo contrario), mientras que los Talismanes pueden ser jugados en esta fase o en 
+Guerra de Talismanes (o incluso en cualquier momento en que el Talismán lo especifique).  
+Las acciones de esta fase son los siguientes:  
+• Terminan los efectos que duran hasta la fase de vigilia. 
+• Se juega el Oro correspondiente al turno (esta acción es opcional).  
+• Se juegan cartas o se utilizan Habilidades en respuesta a la Fase de Vigilia (dependiendo de la primera 
+acción del Jugador Activo en su Fase de Vigilia, descrito en el punto 4.11.1 En respuesta a una Fase 
+de juego).  
+• Se juegan cartas y/o se utilizan Habilidades de cartas, siendo acciones correspondientes a la Fase de 
+Vigilia. El Jugador Activo tiene libre albedrío para realizar el orden de sus acciones durante la Fase de 
+Vigilia, mientras sus recursos así lo permitan.  
+• Si el Jugador Activo no juega más cartas ni utiliza Habilidades, termina su Fase de Vigilia.  
+ 
+ 
+ 
+ 
+
+===== PAGINA 35 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+35 
+5.3 Batalla Mitológica 
+ 
+Esta fase es opcional, y solo existe si el Jugador Activo decide realizar una Declaración de Ataque al oponente. 
+La Fase de Batalla Mitológica se divide en 4 pasos:  
+ 
+5.3.1 Declaración de Ataque  
+ 
+En este paso el Jugador Activo elige qué Aliados atacarán al oponente, y los mueve de la Línea de Defensa a 
+la Línea de Ataque. Para que un Aliado pueda ser declarado Atacante, debe haber permanecido en juego desde 
+la última Fase de Agrupación de su actual Controlador. Los canceladores de ataque se juegan en este paso, y 
+posteriormente saltan el resto de la Batalla Mitológica.  
+Las acciones de esta etapa son las siguientes:  
+• Se declara(n) el(los) Aliado(s) atacante(s).  
+• Se juegan cartas o se utilizan Habilidades en respuesta a la Batalla Mitológica/Declaración de Ataque.  
+ 
+5.3.2 Declaración de Bloqueo  
+ 
+Luego de la Declaración de Ataque, el jugador defensor elige qué Aliados bloquearán a los Aliados declarados 
+atacantes. La declaración de Aliados bloqueadores se realiza uno a uno, es decir, un Aliado bloquea a un Aliado 
+oponente.  
+Los Aliados del jugador defensor que estén en Línea de Ataque no pueden ser declarados bloqueadores.  
+La Declaración de Bloqueo es opcional, es decir, no es obligación bloquear a los Aliados atacantes.  
+Las acciones de esta etapa son las siguientes:  
+• Se declara(n) el(los) Aliado(s) bloqueador(es) frente al(los) Aliado(s) atacante(s), designándolos uno a 
+uno.  
+• Se juegan cartas o se utilizan Habilidades en respuesta a la Declaración de Bloqueo.  
+ 
+5.3.3 Guerra de Talismanes  
+ 
+Una vez que el(los) Aliado(s) bloqueador(es) haya(n) sido declarado(s) (o ninguno), comienza la Guerra de 
+Talismanes. En este paso el jugador defensor tiene la prioridad para jugar Talismanes y/o utilizar Habilidades. 
+La acción de jugar un Talismán o utilizar una Habilidad se realiza de manera alternada entre los jugadores,  
+hasta que ambos decidan no jugar más Talismanes, ni utilizar Habilidades.  
+El jugador defensor puede, en su prioridad de jugar Talismanes o utilizar alguna Habilidad, cedérsela al Jugador 
+Activo, lo que implica que será este último quien empiece jugando un Talismán o utilizando alguna Habilidad. 
+Sin embargo, aún puede jugar un Talismán o utilizar alguna Habilidad para continuar la Guerra de Talismanes. 
+Es decir, ambos jugadores pueden jugar Talismanes y/o utilizar Habilidades mientras cuenten con los recursos 
+necesarios para hacerlo, siempre de manera alternada, y p reguntando previamente al otro jugador si va a 
+realizar alguna acción dentro de la Guerra de Talismanes, para decidir continuar o no con otra acción . Cuando 
+ambos jugadores deciden no jugar cartas , ni utilizar Habilidades de manera consecutiva, termina la Guerra de 
+Talismanes.  
+ 
+ 
+
+===== PAGINA 36 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+36 
+Las acciones de esta etapa son las siguientes:  
+• Se juegan cartas o se utilizan Habilidades en respuesta a la Guerra de Talismanes.  
+• El jugador defensor tiene la prioridad de  jugar Talismanes o utilizar Habilidades durante la Guerra de 
+Talismanes, intercalando 1 a 1 con el Jugador Activo.  
+• Si ningún jugador juega más cartas , ni utiliza más Habilidades de cartas , termina la Guerra de 
+Talismanes.  
+• Se terminan los efectos que duren hasta la Guerra de Talismanes.  
+ 
+5.3.4 Asignación de Daño  
+ 
+En esta etapa  se resuelven los puntos de  Daño hechos por diferencia de Fuerzas entre los Aliados o por 
+Habilidades utilizadas. Una vez resuelto lo anterior, se asigna el Daño, lo que implica que el jugador defensor 
+deba Botar tantas cartas de  su Mazo Castillo como puntos de Daño hayan sido resueltos a partir de dicha 
+diferencia de Fuerzas.  
+Las acciones de esta etapa son las siguientes:  
+• Se juegan cartas o se utilizan Habilidades en respuesta a la etapa de Asignación de Daño.  
+• Se calcula la diferencia entre las Fuerzas de cada uno de los Aliados atacantes y los Aliados 
+bloqueadores. Se rige por las siguientes reglas: 
+o Si el Aliado atacante tiene mayor Fuerza que el Aliado bloqueador, la diferencia entre las 
+Fuerzas de ambos Aliados es el Daño que se asigna al Mazo Castillo del jugador defensor . 
+Posteriormente el Aliado bloqueador es Destruido.  
+o Si ambos Aliados tienen l a misma Fuerza, el Mazo Castillo del jugador defensor no recibe 
+Daño. Posteriormente ambos Aliados son Destruidos.  
+o Si el Aliado bloqueador tiene mayor Fuerza que el Aliado atacante, el Mazo Castillo del 
+jugador defensor no recibe Daño. Posteriormente el Aliado atacante es Destruido.  
+• El Mazo Castillo del jugador defensor recibe el Daño que no fue cubierto por los Aliados bloqueadores. 
+Por cada punto de Daño que recibe un Mazo Castillo, su Dueño coloca la primera carta del Mazo 
+Castillo en su Cementerio.  
+• Los Aliados son Destruidos por Daño de combate, siguiendo las reglas descritas anteriormente según 
+la comparación de sus Fuerzas.  
+• Se disparan los efectos que dicen “ Si/Cuando este Aliado sale/salga del juego”, siguiendo los pasos 
+descritos en el punto 4.6.7 Resolución de múltiples Habilidades.  
+Los Aliados Destruidos como resultado de la comparación de Fuerzas durante la Asignación de Daño, se 
+consideran que fueron Destruidos por Daño de Combate. Si la Habilidad de un Aliado no permite que éste sea 
+Destruido por Aliados, ese Aliado no puede ser Destruido durante la Asignación de Daño.  
+ 
+ 
+Ejemplo 47:  
+Hidra de Lernea  (C: 4, F: 3, Aliado, Raza: Titán. Hidra de Lernea solo puede ser 
+Destruida por Aliados oponentes de Raza Héroe).  
+Hidra de Lernea no puede ser Destruida por ninguna Habilidad o efecto de una carta, 
+a excepción de alguna Habilidad de un Aliado de Raza Héroe que así lo exprese, o 
+bien ser Destruida por Daño de Combate mediante la diferencia de Fuerzas con un 
+Aliado de Raza Héroe. 
+ 
+ 
+ 
+ 
+
+
+===== PAGINA 37 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+37 
+5.4 Fase Final 
+ 
+En esta fase concluyen todos los efectos de cartas y/o Habilidades que dicen “hasta la Fase Final”, y se disparan 
+y/o activan los que dicen “en la Fase Final”.   
+En caso de que dos o más efectos se disparen al mismo tiempo se ordenan de la siguiente manera:  
+• Concluyen todos los efectos que dicen “hasta la Fase Final” de cartas o Habilidades del Jugador Activo.  
+• Concluyen todos los efectos que dicen “hasta la Fase Final” de cartas o Habilidades del Jugador 
+Inactivo.  
+• Se disparan y/o activan los efectos que dicen “en/durante la Fase Final” de cartas o Habilidades, y se 
+resuelven siguiendo los pasos descritos en el punto 4.6.7 Resolución de múltiples Habilidades.  
+Las acciones de esta fase son las siguientes:  
+• Se terminan los efectos que duran hasta la Fase Final (o hasta el Final del Turno).  
+• Se juegan cartas y/o utilizan Habilidades durante la Fase Final (o durante el Final del Turno).  
+• Se juegan cartas o utilizan Habilidades en respuesta a la Fase Final.  
+• Se Roban cartas extras por Habilidades de cartas.  
+ 
+5.5 Final del Turno 
+ 
+Este momento del juego no es una fase en sí. El Jugador Activo Roba una carta de su Mazo Castillo y verifica 
+que la cantidad de cartas en su Mano no supere las 8. De superar dicho número, debe Descartar cartas de su 
+Mano hasta quedarse con 8, y de esta manera termina el turno.  
+Una vez verificado lo anterior, comienza el turno oponente.  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGINA 38 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+38 
+6.- GLOSARIO 
+ 
+1.- Anular: Es la acción de evitar que el efecto de una carta se resuelva (para el caso de los Talismanes) 
+o entre en juego (para el caso de los demás tipos de cartas) . Solo se puede anular una carta en el momento 
+que es jugada, y esa carta va directamente al Cementerio de su Dueño.  
+ 
+2.- Barajar: Es la acción de revolver el Mazo Castillo de forma aleatoria. Se debe Barajar siempre que el 
+Mazo Castillo sea intervenido por efectos y/o Habilidades de cartas. 
+Hay efectos de cartas y Habilidades que Barajan cartas en juego o desde fuera del juego. En dicho caso, siempre 
+son Barajadas en los Mazos Castillos de sus Dueños. Una carta en la Línea de Defensa, Línea de Ataque, Línea 
+de Apoyo, Reserva de Oro o Zona de Oro Pagado que es Barajada, se considera que “sale del juego”.  
+Siempre que una o más cart as de un Cementerio sean Barajadas en el Mazo Castillo de su Dueño, se debe 
+mostrar la cantidad de cartas que son Barajadas.  
+ 
+3.- Bloquear: Es la acción de asignar un Aliado ubicado en la Línea de Defensa para defender el Mazo 
+Castillo ante un Aliado atacante. 
+Si un Aliado bloqueador sale del juego durante la Guerra de Talismanes, el Aliado atacante resolverá su Daño 
+completo en Asignación de Daño debido a que no hay un Aliado bloqueador al momento de resolver el Daño.  
+ 
+4.- Botar: Es la acción de enviar cartas del Mazo castillo al Cementerio. Cada vez que un jugador reciba 
+Daño, Bota al Cementerio, desde el tope superior de su Mazo Castillo, igual cantidad de cartas como puntos de 
+Daño haya recibido. Si un efecto de carta o Habilidad permite Botar más cartas de las que tiene ese Mazo 
+Castillo, se resuelve en medida de lo posible.  
+• Daño Directo: es el Daño que se hace a través del cumplimiento del efecto de la Habilidad de una 
+carta, y siempre tiene el verbo “Botar” escrito en su texto de juego.  
+• Daño de Combate: es el Daño que realizan los Aliados durante la fase de Asignación de Daño. Existen 
+cartas que incluyen en su Habilidad los conceptos de  “hacer daño” o “daño” . Estas Habilidades se 
+consideran como Daño de Combate.  
+ 
+5.- Buscar: Las Habilidades o efectos que permiten Buscar una carta, normalmente especifican la zona 
+en que lo hacen, y puede ser en el Mazo Castillo, Cementerio o Zona de Destierro. En el caso de que la carta 
+no especifique la zona, puede Buscar en cualquiera de las 3 zonas mencionadas del Controlador.  
+Siempre que se tenga que Buscar una carta con características específicas, la carta buscada debe mostrarse 
+al oponente para poder verificar que la carta que fue buscada cumple con las especificaciones requeridas.  
+Buscar una carta es una acción que no hace Objetivo, y por esto puede iniciarse una búsqueda en el Mazo 
+Castillo, Cementerio o Zona de Destierro y fallar la búsqueda voluntariamente.  
+Siempre que se busque una carta en un Mazo Castillo, éste debe ser Barajado posteriormente, se haya 
+encontrado o no el objeto de búsqueda.  
+ 
+6.- Cargar: Es la acción de equipar o colocar un Arma a un Aliado.  
+ 
+7.- Ceder/Pasar Prioridad: Es la acción de pasar voluntariamente la prioridad  de jugar cartas o utilizar 
+habilidades al oponente en Guerra de Talismanes.  
+
+===== PAGINA 39 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+39 
+8.- Copias: Se refiere a cartas con el mismo nombre, independiente de las distintas versiones que tenga, 
+las cuales siempre se consideran que tienen la habilidad de la carta original.  
+El máximo de copias de una carta en el Mazo Castillo es 3 copias, excepto por las Cartas Únicas. 
+ 
+9.- Considerar: Es un efecto de Habilidades que agrega un nuevo tipo de carta, o una nueva Raza, o una 
+nueva Habilidad, a una o más cartas en juego, permitiéndole comportarse como el nuevo tipo de carta o Raza 
+sin perder su condición anterior. En el caso de las Habilidades, la carta pasa a tener una Habilidad adicional.  
+ 
+Ejemplo 48:  
+Dionisio (C: 5, F: 0, Aliado, Raza: Olímpico. Dionisio se considera un Aliado de Raza 
+Héroe, y gana 1 a la Fuerza por cada Aliado de Raza Olímpico y Héroe que tengas 
+en juego).  
+Dionisio se considera un Aliado de Raza Héroe, pero no pierde su Raza original. Es 
+decir, posee ambos tipos de Razas a la vez (Olímpico y Héroe).  
+ 
+Ejemplo 49:  
+Atalanta (C: 5, F: 4, Aliado, Raza: Héroe. Atalanta se considera un Arma).  
+Atalanta se considera un Arma, pero no deja de ser Aliado. Por lo tanto, puede ser 
+afectada por cartas que afecten a Aliados y/o Armas.  
+ 
+10.- Declarar: Es la verbaliz ación de  alguna acción de juego, o bien, la utilización de una Habilidad a 
+resolver.  
+ 
+11.- Descartar: Es la acción de poner una carta de la Mano en el Cementerio de su Dueño. Los efectos de 
+cartas o Habilidades que permitan Descartar se resuelven en medida de lo posible, de acuerdo con lo indicado 
+en el punto 4.5.7 Resolución de los Efectos.  
+ 
+12.- Desterrar: Es la acción de enviar una carta desde cualquier zona de juego a la Zona de Destierro. Una 
+carta en la Línea de Defensa, Línea de Ataque, Línea de Apoyo, Reserva de Oro o Zona de Oro Pagado que 
+es Desterrada, se considera que “sale del juego”.  
+ 
+13.- Destruir: Es la acción de e nviar una carta desde la Línea de Defensa, Línea de Ataque, Línea de 
+Apoyo, Reserva de Oro o Zona de Oro Pagado al Cementerio de su Dueño. Una carta Destruida se considera 
+que “sale del juego”. 
+ 
+14.- Efecto Permanente: Son efectos que, cuando se resuelven, una vez que la carta entra en juego o es 
+jugada, tienen efecto indefinido. Si es una carta en juego, ésta pierde el efecto en el momento en que sale del 
+juego.  
+
+
+===== PAGINA 40 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+40 
+ 
+Ejemplo 50:  
+Ojos de Serpiente  (C: 3, Talismán. Juega Ojos de Serpiente para que un Tótem 
+oponente pierda su Habilidad por el resto del juego).  
+Ojos de Serpiente  hará que un Tótem oponente pierda su Habilidad mientras esté 
+en juego. Sin embargo, si dicho Tótem sale del juego, y en alg ún momento de la 
+partida vuelve a entrar en juego, lo hará con su Habilidad nuevamente. 
+ 
+15.- Fuerza: Es el número impreso en la esquina superior izquierda en las cartas de Aliado. Representa la 
+cantidad de puntos que asigna como Daño de Combate al Mazo Castillo al atacar, o la cantidad de puntos que 
+defiende al momento de bloquear.  
+Para efectos de cartas y Habilidades, se considera como “Fuerza” de un Aliado en juego a la suma de su Fuerza 
+base (impresa en su ícono de Fuerza) y los Modificadores de Fuerza, ya sean positivos o negativos. Esta suma 
+total representa la Fuerza del Aliado en juego , y es la referencia para resolver efectos de cartas o Habilidades 
+que requieran verificar la Fuerza de un Aliado.  
+Cualquier Modificador de Fuerza que se encuentra en juego, no afectará el valor impreso en la Fuerza de las 
+cartas de Aliado que estén fuera del juego.  Los Modificadores de Fuerza de tipo "Habilidad Continua" 
+comienzan a hacer efecto sobre los Aliados al momento de entrar en juego.  
+ 
+ 
+Ejemplo 51:  
+Duque Owen  (C: 3, F: 1, Aliado, Raza: Defensor. Si Duque Owen es declarado 
+Bloqueador, cambia su Fuerza por su Coste).  
+Ulster (C: 2, Tótem. Mientras Ulster esté en juego, todos tus Aliados de Raza 
+Defensor ganan 2 a la Fuerza).  
+Si el jugador controla Duque Owen y Ulster, entonces este Aliado tendrá 3 de Fuerza. 
+No obstante, si Duque Owen es declarado bloqueador, cambia su Fuerza impresa 
+por su Coste impreso, es decir, tendría 3 de Fuerza en ese momento en lugar de 1; 
+pero al estar controlando a Ulster, Duque Owen gana 2 a la Fuerza, teniendo un total 
+de 5 de Fuerza al momento de ser declarado bloqueador.   
+ 
+16.- Generar: Es un tipo de Habilidad que agrega Oros Virtuales a la Reserva de Oro de su Controlador, 
+solo por el turno en que son jugadas las cartas y/o activadas dichas Habilidades.  
+ 
+17.- Imbloqueable: Es un tipo de H abilidad que permite que un Aliado declarado atacante no pueda ser 
+bloqueado en Batalla Mitológica, a excepción de efectos de cartas o Habilidades que permitan su bloqueo. Si 
+una carta se considera Imbloqueable, simplemente es Imbloqueable para efectos de juego.  
+ 
+Ejemplo 52:  
+Alejo (C: 2, F: 2, Aliado, Raza: Caballero. Alejo se considera Imbloqueable).  
+Alejo es Imbloqueable para efectos de juego, aun cuando su Habilidad incluya el 
+concepto “Considerar”.   
+
+
+===== PAGINA 41 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+41 
+18.- Indesterrable: Es un tipo de Habilidad que impide que una carta sea Desterrada por efectos de cartas 
+y/o Habilidades.  
+Los efectos universales de cartas o Habilidades que Destierren cartas Destierran, en medida de lo posible, todo 
+lo que pueda ser Desterrado. Es decir, las cartas con la Habilidad de Indesterrable no son Desterradas durante 
+la resolución de este tipo de efectos.  
+ 
+19.- Indestructible: Es un tipo de Habilidad que impide que una carta sea Destruida por efectos de cartas 
+y/o Habilidades. Para el caso de los Aliados, impide que sean Destruidos durante la Asignación de Daño. 
+Los efectos universales de cartas o Habilidades que Destruyan cartas Destruyen, en medida de lo posible, todo 
+lo que pueda ser Destruido. Es decir, las cartas con la Habilidad de Indestructible no son Destruidas durante la 
+resolución de este tipo de efectos.  
+ 
+20.- Jugador Activo/Jugador Inactivo:  
+• Jugador Activo: Es el jugador que tiene el control del turno, realizando sus acciones normalmente 
+dentro de las fases correspondientes a su turno.  
+• Jugador Inactivo: Es el jugador que no tiene el control del turno, lo que le impide realizar acciones 
+normalmente dentro del turno del Jugador Activo, a excepción de jugar cartas y/o utilizar Habilidades 
+en momentos específicos mencionados en este documento.  
+ 
+21.- Mirar/Ver: Es la acción de observar información determinada, ya sea cartas de un Mazo Castillo o en 
+la Mano de un jugador. Las cartas se Miran /Ven una a una, por lo que las Habilidades que hagan referencia a 
+Mirar/Ver se resuelven en medida de lo posible.  
+Mirar/Ver es una acción que entrega información no pública, por lo que sólo el Controlador del efecto o Habilidad 
+puede tener acceso a esta información.  
+ 
+22.- Mostrar: Es la acción de enseñar o exhibir  cartas del Mazo Castillo o de la Mano . Las cartas se 
+muestran una a una, por lo que las Habilidades que requieran Mostrar una determinada cantidad de cartas se 
+resuelven en medida de lo posible. 
+ 
+23.- Mover: Es la acción de trasladar una carta de una Zona de Juego a otra.  
+ 
+24.- Nombrar una carta:  Es la acción de mencionar una carta para distintos efectos de juego . Las 
+Habilidades que nombran cartas no hacen Objetivo, por lo tanto, esa carta y todas sus copias será n afectadas 
+por la Habilidad. Esta Habilidad puede afectar a las cartas fuera del juego. Si la carta que nombra es para hacer 
+perder (quitar) la Habilidad, se rige por regla de Auto-Referencia.  
+ 
+25.- Pagar: Es la acción de m over Oros de la Reserva de Oro a la Z ona de Oro Pagado. Esta acción es 
+realizada para jugar cartas o activar Habilidades que lo requieran.  
+ 
+26.- Poner cartas en el Cementerio:  Es una acción que permite tomar una (o más) carta(s) en juego y 
+enviarla(s) al Cementerio de forma directa. Esta acción no implica que las cartas sean Destruidas. Sin embargo, 
+para efectos de juego, las cartas salen del juego.  
+ 
+
+===== PAGINA 42 =====
+Documento Actualizado de Reglas  
+Mitos y Leyendas, Formato Primer Bloque 
+42 
+27.- Portar: Es la acción de que un Aliado en juego controle un Arma.  
+ 
+28.- Resolver Daño/Asignar Daño:  
+• Resolver Daño: Es la acción de contar el total de cartas que se deben Botar del Mazo Castillo por 
+Daño de Combate.  
+• Asignar Daño: Es la acción de Botar cartas del Mazo Castillo por Daño de Combate.  
+ 
+29.- Robar: Es la acción de tomar una carta del tope de un Mazo Castillo y ponerla en la Mano.  
+Los efectos de cartas o Habilidades que permiten poner cartas del Mazo Castillo en la Mano de su Dueño no 
+son considerados como Robar.  
+ 
+Ejemplo 53:  
+Dendera (C: 4, Tótem. Dendera no puede ser afectado por Talismanes oponentes. 
+En tu Fase de Vigilia, solo una vez por turno, puedes tomar las tres cartas superiores 
+de tu Mazo Castillo para poner una en tu Mano y las otras en tu Cementerio).  
+Dendera en este caso, no se considera como una acción de Robar, ya que permite a 
+su Controlador tomar las 3 primeras cartas de su Mazo Castillo, y escoger 1 de ellas 
+para ponerla en su Mano y las otras 2 en su Cementerio.   
+ 
+Las cartas se Roban una a una, por lo que los efectos que permitan Robar más cartas que las que quedan en 
+un Mazo Castillo, se resuelven en medida de lo posible.  
+ 
+30.- Subir: Es la acción de enviar una carta desde la Línea de Defensa, Línea de Ataque, Línea de Apoyo, 
+Reserva de Oro o Zona de Oro Pagado a  la Mano de su Dueño. Una carta Subida a la Mano de su Dueño se 
+considera que “sale del juego”.  
+ 
+31.- Turno: Es el conjunto de Fases de juego  en que los jugadores realizar án las acciones con las que 
+intentarán ganar la partida. El juego se desarrolla en una serie de turnos alternados.  
+• Inicio del Turno: Comienza con la Fase de Agrupación.  
+• Fin del Turno: Termina después de Robar la carta del final del turno. Si el Jugador Activo posee más 
+de 8 cartas en su Mano, debe Descartar cartas hasta que tenga 8.  
+ 
+32.- Utilizar: Es un término que abarca los tres tipos de Habilidades normales de cartas (Continuas, 
+Disparadas y Activadas). Cuando una sección del documento menciona “utilizar una Habilidad”, se refiere tanto 
+a Activar una Habilidad, Disparar una Habilidad o cuando una Habilidad Continua comienza a hacer efecto.  

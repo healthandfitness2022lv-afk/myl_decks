@@ -1,54 +1,73 @@
 // lib/main.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'firebase_options.dart';
-import 'auth_gate.dart'; // tu AuthGate
 import 'models/current_user.dart'; // crea este archivo según lo sugerido
+import 'services/error_log_service.dart';
+import 'theme/app_theme.dart';
+import 'router.dart';
+import 'services/deck_service.dart';
+import 'services/inventory_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  // URLs limpias en web (/mazo/... en vez de /#/mazo/...).
+  usePathUrlStrategy();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Persistencia offline: la app abre al instante con datos cacheados
+  // (web incluida) y reduce lecturas de Firestore en cargas repetidas.
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
-  // Instancia compartida del CurrentUser (ChangeNotifier)
+  // Captura errores no manejados en release y los guarda en `app_errors`.
+  ErrorLogService.install();
+
   final currentUser = CurrentUser();
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? userDocSub;
 
   // Escuchar cambios de autenticación y poblar currentUser desde Firestore
   FirebaseAuth.instance.authStateChanges().listen((user) async {
+    await userDocSub?.cancel();
     try {
       if (user == null) {
-        // Usuario desconectado -> limpiar estado
-        currentUser.update(
-          uid_: null,
-          email_: null,
-          role_: 'basico',
-          displayName_: null,
-          photoUrl_: null,
-        );
+        currentUser.clear();
       } else {
-        // Usuario conectado -> leer doc users/{uid}
         final uid = user.uid;
-        final docSnap = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-        final data = docSnap.data() ?? {};
-
-        // Extraer campos con tolerancia a nulos/tipos
-        final role = (data['role'] as String?) ?? 'basico';
-        final username = (data['username'] as String?) ?? user.displayName;
-        final photoUrl = (data['photoUrl'] as String?) ?? user.photoURL;
-        final email = user.email;
-
-        currentUser.update(
-          uid_: uid,
-          email_: email,
-          role_: role,
-          displayName_: username,
-          photoUrl_: photoUrl,
-        );
+        userDocSub = FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .snapshots()
+            .listen((docSnap) {
+              final data = docSnap.data() ?? const <String, dynamic>{};
+              currentUser.update(
+                uid_: uid,
+                email_: user.email,
+                role_: (data['role'] as String?) ?? 'basico',
+                displayName_:
+                    (data['displayName'] as String?) ??
+                    (data['username'] as String?) ??
+                    user.displayName,
+                photoUrl_: (data['photoUrl'] as String?) ?? user.photoURL,
+              );
+            });
+        try {
+          final inventory = InventoryService(uid);
+          await inventory.migrateFromDecksIfNeeded(
+            await DeckService(uid).listMine(),
+          );
+        } catch (error, stack) {
+          debugPrint('No se pudo conciliar el inventario: $error\n$stack');
+        }
       }
     } catch (e, st) {
       // Si algo falla al leer Firestore, al menos limpiamos y mostramos consola.
@@ -65,8 +84,10 @@ Future<void> main() async {
   });
 
   runApp(
-    ChangeNotifierProvider<CurrentUser>.value(
-      value: currentUser,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<CurrentUser>.value(value: currentUser),
+      ],
       child: const MyApp(),
     ),
   );
@@ -79,14 +100,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       debugShowCheckedModeBanner: false,
-      title: 'MyL Decks',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
-      ),
-      home: const AuthGate(),
+      title: 'MyL Mazos',
+      theme: AppTheme.dark,
+      routerConfig: appRouter,
     );
   }
 }

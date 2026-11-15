@@ -1,0 +1,621 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isAuth() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administrador' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.marketplaceRole == 'admin'
+      );
+    }
+
+    function isCatalogSuperAdmin() {
+      return isAuth() && request.auth.token.email in [
+        'hecturnicolas@gmail.com', 'tartarostorelv@gmail.com'
+      ];
+    }
+
+    function validInventory() {
+      return request.resource.data.total is int &&
+        request.resource.data.total >= 0;
+    }
+
+    // Los roles, planes y métricas no son datos editables por el titular de
+    // la cuenta. Sin esta separación cualquier usuario podría ascenderse a
+    // administrador modificando users/{uid} desde el cliente.
+    function ownerEditsOnlyProfile() {
+      // Lista de campos BLOQUEADOS (no de permitidos): myl_decks comparte
+      // este documento y guarda sus propios campos (migraciones, fondo, etc.).
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'role', 'marketplaceRole', 'planType', 'planExpiry', 'catalogAccess',
+        'ratingAvg', 'ratingCount'
+      ]);
+    }
+
+    // ── Funciones compartidas con myl_decks (mismo proyecto Firebase) ──────
+    function deckMigrationComplete(uid) {
+      return 'deckMigrationV2' in get(/databases/$(database)/documents/users/$(uid)).data &&
+        get(/databases/$(database)/documents/users/$(uid)).data.deckMigrationV2.phase == 'complete';
+    }
+
+    function validUnifiedDeck(uid) {
+      return !deckMigrationComplete(uid) || (
+        request.resource.data.schemaVersion == 2 &&
+        request.resource.data.assemblyEnabled is bool &&
+        !request.resource.data.keys().hasAny([
+          'status', 'objectiveCards', 'linkedDeckId'
+        ])
+      );
+    }
+
+    function teamDoc(teamId) {
+      return get(/databases/$(database)/documents/teams/$(teamId));
+    }
+
+    function isTeamOwner(teamId) {
+      return isAuth() && (
+        teamDoc(teamId).data.ownerId == request.auth.uid ||
+        teamDoc(teamId).data.adminUid == request.auth.uid
+      );
+    }
+
+    function isTeamMember(teamId) {
+      return isAuth() && exists(
+        /databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)
+      );
+    }
+
+    function isTeamManager(teamId) {
+      return isTeamOwner(teamId) || isAdmin() || (
+        isTeamMember(teamId) &&
+        get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role in ['owner', 'admin']
+      );
+    }
+
+    function isLeagueManager(leagueId) {
+      let league = get(/databases/$(database)/documents/leagues/$(leagueId)).data;
+      return isAuth() && (
+        league.adminUid == request.auth.uid ||
+        (league.teamId is string && league.teamId != '' && isTeamManager(league.teamId))
+      );
+    }
+
+
+    function isOrderBuyer() {
+      return resource.data.buyerUid == request.auth.uid;
+    }
+
+    function isOrderSeller() {
+      return resource.data.sellerUid == request.auth.uid;
+    }
+
+    function validReviewForDeliveredOrder() {
+      return request.resource.data.orderId is string
+          && exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId))
+          && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.status == 'delivered'
+          && request.resource.data.reviewerUid == request.auth.uid
+          && request.resource.data.rating is int
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && ((get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.buyerUid == request.auth.uid
+               && request.resource.data.targetUid == get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.sellerUid)
+              ||
+              (get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.sellerUid == request.auth.uid
+               && request.resource.data.targetUid == get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.buyerUid));
+    }
+
+    // ── users ──────────────────────────────────────────────────────────────────
+    // Lectura pública (sin auth): solo el perfil del vendedor para el marketplace.
+    // Los datos sensibles (email, paymentInfo, etc.) no se exponen —
+    // solo se permite leer el documento raíz (username, displayName, ratingAvg,
+    // ratingCount, isVip, whatsapp para contacto), que ya es información pública
+    // que el vendedor eligió compartir al registrarse como vendedor.
+    // Los administradores pueden actualizar cualquier documento (roles, etc.).
+    match /users/{userId} {
+      // No se puede ocultar campos individuales en un documento de Firestore.
+      // El perfil completo deja de ser público hasta migrar los datos visibles
+      // del marketplace a una colección public_profiles separada.
+      allow read:   if isAuth();
+      allow create: if isOwner(userId)
+                    && request.resource.data.role in ['basico', 'pro']
+                    && request.resource.data.marketplaceRole in ['buyer', 'seller'];
+      allow update: if (isOwner(userId) && ownerEditsOnlyProfile()) || isAdmin();
+      allow delete: if false;
+
+      // decks subcollection (myl_decks)
+      match /decks/{deckId} {
+        allow read:  if isAuth();
+        allow create, update: if isOwner(userId) && validUnifiedDeck(userId);
+        // En delete no existe request.resource: validUnifiedDeck fallaría
+        // y el dueño no podría eliminar sus mazos.
+        allow delete: if isOwner(userId);
+
+        // Registro de partidas del mazo (myl_decks)
+        match /match_logs/{logId} {
+          allow read:  if isAuth();
+          allow write: if isOwner(userId);
+        }
+      }
+
+      match /transfer_plans/{planId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /teams/{teamId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) || isTeamManager(teamId);
+      }
+
+      // friends subcollection (myl_decks)
+      match /friends/{friendId} {
+        allow read:  if isAuth();
+        allow write: if isOwner(userId);
+      }
+
+      // wishlist subcollection (myl_decks)
+      match /wishlist/{itemId} {
+        allow read:  if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+
+      match /inventory/{itemId} {
+        allow read: if isOwner(userId) || isCatalogSuperAdmin();
+        allow delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && validInventory();
+      }
+
+      // bundles subcollection (lotes de cartas)
+      match /bundles/{bundleId} {
+        allow read:  if isAuth();
+        allow create, delete: if isOwner(userId);
+        allow update: if isOwner(userId) ||
+          (isCatalogSuperAdmin() &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'items', 'updatedAt'
+           ]));
+      }
+
+      // favorites subcollection (wishlist del comprador)
+      match /favorites/{favId} {
+        allow read:  if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+
+      match /manual_sales/{saleId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+                      && request.resource.data.sellerUid == userId
+                      && request.resource.data.total is int
+                      && request.resource.data.total > 0
+                      && request.resource.data.items is list
+                      && request.resource.data.items.size() > 0
+                      && request.resource.data.items.size() <= 20;
+        allow update, delete: if false;
+      }
+
+      // notifications subcollection (notificaciones de estado de pedidos — comprador)
+      match /notifications/{notifId} {
+        allow read:   if isOwner(userId);
+        allow create: if isAuth()
+                      && request.resource.data.orderId is string
+                      && exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId))
+                      && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.buyerUid == userId
+                      && (get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.buyerUid == request.auth.uid ||
+                          get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.sellerUid == request.auth.uid);
+        allow update, delete: if isOwner(userId);
+      }
+
+      // seller_notifications subcollection (notificaciones del vendedor)
+      match /seller_notifications/{notifId} {
+        allow read:   if isOwner(userId);
+        allow create: if isAuth()
+                      && request.resource.data.orderId is string
+                      && exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId))
+                      && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.sellerUid == userId
+                      && (get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.buyerUid == request.auth.uid ||
+                          get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.sellerUid == request.auth.uid);
+        allow update, delete: if isOwner(userId);
+      }
+
+      // reviews subcollection
+      match /reviews/{reviewId} {
+        allow read:  if isAuth();
+        allow create: if validReviewForDeliveredOrder();
+        allow update, delete: if false;
+      }
+
+      // marketplace_folders — acceso público para el marketplace sin login
+      match /marketplace_folders/{folderId} {
+        allow read: if true;           // público — grilla y búsqueda por código sin login
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId) || isAdmin();
+        allow delete: if isOwner(userId) || isAdmin();
+
+        // listings subcollection — pública para ver cartas sin login
+        match /listings/{listingId} {
+          allow read:  if true;        // público — ver cartas sin login
+          allow create, delete: if isOwner(userId) || isAdmin();
+          allow update: if isOwner(userId) || isAdmin() ||
+            (isCatalogSuperAdmin() &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+               'variantName', 'variantNameLower', 'printType',
+               'searchTokens', 'updatedAt', 'productName'
+             ]) &&
+             request.resource.data.cardId == resource.data.cardId &&
+             request.resource.data.variantId == resource.data.variantId);
+
+          // Historial de precios de la carta (gráfico público).
+          match /price_history/{pointId} {
+            allow read: if true;
+            allow write: if isOwner(userId) || isAdmin();
+          }
+        }
+      }
+    }
+
+    // ── cards / variants (catálogo myl_decks) ─────────────────────────────────
+    match /drive_folder_notes/{folderId} {
+      allow read, write: if isAdmin() ||
+        (isAuth() && request.auth.token.email in [
+          'hecturnicolas@gmail.com', 'tartarostorelv@gmail.com'
+        ]);
+    }
+
+    match /cards/{cardId} {
+      // El dashboard público de ligas (mylmazos.web.app/dashboard) lee el catálogo sin login.
+      allow read:  if true;
+      allow write: if isAdmin() || isCatalogSuperAdmin();
+
+      match /variants/{variantId} {
+        allow read:  if true;
+        allow create, delete: if isAdmin() || isCatalogSuperAdmin();
+        allow update: if isAdmin() ||
+          (isCatalogSuperAdmin() &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'name', 'printType', 'productName'
+           ]));
+      }
+    }
+
+    // ── decks (colección raíz) ─────────────────────────────────────────────────
+    match /decks/{deckId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+    }
+
+    // ── tournaments ────────────────────────────────────────────────────────────
+    match /tournaments/{tournamentId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+
+      match /{sub=**} {
+        allow read:  if isAuth();
+        allow write: if isAuth();
+      }
+    }
+
+    // ── teams ──────────────────────────────────────────────────────────────────
+    match /teams/{teamId} {
+      // Dashboard público: equipos y sus jugadores sin login (el resto sigue privado).
+      allow read:  if true;
+      allow write: if isAuth();
+
+      match /players/{playerId} {
+        allow read: if true;
+      }
+
+      match /{sub=**} {
+        allow read:  if isAuth();
+        allow write: if isAuth();
+      }
+    }
+
+    // ── communities ────────────────────────────────────────────────────────────
+    match /communities/{communityId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+
+      match /{sub=**} {
+        allow read:  if isAuth();
+        allow write: if isAuth();
+      }
+    }
+
+    // ── friend_requests ────────────────────────────────────────────────────────
+    match /friend_requests/{reqId} {
+      allow read: if isAuth() && (
+        resource.data.fromUid == request.auth.uid ||
+        resource.data.toUid  == request.auth.uid
+      );
+      allow create: if isAuth();
+      allow update, delete: if isAuth() && (
+        resource.data.fromUid == request.auth.uid ||
+        resource.data.toUid  == request.auth.uid
+      );
+    }
+
+    // ── matches ────────────────────────────────────────────────────────────────
+    match /matches/{matchId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+    }
+
+    // ── notifications ──────────────────────────────────────────────────────────
+    match /notifications/{notifId} {
+      allow read: if isAuth() && resource.data.toUid == request.auth.uid;
+      allow create: if isAuth();
+      allow update, delete: if isAuth() && resource.data.toUid == request.auth.uid;
+    }
+
+    match /notifications_email/{notifId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+    }
+
+    // ── chats / messages ───────────────────────────────────────────────────────
+    match /chats/{chatId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+
+      match /messages/{messageId} {
+        allow read:  if isAuth();
+        allow write: if isAuth();
+      }
+    }
+
+    // ── ban_list ───────────────────────────────────────────────────────────────
+    match /ban_list/{entryId} {
+      allow read:  if true;
+      allow write: if isAuth();
+    }
+
+    // ── card_submissions ───────────────────────────────────────────────────────
+    match /card_submissions/{subId} {
+      allow read:   if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isAuth();
+    }
+
+    // ── card_custom_features ───────────────────────────────────────────────────
+    match /card_custom_features/{docId} {
+      allow read:  if true;  // dashboard público
+      allow write: if isAuth();
+    }
+
+    // ── videos / posts ─────────────────────────────────────────────────────────
+    match /videos/{videoId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+    }
+
+    match /posts/{postId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+
+      match /replies/{replyId} {
+        allow read:  if isAuth();
+        allow write: if isAuth();
+      }
+    }
+
+    // ── race_pools ─────────────────────────────────────────────────────────────
+    match /race_pools/{poolId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+    }
+
+    // ── marketplace_listings (colección raíz) ─────────────────────────────────
+    match /marketplace_listings/{listingId} {
+      allow read:  if isAuth();
+      allow write: if isAuth();
+    }
+
+    // ── collectionGroup: marketplace_folders ──────────────────────────────────
+    // Requerido para que collectionGroup('marketplace_folders') funcione.
+    // Acceso público: el marketplace es visible sin login.
+    match /{path=**}/marketplace_folders/{folderId} {
+      allow read: if true;   // público — grilla VIP y búsqueda por código sin login
+      allow write: if false; // el write lo maneja la regla anidada en users/
+    }
+
+    // ── collectionGroup: listings ─────────────────────────────────────────────
+    // Requerido para que collectionGroup('listings') funcione.
+    // Acceso público: ver cartas sin login.
+    match /{path=**}/listings/{listingId} {
+      allow read: if true;   // público — ver cartas sin login
+      allow write: if false; // el write lo maneja la regla anidada en users/
+    }
+
+    // ── collectionGroup: variants (catálogo de cartas) ─────────────────────────
+    // Requerido para que collectionGroup('variants') funcione en lectura.
+    match /{path=**}/variants/{variantId} {
+      allow read: if isAuth();
+      allow write: if false; // el write lo maneja la regla anidada en cards/
+    }
+
+    match /{path=**}/inventory/{itemId} {
+      allow read: if isCatalogSuperAdmin();
+      allow write: if false;
+    }
+
+    // ── cart_items (subcollección del comprador) ───────────────────────────────
+    match /users/{userId}/cart_items/{itemId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ── orders (colección raíz) ───────────────────────────────────────────────
+    // El comprador puede crear y leer sus propios pedidos.
+    // El vendedor puede leer y actualizar los pedidos que le corresponden.
+    match /orders/{orderId} {
+      allow read: if isAuth() && (
+        resource.data.buyerUid  == request.auth.uid ||
+        resource.data.sellerUid == request.auth.uid
+      );
+      allow create: if isAuth()
+                    && request.resource.data.buyerUid == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.total is number
+                    && request.resource.data.total >= 0;
+      // Los datos comerciales (vendedor, comprador, ítems y total) quedan
+      // inmutables. Solo cada parte puede avanzar su siguiente estado.
+      allow update: if isAuth() && (
+        (isOrderSeller()
+          && resource.data.status == 'pending'
+          && request.resource.data.status in ['confirmed', 'rejected']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'paymentInfo', 'deliveryMethod', 'paymentMethod',
+            'confirmedAt', 'rejectedAt', 'updatedAt'
+          ])) ||
+        (isOrderSeller()
+          && resource.data.status == 'confirmed'
+          && request.resource.data.status == 'paid'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'paymentMethod', 'paidAt', 'updatedAt'
+          ])) ||
+        (isOrderSeller()
+          && resource.data.status == 'paid'
+          && request.resource.data.status == 'shipped'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'trackingNumber', 'shippedAt', 'updatedAt'
+          ])) ||
+        (isOrderBuyer()
+          && resource.data.status in ['paid', 'shipped']
+          && request.resource.data.status == 'delivered'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'deliveredAt', 'updatedAt'
+          ]))
+      );
+      allow delete: if false;
+    }
+
+    // ── collectionGroup: bundles ──────────────────────────────────────────────
+    match /{path=**}/bundles/{bundleId} {
+      allow read: if isAuth();
+      allow write: if false; // el write lo maneja la regla anidada en users/
+    }
+
+    // ── collectionGroup: reviews ──────────────────────────────────────────────
+    match /{path=**}/reviews/{reviewId} {
+      allow read:  if isAuth();
+      allow create: if validReviewForDeliveredOrder();
+      allow update, delete: if false;
+    }
+
+    // ── config (configuración global de la app) ───────────────────────────────
+    // Lectura pública: la app lee config/marketplace sin login.
+    // Escritura: cualquier usuario autenticado con marketplaceRole == 'admin'
+    // (se verifica leyendo su propio doc de usuario).
+    match /config/{docId} {
+      allow read:  if true;
+      allow write: if isAuth() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.marketplaceRole == 'admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administrador'
+      );
+    }
+
+    // ── Colecciones de myl_decks (copiadas tal cual de su firestore.rules) ──
+    match /{path=**}/decks/{deckId} {
+      allow read: if isAuth();
+    }
+
+    match /app_errors/{errorId} {
+      allow create: if isAuth();
+      allow read:   if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /leagues/{leagueId} {
+      // El dashboard público consume ligas, participantes y fechas sin login.
+      allow read:  if true;
+      allow create: if isAuth();
+      allow update, delete: if isAuth() && (
+        resource.data.adminUid == request.auth.uid ||
+        (resource.data.teamId is string && resource.data.teamId != '' && isTeamManager(resource.data.teamId))
+      );
+
+      match /players/{playerId} {
+        allow read:  if true;
+        allow write: if isLeagueManager(leagueId);
+      }
+
+      match /rounds/{roundId} {
+        allow read:  if true;
+        allow write: if isLeagueManager(leagueId);
+      }
+    }
+
+    match /ban_list_libre/{entryId} {
+      allow read:  if true;
+      allow write: if isAuth();
+    }
+
+    match /ban_list_full/{entryId} {
+      allow read:  if true;
+      allow write: if isAuth();
+    }
+
+    // ── simulations (simulador de partidas, myl_decks) ─────────────────────────
+    // Por ahora solo para el dueño. El worker Python escribe con la cuenta de
+    // servicio (Admin SDK), que no pasa por estas reglas.
+    match /notable_decks/{deckId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.submittedBy == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.submittedBy == request.auth.uid;
+    }
+
+    match /simulations/{simId} {
+      allow read, write: if isAuth() &&
+        request.auth.token.email == 'hecturnicolas@gmail.com';
+    }
+
+    // Partidas humanas contra el worker local. El cliente solo puede acceder
+    // a sus propios desafíos; el worker usa Admin SDK y escribe el estado.
+    match /ai_challenges/{challengeId} {
+      allow create: if isAuth() && request.resource.data.ownerUid == request.auth.uid;
+      allow read: if isAuth() && resource.data.ownerUid == request.auth.uid;
+      allow update: if isAuth() && resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+    }
+    match /ai_challenges/{challengeId}/repeticion/{chunkId} {
+      allow read: if isAuth() &&
+        get(/databases/$(database)/documents/ai_challenges/$(challengeId)).data.ownerUid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Programar cartas con IA: la app pide, el worker local (Admin SDK)
+    // procesa y escribe resultados. Solo el dueño del simulador.
+    match /card_ai_jobs/{jobId} {
+      allow read, create: if isAuth() &&
+        request.auth.token.email == 'hecturnicolas@gmail.com';
+      allow update, delete: if false;
+    }
+
+    // Laboratorio ML: el cliente crea tareas y lee su avance; el worker local
+    // (Admin SDK) es el único que puede escribir resultados o rutas locales.
+    match /ml_jobs/{jobId} {
+      allow read: if isAuth() &&
+        request.auth.token.email == 'hecturnicolas@gmail.com';
+      allow create: if isAuth() &&
+        request.auth.token.email == 'hecturnicolas@gmail.com' &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.tipo == 'matriz' &&
+        request.resource.data.status == 'pending';
+      allow update, delete: if false;
+    }
+
+    // Señal de vida del worker del simulador (la escribe el Admin SDK).
+    match /simulator_status/{doc} {
+      allow read: if isAuth() &&
+        request.auth.token.email == 'hecturnicolas@gmail.com';
+    }
+  }
+}

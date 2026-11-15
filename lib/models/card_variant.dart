@@ -1,12 +1,37 @@
-// lib/models/card_variant.dart
+import '../utils/card_image_resolver.dart';
+
 class CardVariant {
   final String id;
-  final String name;                 // Variante (ej: Full Art 2023)
-  final String printType;            // Tipo de impresión (ej: Base, Foil, Alt, etc.)
-  final String? code;                // Código opcional
-  final String? imageFrontUrl;       // Imagen de la variante
-  final String? cloudinaryPublicId;  // opcional (para borrar en Cloudinary)
-  final bool isBase;                 // true para la variante "normal" de la carta
+  final String name;
+  final String printType;
+  final String? code;
+  final String? imageFrontUrl;
+  final String? cloudinaryPublicId;
+  final bool isBase;
+
+  static const List<String> orderedGroupKeys = [
+    'normal',
+    'legendaria',
+    'arte_alternativo',
+    'full_art',
+    'milenaria',
+    'shogun',
+    'foil_lluvia',
+    'jo',
+    'otros',
+  ];
+
+  static const Map<String, String> groupLabels = {
+    'normal': 'Normal',
+    'legendaria': 'Legendaria',
+    'arte_alternativo': 'Arte alternativo',
+    'full_art': 'Full art',
+    'milenaria': 'Milenaria',
+    'shogun': 'Shogun',
+    'foil_lluvia': 'Foil lluvia',
+    'jo': 'JO',
+    'otros': 'Otras',
+  };
 
   CardVariant({
     required this.id,
@@ -24,25 +49,83 @@ class CardVariant {
       name: (map['name'] ?? '').toString(),
       printType: (map['printType'] ?? '').toString(),
       code: map['code']?.toString(),
-      imageFrontUrl: map['imageFrontUrl']?.toString(),
+      imageFrontUrl: CardImageResolver.fromMap(map),
       cloudinaryPublicId: map['cloudinaryPublicId']?.toString(),
       isBase: (map['isBase'] as bool?) ?? false,
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'printType': printType,
-        if (code != null && code!.isNotEmpty) 'code': code,
-        if (imageFrontUrl != null && imageFrontUrl!.isNotEmpty) 'imageFrontUrl': imageFrontUrl,
-        if (cloudinaryPublicId != null && cloudinaryPublicId!.isNotEmpty)
-          'cloudinaryPublicId': cloudinaryPublicId,
-        if (isBase) 'isBase': true,
-      };
+    'name': name,
+    'printType': printType,
+    if (code != null && code!.isNotEmpty) 'code': code,
+    if (imageFrontUrl != null && imageFrontUrl!.isNotEmpty)
+      'imageFrontUrl': imageFrontUrl,
+    if (cloudinaryPublicId != null && cloudinaryPublicId!.isNotEmpty)
+      'cloudinaryPublicId': cloudinaryPublicId,
+    if (isBase) 'isBase': true,
+  };
 
-  // ================================
-  // 👇 Helpers para URLs con Cloudinary
-  // ================================
+  String get groupKey =>
+      normalizeGroup(printType.isNotEmpty ? printType : name, isBase: isBase);
+
+  String get groupLabel {
+    final key = groupKey;
+    if (key == 'otros') {
+      // Usar el nombre real en lugar del genérico "Otras"
+      final label = printType.isNotEmpty ? printType : name;
+      return label.isNotEmpty ? label : 'Otras';
+    }
+    return groupLabels[key] ?? name;
+  }
+
+  int get groupRank {
+    final index = orderedGroupKeys.indexOf(groupKey);
+    return index >= 0 ? index : orderedGroupKeys.length;
+  }
+
+  static String normalizeGroup(String raw, {bool isBase = false}) {
+    if (isBase) return 'normal';
+
+    final value = raw
+        .trim()
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u');
+
+    if (value.isEmpty) return 'normal';
+    if (value.contains('foil lluvia') || value.contains('lluvia foil')) {
+      return 'foil_lluvia';
+    }
+    if (value == 'jo' || value.contains(' jo ') || value.startsWith('jo ')) {
+      return 'jo';
+    }
+    if (value.contains('shogun')) return 'shogun';
+    if (value.contains('milenaria')) return 'milenaria';
+    if (value.contains('full art') || value.contains('fullart')) {
+      return 'full_art';
+    }
+    if (value.contains('arte alternativo') ||
+        value.contains('art alt') ||
+        value.contains('alt art') ||
+        value.contains('alternativo')) {
+      return 'arte_alternativo';
+    }
+    if (value.contains('legendaria') || value.contains('legendary')) {
+      return 'legendaria';
+    }
+    if (value.contains('normal') ||
+        value.contains('base') ||
+        value.contains('clasica') ||
+        value.contains('clasico')) {
+      return 'normal';
+    }
+    return 'otros';
+  }
+
   String? thumbUrl({int w = 120, int h = 160}) {
     final url = imageFrontUrl;
     if (url == null || url.isEmpty) return null;

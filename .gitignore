@@ -44,3 +44,46 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 node_modules/
+
+# Firebase deploy cache
+.firebase/
+
+# Claves y credenciales (service accounts)
+secrets/
+
+tools/node_modules/
+simulator/.venv/
+simulator/cache/
+__pycache__/
+tools/respaldos/
+
+# --- Nexus AI: base ---
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+key.properties
+serviceAccount*.json
+*service-account*.json
+*.pem
+*.p12
+*-debug.log
+node_modules/
+build/
+dist/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.firebase/
+.idea/
+.gradle/
+.kotlin/
+local.properties
+.cxx/
+Pods/
+.venv/
+venv/
+__pycache__/
+.DS_Store
+Thumbs.db

@@ -1,5 +1,13 @@
 {
   "projects": {
     "default": "mylmazos"
+  },
+  "targets": {
+    "mylmazos": {
+      "hosting": {
+        "mylmazos": ["mylmazos"],
+        "nexustcg": ["nexustcg"]
+      }
+    }
   }
 }

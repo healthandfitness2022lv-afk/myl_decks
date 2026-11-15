@@ -88,5 +88,4 @@ class DefaultFirebaseOptions {
     databaseURL: 'https://mylmazos-default-rtdb.firebaseio.com',
     storageBucket: 'mylmazos.firebasestorage.app',
   );
-
 }

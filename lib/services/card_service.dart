@@ -1,12 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/card_myl.dart';
+import '../utils/text_normalize.dart';
 
 /// Servicio para gestionar cartas MyL en Firestore.
 /// Colección usada: `cards`
 class CardService {
   final FirebaseFirestore _db;
 
-  CardService([FirebaseFirestore? instance]) : _db = instance ?? FirebaseFirestore.instance;
+  CardService([FirebaseFirestore? instance])
+    : _db = instance ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _col => _db.collection('cards');
 
@@ -23,8 +25,8 @@ class CardService {
     // Partimos del mapa que provea el modelo, pero sobreescribimos y normalizamos
     final Map<String, dynamic> data = Map<String, dynamic>.from(card.toMap());
 
-    // nombre_lower para búsquedas por prefijo
-    data['nombre_lower'] = (card.nombre).toString().toLowerCase();
+    // nombre_lower para búsquedas por prefijo (sin tildes, ver text_normalize.dart)
+    data['nombre_lower'] = normalizeSearch((card.nombre).toString());
 
     // Asegurar arrays: siempre enviar (aunque vacíos)
     data['caracteristicasRaw'] =
@@ -58,14 +60,18 @@ class CardService {
 
     // Si se modifica el nombre, actualizamos nombre_lower también
     if (normalized.containsKey('nombre')) {
-      normalized['nombre_lower'] = (normalized['nombre'] ?? '').toString().toLowerCase();
+      normalized['nombre_lower'] = normalizeSearch(
+        (normalized['nombre'] ?? '').toString(),
+      );
     }
 
     // Normalizar caracteristicasRaw si viene en el patch (incluso si es [])
     if (normalized.containsKey('caracteristicasRaw')) {
       final raw = normalized['caracteristicasRaw'];
       normalized['caracteristicasRaw'] =
-          (raw == null) ? <String>[] : List<String>.from((raw as Iterable).map((e) => e.toString()));
+          (raw == null)
+              ? <String>[]
+              : List<String>.from((raw as Iterable).map((e) => e.toString()));
     }
 
     // Normalizar tags si viene en el patch
@@ -97,26 +103,33 @@ class CardService {
   // -------------------------
   // Búsqueda por prefijo
   // -------------------------
-  Future<List<CardMyL>> searchByNamePrefix(String query, {int limit = 25}) async {
-    final q = query.trim().toLowerCase();
+  Future<List<CardMyL>> searchByNamePrefix(
+    String query, {
+    int limit = 25,
+  }) async {
+    final q = normalizeSearch(query);
     if (q.isEmpty) return [];
-    final snap = await _col
-        .where('nombre_lower', isGreaterThanOrEqualTo: q)
-        .where('nombre_lower', isLessThan: '$q\uf8ff')
-        .limit(limit)
-        .get();
+    final snap =
+        await _col
+            .where('nombre_lower', isGreaterThanOrEqualTo: q)
+            .where('nombre_lower', isLessThan: '$q\uf8ff')
+            .limit(limit)
+            .get();
     return snap.docs.map((d) => CardMyL.fromMap(d.data(), d.id)).toList();
   }
 
   Stream<List<CardMyL>> watchByNamePrefix(String query, {int limit = 25}) {
-    final q = query.trim().toLowerCase();
+    final q = normalizeSearch(query);
     if (q.isEmpty) return Stream.value(const []);
     return _col
         .where('nombre_lower', isGreaterThanOrEqualTo: q)
         .where('nombre_lower', isLessThan: '$q\uf8ff')
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => CardMyL.fromMap(d.data(), d.id)).toList());
+        .map(
+          (snap) =>
+              snap.docs.map((d) => CardMyL.fromMap(d.data(), d.id)).toList(),
+        );
   }
 
   // -------------------------
@@ -138,9 +151,9 @@ class CardService {
     for (final d in snap.docs) {
       final data = d.data();
       final nombre = (data['nombre'] ?? '').toString();
-      final lower = nombre.toLowerCase();
-      if (data['nombre_lower'] != lower) {
-        batch.update(d.reference, {'nombre_lower': lower});
+      final normalized = normalizeSearch(nombre);
+      if (data['nombre_lower'] != normalized) {
+        batch.update(d.reference, {'nombre_lower': normalized});
         ops++;
         if (ops >= batchSize) {
           await commitIfNeeded();
@@ -151,11 +164,17 @@ class CardService {
   }
 
   // Fallback: búsqueda en memoria si no tienes `nombre_lower`.
-  Future<List<CardMyL>> slowSearchByNamePrefix(String query, {int limit = 25}) async {
-    final q = query.trim().toLowerCase();
+  Future<List<CardMyL>> slowSearchByNamePrefix(
+    String query, {
+    int limit = 25,
+  }) async {
+    final q = normalizeSearch(query);
     if (q.isEmpty) return [];
     final all = await getAllCards();
-    return all.where((c) => c.nombre.toLowerCase().startsWith(q)).take(limit).toList();
+    return all
+        .where((c) => normalizeSearch(c.nombre).startsWith(q))
+        .take(limit)
+        .toList();
   }
 
   // -------------------------
@@ -197,7 +216,14 @@ class CardService {
 
       // Si ya es Map
       if (tag is Map<String, dynamic>) {
-        final key = (tag['key'] ?? tag['id'] ?? tag['k'] ?? tag['label'] ?? tag.values.first ?? '').toString();
+        final key =
+            (tag['key'] ??
+                    tag['id'] ??
+                    tag['k'] ??
+                    tag['label'] ??
+                    tag.values.first ??
+                    '')
+                .toString();
         final label = (tag['label'] ?? tag['name'] ?? key).toString();
         return {'key': key, 'label': label};
       }
@@ -206,7 +232,14 @@ class CardService {
       try {
         final maybe = (tag as dynamic).toMap();
         if (maybe is Map<String, dynamic>) {
-          final key = (maybe['key'] ?? maybe['id'] ?? maybe['k'] ?? maybe['label'] ?? maybe.values.first ?? '').toString();
+          final key =
+              (maybe['key'] ??
+                      maybe['id'] ??
+                      maybe['k'] ??
+                      maybe['label'] ??
+                      maybe.values.first ??
+                      '')
+                  .toString();
           final label = (maybe['label'] ?? maybe['name'] ?? key).toString();
           return {'key': key, 'label': label};
         }

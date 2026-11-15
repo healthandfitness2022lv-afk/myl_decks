@@ -8,6 +8,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 
 import '../services/cloudinary_service.dart';
+import '../services/community_repository.dart';
+import '../widgets/async_state_view.dart';
 
 class CommunitiesScreen extends StatelessWidget {
   final String communityId;
@@ -52,8 +54,9 @@ class _ForumTab extends StatefulWidget {
 }
 
 class _ForumTabState extends State<_ForumTab> {
+  final _repository = CommunityRepository();
   final _titleCtrl = TextEditingController();
-  final _textCtrl  = TextEditingController();
+  final _textCtrl = TextEditingController();
   bool _sending = false;
 
   @override
@@ -65,32 +68,22 @@ class _ForumTabState extends State<_ForumTab> {
 
   Future<void> _startDebate() async {
     final title = _titleCtrl.text.trim();
-    final text  = _textCtrl.text.trim();
+    final text = _textCtrl.text.trim();
     if (title.isEmpty || text.isEmpty) return;
 
     setState(() => _sending = true);
     try {
-      final user = FirebaseAuth.instance.currentUser!;
-      await FirebaseFirestore.instance
-          .collection('communities')
-          .doc(widget.communityId)
-          .collection('posts')
-          .add({
-        'title': title,
-        'text': text, // mensaje inicial
-        'authorUid': user.uid,
-        'authorName': user.displayName ?? user.email ?? 'Usuario',
-        'createdAt': FieldValue.serverTimestamp(),
-        'comments': 0,
-        'likes': 0,
-        'dislikes': 0,
-      });
+      await _repository.createPost(
+        communityId: widget.communityId,
+        title: title,
+        text: text,
+      );
       _titleCtrl.clear();
       _textCtrl.clear();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Debate iniciado')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Debate iniciado')));
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -100,7 +93,7 @@ class _ForumTabState extends State<_ForumTab> {
   String _fmt(DateTime? d) {
     if (d == null) return '—';
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')} '
-           '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -119,7 +112,10 @@ class _ForumTabState extends State<_ForumTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Iniciar debate', style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text(
+                'Iniciar debate',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _titleCtrl,
@@ -143,9 +139,14 @@ class _ForumTabState extends State<_ForumTab> {
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
                   onPressed: _sending ? null : _startDebate,
-                  icon: _sending
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.playlist_add),
+                  icon:
+                      _sending
+                          ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Icon(Icons.playlist_add),
                   label: const Text('Publicar debate'),
                 ),
               ),
@@ -158,11 +159,13 @@ class _ForumTabState extends State<_ForumTab> {
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: postsRef.snapshots(),
             builder: (context, snap) {
+              if (snap.hasError) return ErrorStateView(error: snap.error);
               if (snap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const LoadingStateView(message: 'Cargando debates…');
               }
               final docs = snap.data?.docs ?? [];
-              if (docs.isEmpty) return const Center(child: Text('Aún no hay debates.'));
+              if (docs.isEmpty)
+                return const Center(child: Text('Aún no hay debates.'));
 
               return ListView.separated(
                 padding: const EdgeInsets.all(12),
@@ -170,13 +173,15 @@ class _ForumTabState extends State<_ForumTab> {
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (_, i) {
                   final id = docs[i].id;
-                  final d  = docs[i].data();
+                  final d = docs[i].data();
                   final ts = (d['createdAt'] as Timestamp?)?.toDate();
 
                   return Card(
                     child: ListTile(
                       title: Text(d['title'] ?? 'Debate'),
-                      subtitle: Text('${d['authorName'] ?? 'Usuario'} · ${_fmt(ts)}'),
+                      subtitle: Text(
+                        '${d['authorName'] ?? 'Usuario'} · ${_fmt(ts)}',
+                      ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -196,10 +201,11 @@ class _ForumTabState extends State<_ForumTab> {
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => _PostDetailsScreen(
-                              communityId: widget.communityId,
-                              postId: id,
-                            ),
+                            builder:
+                                (_) => _PostDetailsScreen(
+                                  communityId: widget.communityId,
+                                  postId: id,
+                                ),
                           ),
                         );
                       },
@@ -264,7 +270,9 @@ class _PostDetailsScreenState extends State<_PostDetailsScreen> {
         .collection('posts')
         .doc(widget.postId);
 
-    final repliesRef = postRef.collection('replies').orderBy('createdAt', descending: true);
+    final repliesRef = postRef
+        .collection('replies')
+        .orderBy('createdAt', descending: true);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Publicación')),
@@ -308,10 +316,14 @@ class _PostDetailsScreenState extends State<_PostDetailsScreen> {
                 const SizedBox(width: 8),
                 FilledButton.icon(
                   onPressed: _sending ? null : _sendReply,
-                  icon: _sending
-                      ? const SizedBox(
-                          width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.reply),
+                  icon:
+                      _sending
+                          ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Icon(Icons.reply),
                   label: const Text('Enviar'),
                 ),
               ],
@@ -376,7 +388,8 @@ class _MembersTab extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         final docs = snap.data?.docs ?? [];
-        if (docs.isEmpty) return const Center(child: Text('No hay miembros aún.'));
+        if (docs.isEmpty)
+          return const Center(child: Text('No hay miembros aún.'));
         return ListView.separated(
           padding: const EdgeInsets.all(12),
           itemCount: docs.length,
@@ -390,9 +403,10 @@ class _MembersTab extends StatelessWidget {
                 ),
                 title: Text(m['name'] ?? 'Usuario'),
                 subtitle: Text(m['role'] ?? 'miembro'),
-                trailing: m['active'] == false
-                    ? const Chip(label: Text('Inactivo'))
-                    : const SizedBox.shrink(),
+                trailing:
+                    m['active'] == false
+                        ? const Chip(label: Text('Inactivo'))
+                        : const SizedBox.shrink(),
               ),
             );
           },
@@ -474,14 +488,14 @@ class _VideosTabState extends State<_VideosTab> {
           .doc(widget.communityId)
           .collection('videos')
           .add({
-        'url': secureUrl,
-        'publicId': publicId,
-        'title': meta.title,
-        'description': meta.description,
-        'uploadedBy': user.uid,
-        'uploaderName': user.displayName ?? user.email ?? 'Usuario',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+            'url': secureUrl,
+            'publicId': publicId,
+            'title': meta.title,
+            'description': meta.description,
+            'uploadedBy': user.uid,
+            'uploaderName': user.displayName ?? user.email ?? 'Usuario',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -490,8 +504,9 @@ class _VideosTabState extends State<_VideosTab> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error al subir: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al subir: $e')));
       }
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -514,10 +529,14 @@ class _VideosTabState extends State<_VideosTab> {
             children: [
               FilledButton.icon(
                 onPressed: _uploading ? null : _pickAndUpload,
-                icon: _uploading
-                    ? const SizedBox(
-                        width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.cloud_upload),
+                icon:
+                    _uploading
+                        ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Icon(Icons.cloud_upload),
                 label: const Text('Subir video'),
               ),
               const SizedBox(width: 12),
@@ -534,24 +553,24 @@ class _VideosTabState extends State<_VideosTab> {
                 return const Center(child: CircularProgressIndicator());
               }
               final docs = snap.data?.docs ?? [];
-              if (docs.isEmpty) return const Center(child: Text('No hay videos aún.'));
+              if (docs.isEmpty)
+                return const Center(child: Text('No hay videos aún.'));
               return ListView.separated(
                 padding: const EdgeInsets.all(12),
                 itemCount: docs.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (_, i) {
-  final v = docs[i].data();
-  final dt = (v['createdAt'] as Timestamp?)?.toDate();
-  return _VideoTile(
-    url: v['url'] ?? '',
-    publicId: v['publicId'],
-    title: (v['title'] ?? 'Video').toString(),
-    description: (v['description'] ?? '').toString(),
-    uploaderName: (v['uploaderName'] ?? 'Usuario').toString(),
-    date: dt,
-  );
-},
-
+                  final v = docs[i].data();
+                  final dt = (v['createdAt'] as Timestamp?)?.toDate();
+                  return _VideoTile(
+                    url: v['url'] ?? '',
+                    publicId: v['publicId'],
+                    title: (v['title'] ?? 'Video').toString(),
+                    description: (v['description'] ?? '').toString(),
+                    uploaderName: (v['uploaderName'] ?? 'Usuario').toString(),
+                    date: dt,
+                  );
+                },
               );
             },
           ),
@@ -615,7 +634,10 @@ class _VideoMetaDialogState extends State<_VideoMetaDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
         FilledButton(
           onPressed: () {
             final title = _t.text.trim().isEmpty ? 'Video' : _t.text.trim();
@@ -628,8 +650,6 @@ class _VideoMetaDialogState extends State<_VideoMetaDialog> {
     );
   }
 }
-
-
 
 class _VideoTile extends StatelessWidget {
   final String url;
@@ -679,10 +699,11 @@ class _VideoTile extends StatelessWidget {
       );
     }
 
-    final dateStr = date != null
-        ? '${date!.day.toString().padLeft(2, '0')}/${date!.month.toString().padLeft(2, '0')} '
-          '${date!.hour.toString().padLeft(2, '0')}:${date!.minute.toString().padLeft(2, '0')}'
-        : null;
+    final dateStr =
+        date != null
+            ? '${date!.day.toString().padLeft(2, '0')}/${date!.month.toString().padLeft(2, '0')} '
+                '${date!.hour.toString().padLeft(2, '0')}:${date!.minute.toString().padLeft(2, '0')}'
+            : null;
 
     return Card(
       child: InkWell(
@@ -722,7 +743,11 @@ class _VideoTile extends StatelessWidget {
                     // “Compartido por … · fecha”
                     Row(
                       children: [
-                        const Icon(Icons.person, size: 16, color: Colors.black54),
+                        const Icon(
+                          Icons.person,
+                          size: 16,
+                          color: Colors.black54,
+                        ),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
@@ -757,7 +782,6 @@ class _VideoTile extends StatelessWidget {
     );
   }
 }
-
 
 class _VideoPlayerSheet extends StatefulWidget {
   final String url;
@@ -815,7 +839,11 @@ class _VideoPlayerSheetState extends State<_VideoPlayerSheet> {
                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
                   child: Text(
                     widget.title,
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -823,9 +851,10 @@ class _VideoPlayerSheetState extends State<_VideoPlayerSheet> {
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final maxW = constraints.maxWidth;
-                    final ratio = (_ready && _controller!.value.aspectRatio > 0)
-                        ? _controller!.value.aspectRatio
-                        : (16 / 9);
+                    final ratio =
+                        (_ready && _controller!.value.aspectRatio > 0)
+                            ? _controller!.value.aspectRatio
+                            : (16 / 9);
                     // límite de altura para no “salirse”
                     final targetW = maxW;
                     final targetH = targetW / ratio;
@@ -835,18 +864,26 @@ class _VideoPlayerSheetState extends State<_VideoPlayerSheet> {
                       width: targetW,
                       height: h,
                       child: DecoratedBox(
-                        decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: _ready
-                              ? Stack(
-                                  alignment: Alignment.bottomCenter,
-                                  children: [
-                                    VideoPlayer(_controller!),
-                                    _ControlsOverlay(controller: _controller!),
-                                  ],
-                                )
-                              : const Center(child: CircularProgressIndicator()),
+                          child:
+                              _ready
+                                  ? Stack(
+                                    alignment: Alignment.bottomCenter,
+                                    children: [
+                                      VideoPlayer(_controller!),
+                                      _ControlsOverlay(
+                                        controller: _controller!,
+                                      ),
+                                    ],
+                                  )
+                                  : const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
                         ),
                       ),
                     );
@@ -868,7 +905,7 @@ class _VideoPlayerSheetState extends State<_VideoPlayerSheet> {
                     IconButton(
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close, color: Colors.white),
-                    )
+                    ),
                   ],
                 ),
               ],
@@ -887,17 +924,26 @@ class _ControlsOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => controller.value.isPlaying ? controller.pause() : controller.play(),
+      onTap:
+          () =>
+              controller.value.isPlaying
+                  ? controller.pause()
+                  : controller.play(),
       child: Stack(
         children: <Widget>[
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
             reverseDuration: const Duration(milliseconds: 200),
-            child: controller.value.isPlaying
-                ? const SizedBox.shrink()
-                : const Center(
-                    child: Icon(Icons.play_circle_fill, size: 64, color: Colors.white70),
-                  ),
+            child:
+                controller.value.isPlaying
+                    ? const SizedBox.shrink()
+                    : const Center(
+                      child: Icon(
+                        Icons.play_circle_fill,
+                        size: 64,
+                        color: Colors.white70,
+                      ),
+                    ),
           ),
           VideoProgressIndicator(controller, allowScrubbing: true),
         ],
@@ -905,4 +951,3 @@ class _ControlsOverlay extends StatelessWidget {
     );
   }
 }
-

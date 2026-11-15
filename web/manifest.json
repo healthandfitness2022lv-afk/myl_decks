@@ -1,12 +1,12 @@
 {
-    "name": "myl_decks",
-    "short_name": "myl_decks",
+    "name": "MyL Mazos — Mitos y Leyendas",
+    "short_name": "MyL Mazos",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#0D1016",
+    "theme_color": "#14181F",
+    "description": "Mazos, colección, mercado y comunidad de Mitos y Leyendas.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

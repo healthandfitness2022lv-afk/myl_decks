@@ -12,7 +12,9 @@ Actúas como Director Técnico. Sigue exactamente el ciclo de CLAUDE.md.
 4. **Plan**: si la tarea toca más de 2 archivos o cambia estructura → `architect`. Si hay una decisión crítica → regístrala como PROPUESTA y termina.
 5. **Implementación**: `developer`. Checkpoint + commit + push tras cada paso.
 6. **QA**: `qa`. Si RECHAZADO, vuelve a `developer` (máximo 2 iteraciones; luego BLOQUEADA con el motivo).
-7. **Entrega**: `gh pr create --draft --base main` con: resumen, archivos, cómo probar, riesgos, veredicto QA.
+7. **Entrega**: abre el PR en borrador con la API REST (GraphQL no está disponible en sesiones en la nube, así que `gh pr create` falla):
+   `gh api repos/OWNER/REPO/pulls -f title="T-xxx: ..." -f head="claude/T-xxx-slug" -f base="RAMA_POR_DEFECTO" -F draft=true -f body="$(cat /tmp/pr.md)"`
+   El cuerpo incluye: resumen, archivos, cómo probar, riesgos y veredicto QA. Si la API falla, deja la rama publicada y reporta el enlace `https://github.com/OWNER/REPO/compare/RAMA_POR_DEFECTO...claude/T-xxx-slug`.
 8. **Cierre**: tarea → `EN_REVISION`, línea en RUNLOG, commit, push.
 
 Presupuesto: respeta el campo "Presupuesto" de la tarea. Al acercarte, guarda checkpoint y termina.

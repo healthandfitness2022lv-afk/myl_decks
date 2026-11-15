@@ -7,6 +7,7 @@ La sesión principal actúa como **Director Técnico (orquestador)**. Los demás
 1. `docs/TASKS.md` — cola de trabajo y estado de cada tarea. Fuente de verdad para reanudar.
 2. `docs/RUNLOG.md` — bitácora de ejecuciones (últimas entradas).
 3. `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md` — contexto técnico.
+4. `docs/VALORACION.md` — valor estimado del desarrollo; se actualiza con cada módulo o mejora entregada.
 
 Nunca confíes en la memoria de una sesión anterior: lo que no está en estos archivos no existe.
 

@@ -3,17 +3,16 @@
 Estados: `PENDIENTE` → `EN_CURSO` → `EN_REVISION` → `HECHA` · también `BLOQUEADA (motivo)`.
 Prioridad: P0 (urgente) · P1 · P2. Solo el humano mueve tareas a `HECHA` (al hacer merge).
 
-| ID | Prioridad | Estado | Título | Rama | Checkpoint / Notas | PR |
-|----|-----------|--------|--------|------|--------------------|----|
-| T-001 | P1 | PENDIENTE | Completar ARCHITECTURE.md inspeccionando el código real | — | — | — |
-| T-002 | P2 | PENDIENTE | Diagnóstico de calidad: análisis estático y tests, registrar fallos como tareas | — | — | — |
-| T-003 | P2 | PENDIENTE | Análisis comercial (sales): cliente objetivo, propuesta de valor, precios y 3 mejoras prioritarias | — | — | — |
-
+| ID | Prioridad | Estado | Título | Rama | Checkpoint / Notas | PR | Valor (CLP) |
+|----|-----------|--------|--------|------|--------------------|----|-------------|
+| T-001 | P1 | PENDIENTE | Completar ARCHITECTURE.md inspeccionando el código real | — | — | — | por estimar |
+| T-002 | P2 | PENDIENTE | Diagnóstico de calidad: análisis estático y tests, registrar fallos como tareas | — | — | — | por estimar |
+| T-003 | P2 | PENDIENTE | Análisis comercial (sales): cliente objetivo, propuesta de valor, precios y 3 mejoras prioritarias | — | — | — | por estimar |
 ## Detalle de tareas
 
 ### T-001 — Completar ARCHITECTURE.md
 - Objetivo: describir stack, módulos, flujo de datos, cómo testear. Rellenar "Comandos del proyecto" en CLAUDE.md.
-- Criterio de aceptación: documentos reflejan el código; PR en borrador abierto.
+- Criterio de aceptación: documentos reflejan el código; **docs/VALORACION.md con la valoración inicial de todos los módulos existentes** (horas × $25.000 CLP/h y referencia de mercado); PR en borrador abierto.
 - Presupuesto: 40 turnos.
 
 ### T-002 — Diagnóstico de calidad

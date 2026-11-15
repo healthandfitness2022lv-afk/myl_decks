@@ -5,7 +5,7 @@ Prioridad: P0 (urgente) · P1 · P2. Solo el humano mueve tareas a `HECHA` (al h
 
 | ID | Prioridad | Estado | Título | Rama | Checkpoint / Notas | PR | Valor (CLP) |
 |----|-----------|--------|--------|------|--------------------|----|-------------|
-| T-001 | P1 | EN_CURSO | Completar ARCHITECTURE.md inspeccionando el código real | claude/T-001-architecture | checkpoint 1: inspeccionando código | — | por estimar |
+| T-001 | P1 | EN_REVISION | Completar ARCHITECTURE.md inspeccionando el código real | claude/T-001-architecture | QA APROBADO; docs + valoración inicial | — | $67.250.000 |
 | T-002 | P2 | PENDIENTE | Diagnóstico de calidad: análisis estático y tests, registrar fallos como tareas | — | — | — | por estimar |
 | T-003 | P2 | PENDIENTE | Análisis comercial (sales): cliente objetivo, propuesta de valor, precios y 3 mejoras prioritarias | — | — | — | por estimar |
 ## Detalle de tareas

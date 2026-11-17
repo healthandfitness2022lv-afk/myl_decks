@@ -141,20 +141,6 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
 
     final id = '${_normalize(edicion)}_${_normalize(title)}';
 
-    List<String> caracteristicas = [];
-    try {
-      final raw = cardData['caracteristicas'];
-      if (raw is Iterable) {
-        caracteristicas =
-            raw
-                .map((e) => e?.toString() ?? '')
-                .where((s) => s.isNotEmpty)
-                .toList();
-      }
-    } catch (_) {}
-
-    final Set<CardTag> tags = <CardTag>{};
-
     return CardMyL(
       id: id,
       nombre: title,
@@ -166,8 +152,6 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
       habilidad: habilidad,
       raza: raza,
       unica: unica,
-      tags: tags,
-      caracteristicasRaw: caracteristicas,
     );
   }
 

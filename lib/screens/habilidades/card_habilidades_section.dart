@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/card_habilidad.dart';
 import '../../models/card_myl.dart';
-import '../../services/feature_catalog_service.dart';
+import '../../domain/catalogo_acciones.dart';
 import 'glosario_screen.dart';
 import 'habilidad_editor.dart';
 
@@ -33,8 +33,7 @@ class CardHabilidadesSection extends StatefulWidget {
 }
 
 class _CardHabilidadesSectionState extends State<CardHabilidadesSection> {
-  late final Stream<List<FeatureDef>> _features =
-      FeatureCatalogService.stream();
+  final List<AccionDef> _features = catalogoAcciones();
   bool _saving = false;
   late final _notasCtrl = TextEditingController(
     text: widget.card.notasSimulador,
@@ -93,18 +92,8 @@ class _CardHabilidadesSectionState extends State<CardHabilidadesSection> {
   }) async {
     setState(() => _saving = true);
     try {
-      // Las características usadas se agregan a caracteristicasRaw para que
-      // los filtros y estadísticas actuales las sigan viendo.
-      final raw = {...widget.card.caracteristicasRaw};
-      for (final h in habilidades) {
-        if (h.featureName.isNotEmpty &&
-            !h.featureId.startsWith(kPrefijoSimulador)) {
-          raw.add(h.featureName);
-        }
-      }
       await _ref.update({
         'habilidades': habilidades.map((h) => h.toMap()).toList(),
-        'caracteristicasRaw': raw.toList(),
         // Cambiar las habilidades vuelve a pedir revisión, salvo que se
         // indique explícitamente.
         'habilidadesRevisadas': revisadas ?? false,
@@ -120,7 +109,7 @@ class _CardHabilidadesSectionState extends State<CardHabilidadesSection> {
     }
   }
 
-  Future<void> _editar(List<FeatureDef> features, [int? index]) async {
+  Future<void> _editar(List<AccionDef> features, [int? index]) async {
     final list = [...widget.card.habilidades];
     final result = await showHabilidadEditor(
       context,
@@ -168,10 +157,9 @@ class _CardHabilidadesSectionState extends State<CardHabilidadesSection> {
     final revisada = card.habilidadesRevisadas;
     final conNotas = card.notasSimulador.isNotEmpty;
 
-    return StreamBuilder<List<FeatureDef>>(
-      stream: _features,
-      builder: (context, snap) {
-        final features = snap.data ?? const <FeatureDef>[];
+    return Builder(
+      builder: (context) {
+        final features = _features;
         return Card(
           color: const Color(0xFF132126),
           elevation: 0,
@@ -212,7 +200,7 @@ class _CardHabilidadesSectionState extends State<CardHabilidadesSection> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     IconButton(
-                      tooltip: 'Glosario de características',
+                      tooltip: 'Glosario de acciones',
                       icon: const Icon(
                         Icons.menu_book_rounded,
                         color: Colors.white70,

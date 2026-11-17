@@ -1,13 +1,10 @@
 // lib/models/card_habilidad.dart
 //
-// Habilidades parametrizadas (características v3), programadas a mano.
-//
-// Cada característica del catálogo (`card_custom_features`) define:
-//   - descripcion: qué significa, en lenguaje simple
-//   - accion: el verbo que ejecuta el simulador (ver [Accion])
+// Habilidades parametrizadas, programadas a mano.
 //
 // Cada carta guarda en `habilidades` una lista de [CardHabilidad]: qué
-// característica usa y con qué parámetros (cuándo, fase, condición, costo,
+// acción ejecuta el simulador (ver [Accion]) y con qué parámetros (cuándo,
+// fase, condición, costo,
 // objetivo, cantidad, duración…). El simulador Python lee exactamente estos
 // mapas, así que los nombres de campo son el contrato entre ambos.
 //
@@ -2039,47 +2036,4 @@ class CardHabilidad {
         '${opcional ? ' (opcional)' : ''}'
         '${luego.map((e) => ' → ${e.resumen}').join()}';
   }
-}
-
-/// Sugerencia de acción para las características existentes según su
-/// nombre. Solo se usa como valor inicial en el glosario; lo que manda es lo
-/// guardado en `card_custom_features.accion`.
-Accion sugerirAccion(String nombreCaracteristica) {
-  final n = nombreCaracteristica
-      .toLowerCase()
-      .replaceAll(RegExp(r'[áà]'), 'a')
-      .replaceAll(RegExp(r'[éè]'), 'e')
-      .replaceAll(RegExp(r'[íì]'), 'i')
-      .replaceAll(RegExp(r'[óò]'), 'o')
-      .replaceAll(RegExp(r'[úù]'), 'u')
-      .replaceAll('ñ', 'n');
-  bool has(String s) => n.contains(s);
-  if (has('no anulable')) return Accion.noAnulable;
-  if (has('anulacion')) return Accion.anular;
-  if (has('imbloqueable') && !has('bloquea imbloqueables')) {
-    return Accion.imbloqueable;
-  }
-  if (has('indestructible')) return Accion.indestructible;
-  if (has('indesterrable')) return Accion.indesterrable;
-  if (has('furia')) return Accion.furia;
-  if (n == 'robo' || has('robar')) return Accion.robar;
-  if (has('dano directo') || has('desterrar del tope')) return Accion.botar;
-  if (has('autodescarte') || n == 'descarte') return Accion.descartar;
-  if (has('destierro') || has('desterrar')) return Accion.desterrar;
-  if (has('destruir') || has('removal')) return Accion.destruir;
-  if (has('subir')) return Accion.subirMano;
-  if (has('baraj')) return Accion.barajar;
-  if (has('buscador') || has('buscar')) return Accion.buscar;
-  if (has('invocador') || has('exhumar') || has('reclutar')) {
-    return Accion.ponerEnJuego;
-  }
-  if (has('generador') || has('acelerar oro')) return Accion.generarOro;
-  if (has('bonificador') || has('reducir fuerza'))
-    return Accion.modificarFuerza;
-  if (has('reducir coste') || has('sin pagar')) return Accion.modificarCoste;
-  if (has('inhabilitar') || has('perder habilidad')) {
-    return Accion.perderHabilidad;
-  }
-  if (has('prevencion')) return Accion.prevenir;
-  return Accion.otra;
 }

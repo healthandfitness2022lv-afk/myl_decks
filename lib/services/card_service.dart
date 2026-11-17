@@ -16,9 +16,6 @@ class CardService {
   // Upsert: crea o actualiza
   // -------------------------
   /// Crear o reemplazar una carta (upsert).
-  /// Garantiza que arrays como `caracteristicasRaw` y `tags` siempre
-  /// se envíen (aunque estén vacíos) evitando que Firestore
-  /// conserve valores antiguos al usar merge.
   Future<void> addCard(CardMyL card) async {
     final docRef = _col.doc(card.id);
 
@@ -28,12 +25,6 @@ class CardService {
     // nombre_lower para búsquedas por prefijo (sin tildes, ver text_normalize.dart)
     data['nombre_lower'] = normalizeSearch((card.nombre).toString());
 
-    // Asegurar arrays: siempre enviar (aunque vacíos)
-    data['caracteristicasRaw'] =
-        (card.caracteristicasRaw).map((e) => e.toString()).toList();
-
-    data['tags'] = _normalizeTagsForStorage(card.tags);
-
     // Timestamps
     data['updatedAt'] = FieldValue.serverTimestamp();
 
@@ -42,8 +33,6 @@ class CardService {
       data['createdAt'] = FieldValue.serverTimestamp();
       await docRef.set(data);
     } else {
-      // Usamos merge: true pero como enviamos siempre las keys críticas,
-      // las listas serán reemplazadas por las nuevas (incluso si son vacías).
       await docRef.set(data, SetOptions(merge: true));
     }
   }
@@ -52,8 +41,6 @@ class CardService {
   // Actualización parcial
   // -------------------------
   /// Actualizar parcialmente una carta.
-  /// Si `patch` contiene `caracteristicasRaw` o `tags` las normaliza
-  /// para evitar inconsistencias (y para que enviar [] borre la lista).
   Future<void> updateCard(String id, Map<String, dynamic> patch) async {
     final docRef = _col.doc(id);
     final Map<String, dynamic> normalized = Map<String, dynamic>.from(patch);
@@ -63,20 +50,6 @@ class CardService {
       normalized['nombre_lower'] = normalizeSearch(
         (normalized['nombre'] ?? '').toString(),
       );
-    }
-
-    // Normalizar caracteristicasRaw si viene en el patch (incluso si es [])
-    if (normalized.containsKey('caracteristicasRaw')) {
-      final raw = normalized['caracteristicasRaw'];
-      normalized['caracteristicasRaw'] =
-          (raw == null)
-              ? <String>[]
-              : List<String>.from((raw as Iterable).map((e) => e.toString()));
-    }
-
-    // Normalizar tags si viene en el patch
-    if (normalized.containsKey('tags')) {
-      normalized['tags'] = _normalizeTagsForStorage(normalized['tags']);
     }
 
     // Siempre usar set merge para ser tolerante a doc inexistente
@@ -175,91 +148,5 @@ class CardService {
         .where((c) => normalizeSearch(c.nombre).startsWith(q))
         .take(limit)
         .toList();
-  }
-
-  // -------------------------
-  // Helpers privados
-  // -------------------------
-  /// Normaliza cualquier representación de tags a una lista de maps
-  /// apta para almacenar en Firestore. Acepta:
-  /// - Set<CardTag>, List<CardTag>
-  /// - List<String>, Set<String>
-  /// - List<Map<String,dynamic>>
-  /// - null -> []
-  List<Map<String, dynamic>> _normalizeTagsForStorage(dynamic tags) {
-    if (tags == null) return <Map<String, dynamic>>[];
-
-    final out = <Map<String, dynamic>>[];
-
-    // Si ya viene como Iterable
-    if (tags is Iterable) {
-      for (final t in tags) {
-        final mm = _serializeTagToMap(t);
-        out.add(mm);
-      }
-      return out;
-    }
-
-    // Si es único (no iterable) lo serializamos igual
-    return <Map<String, dynamic>>[_serializeTagToMap(tags)];
-  }
-
-  /// Intenta serializar un tag a Map<String,dynamic>.
-  /// Maneja:
-  /// - si ya es Map -> lo normaliza
-  /// - si tiene toMap() -> lo usa
-  /// - si tiene propiedades key/label -> las extrae
-  /// - si es String -> {'key': string, 'label': string}
-  Map<String, dynamic> _serializeTagToMap(dynamic tag) {
-    try {
-      if (tag == null) return {'key': '', 'label': ''};
-
-      // Si ya es Map
-      if (tag is Map<String, dynamic>) {
-        final key =
-            (tag['key'] ??
-                    tag['id'] ??
-                    tag['k'] ??
-                    tag['label'] ??
-                    tag.values.first ??
-                    '')
-                .toString();
-        final label = (tag['label'] ?? tag['name'] ?? key).toString();
-        return {'key': key, 'label': label};
-      }
-
-      // Si tiene toMap()
-      try {
-        final maybe = (tag as dynamic).toMap();
-        if (maybe is Map<String, dynamic>) {
-          final key =
-              (maybe['key'] ??
-                      maybe['id'] ??
-                      maybe['k'] ??
-                      maybe['label'] ??
-                      maybe.values.first ??
-                      '')
-                  .toString();
-          final label = (maybe['label'] ?? maybe['name'] ?? key).toString();
-          return {'key': key, 'label': label};
-        }
-      } catch (_) {}
-
-      // Si tiene propiedades key/label
-      try {
-        final key = (tag as dynamic).key ?? (tag as dynamic).id;
-        final label = (tag as dynamic).label ?? (tag as dynamic).name ?? key;
-        if (key != null) {
-          return {'key': key.toString(), 'label': (label ?? key).toString()};
-        }
-      } catch (_) {}
-
-      // Fallback: string
-      final s = tag.toString();
-      return {'key': s, 'label': s};
-    } catch (_) {
-      final s = tag?.toString() ?? '';
-      return {'key': s, 'label': s};
-    }
   }
 }

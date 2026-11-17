@@ -519,7 +519,6 @@ class _AdminBulkAssignScreenState extends State<AdminBulkAssignScreen> {
       'rareza': '',
       'habilidad': '',
       'unica': false,
-      'caracteristicasRaw': [],
       'status': 'stub',
       'createdAt': FieldValue.serverTimestamp(),
     });

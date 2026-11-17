@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../domain/perfil_habilidades.dart';
+import '../domain/analisis_mazo/analisis_mazo.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -657,9 +657,9 @@ class _MyDecksScreenState extends State<MyDecksScreen> {
   }
 
   /// Perfil del mazo según las habilidades programadas de sus cartas.
-  PerfilHabilidades? _perfil(Deck deck) {
+  AnalisisMazo? _perfil(Deck deck) {
     if (_catalogById.isEmpty && _catalogByName.isEmpty) return null;
-    final perfil = calcularPerfilHabilidades(
+    final perfil = analizarMazo(
       deck,
       resolver: (entry) {
         final id = (entry.cardId ?? '').trim();
@@ -668,7 +668,7 @@ class _MyDecksScreenState extends State<MyDecksScreen> {
             _catalogByName[entry.name];
       },
     );
-    return perfil.vacio ? null : perfil;
+    return perfil.sinRoles ? null : perfil;
   }
 
   bool? _legal(Deck deck) {
@@ -1336,7 +1336,7 @@ class _DeckConfigurationCard extends StatelessWidget {
   final DeckCoverage coverage;
   final String? coverUrl;
   final bool? legal;
-  final PerfilHabilidades? perfil;
+  final AnalisisMazo? perfil;
   final bool sharedStock;
   final VoidCallback onOpen;
   final VoidCallback onEdit;
@@ -1487,9 +1487,9 @@ class _DeckConfigurationCard extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Tooltip(
-                          message: perfil!.motivoPerfil,
+                          message: perfil!.motivo,
                           child: Text(
-                            _resumenPerfil(perfil!),
+                            perfil!.resumen,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
@@ -2031,16 +2031,4 @@ class _MigrationDialogState extends State<_MigrationDialog> {
       ],
     );
   }
-}
-
-
-/// "Control · Robo 16 · Recursión 15 · Remoción 15" (las 3 categorías más altas).
-String _resumenPerfil(PerfilHabilidades perfil) {
-  final top =
-      perfil.porCategoria.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-  final partes = [
-    for (final e in top.take(3)) '${e.key.split(' (').first} ${e.value}',
-  ];
-  return [perfil.perfil, ...partes].join(' · ');
 }

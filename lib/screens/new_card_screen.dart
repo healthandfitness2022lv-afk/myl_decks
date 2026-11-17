@@ -53,7 +53,6 @@ class _NewCardScreenState extends State<NewCardScreen> {
 
   bool _unica = false;
   bool _soloLibre = false;
-  final Set<String> _caracteristicas = <String>{};
 
   bool _saving = false;
 
@@ -63,14 +62,7 @@ class _NewCardScreenState extends State<NewCardScreen> {
   _imageDisplayUrl; // URL lista para mostrar en web (proxy si corresponde)
   bool _imageUploading = false;
 
-  // custom features traídas desde Firestore
-  final List<String> _customFeatures = [];
-  bool _loadingCustomFeatures = false;
   static const String _ownerEmail = AppConstants.ownerEmail;
-
-  // guarda tags iniciales convertidos en Set<CardTag>
-
-  String _currentUserEmail() => FirebaseAuth.instance.currentUser?.email ?? '';
 
   // Debounce y sugerencias para autocomplete
   Timer? _nameDebounce;
@@ -101,31 +93,11 @@ class _NewCardScreenState extends State<NewCardScreen> {
       _unica = init.unica;
       _soloLibre = init.soloLibre;
 
-      // Intentamos obtener las características directamente desde el campo esperado
-      List<String> raws = [];
-      try {
-        final maybe = init.caracteristicasRaw;
-        raws =
-            List<String>.from(
-              (maybe as Iterable).map((e) => e?.toString().trim() ?? ''),
-            ).where((s) => s.isNotEmpty).toList();
-      } catch (_) {
-        raws = [];
-      }
-
-      // rellenamos el set usado por los chips
-      _caracteristicas
-        ..clear()
-        ..addAll(raws);
-
       // carga imagen oficial desde Firestore si existe (respaldo seguro)
       if (init.id.isNotEmpty) {
         _loadOfficialImageFromFirestore(init.id);
       }
     }
-
-    // carga las características personalizadas (async, no bloqueante)
-    _loadCustomFeatures();
   }
 
   Future<void> _loadOfficialImageFromFirestore(String cardId) async {
@@ -158,16 +130,6 @@ class _NewCardScreenState extends State<NewCardScreen> {
     _fuerzaCtrl.dispose();
     _nameDebounce?.cancel();
     super.dispose();
-  }
-
-  // Helpers: tags <-> CardTag
-  Set<CardTag> _mapCaracteristicasATags(Iterable<String> raw) {
-    final out = <CardTag>{};
-    for (final s in raw) {
-      final t = CardTagX.parse(s);
-      if (t != null) out.add(t);
-    }
-    return out;
   }
 
   Future<void> _pickFromDrive() async {
@@ -221,11 +183,6 @@ class _NewCardScreenState extends State<NewCardScreen> {
       int? fuerza =
           (tipo == 'Aliado') ? int.tryParse(_fuerzaCtrl.text.trim()) : null;
 
-      final caracteristicas = _caracteristicas.toList()..sort();
-
-      final tagsFromRaw = _mapCaracteristicasATags(caracteristicas);
-      final tags = <CardTag>{}..addAll(tagsFromRaw);
-
       const rareza = '';
       const descripcion = '';
 
@@ -247,8 +204,6 @@ class _NewCardScreenState extends State<NewCardScreen> {
         raza: raza,
         unica: _unica,
         soloLibre: _soloLibre,
-        tags: tags,
-        caracteristicasRaw: caracteristicas,
       );
 
       // Check user and role to decide publish vs propose
@@ -272,7 +227,6 @@ class _NewCardScreenState extends State<NewCardScreen> {
           'rareza': rareza,
           'habilidad': descripcion,
           'unica': _unica,
-          'caracteristicas': caracteristicas,
         },
         'imageUrl': _imageUrl,
         'submittedBy': user.uid,
@@ -425,37 +379,6 @@ class _NewCardScreenState extends State<NewCardScreen> {
   // ==========================
   // Custom features (Firestore)
   // ==========================
-  Future<void> _loadCustomFeatures() async {
-    try {
-      setState(() => _loadingCustomFeatures = true);
-      final snap =
-          await FirebaseFirestore.instance
-              .collection('card_custom_features')
-              .orderBy('name')
-              .get();
-      final list = <String>[];
-      for (final d in snap.docs) {
-        // Las unificadas en una genérica ya no se ofrecen.
-        if (d.data()['unificadaEn'] != null) continue;
-        final n = d.data()['name'];
-        if (n != null && n is String && n.trim().isNotEmpty) list.add(n.trim());
-      }
-
-      list.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
-      if (!mounted) return;
-      setState(() {
-        _customFeatures
-          ..clear()
-          ..addAll(list);
-      });
-    } catch (e) {
-      // fallback silencioso
-    } finally {
-      if (mounted) setState(() => _loadingCustomFeatures = false);
-    }
-  }
-
   void _onNameChanged(String value) {
     // debounce
     _nameDebounce?.cancel();
@@ -526,78 +449,6 @@ class _NewCardScreenState extends State<NewCardScreen> {
     }
   }
 
-  Future<void> _addCustomFeatureDialog() async {
-    final ctrl = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('Agregar característica'),
-            content: TextField(
-              controller: ctrl,
-              autofocus: true,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                hintText: 'Nombre de la característica',
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  final value = ctrl.text.trim();
-                  if (value.isEmpty) return;
-                  Navigator.pop(ctx, true);
-                },
-                child: const Text('Agregar'),
-              ),
-            ],
-          ),
-    );
-
-    if (ok != true) return;
-    final value = ctrl.text.trim();
-
-    final lower = value.toLowerCase();
-    final exists = _customFeatures.any((c) => c.toLowerCase() == lower);
-    if (exists) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ya existe esa característica')),
-      );
-      return;
-    }
-
-    try {
-      final docRef =
-          FirebaseFirestore.instance.collection('card_custom_features').doc();
-      await docRef.set({
-        'name': value,
-        'createdBy': _currentUserEmail(),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      if (!mounted) return;
-      setState(() {
-        _customFeatures.add(value);
-        _customFeatures.sort(
-          (a, b) => a.toLowerCase().compareTo(b.toLowerCase()),
-        );
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Característica agregada')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error al agregar: $e')));
-    }
-  }
-
   String _saveButtonMessage() {
     if (_saving) return 'Guardando...';
     if (_nameExists) return 'Ya existe una carta con ese nombre';
@@ -647,16 +498,6 @@ class _NewCardScreenState extends State<NewCardScreen> {
       ),
       child: child,
     );
-  }
-
-  void _toggleFeature(String feature, bool selected) {
-    setState(() {
-      if (selected) {
-        _caracteristicas.add(feature);
-      } else {
-        _caracteristicas.remove(feature);
-      }
-    });
   }
 
   Widget _buildUniqueSwitch() {
@@ -722,73 +563,6 @@ class _NewCardScreenState extends State<NewCardScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildFeaturesSection() {
-    return _sectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Expanded(
-                child: Text(
-                  'Caracteristicas',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              if (_loadingCustomFeatures)
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                IconButton(
-                  tooltip: 'Agregar caracteristica nueva',
-                  onPressed: _addCustomFeatureDialog,
-                  icon: const Icon(
-                    Icons.add_circle_outline,
-                    color: Color(0xFFF1D48B),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (!_loadingCustomFeatures && _customFeatures.isEmpty)
-            const Text(
-              'No hay caracteristicas cargadas.',
-              style: TextStyle(color: Colors.white60),
-            ),
-          if (_customFeatures.isNotEmpty)
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children:
-                  _customFeatures.map((feature) {
-                    final selected = _caracteristicas.contains(feature);
-                    return FilterChip(
-                      label: Text(feature),
-                      selected: selected,
-                      labelStyle: TextStyle(
-                        color:
-                            selected ? const Color(0xFF14181F) : Colors.white70,
-                      ),
-                      selectedColor: const Color(0xFFF1D48B),
-                      backgroundColor: const Color(0xFF1A212B),
-                      side: const BorderSide(color: Colors.white12),
-                      onSelected: (value) => _toggleFeature(feature, value),
-                    );
-                  }).toList(),
-            ),
-        ],
-      ),
     );
   }
 
@@ -929,8 +703,6 @@ class _NewCardScreenState extends State<NewCardScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                _buildFeaturesSection(),
                 const SizedBox(height: 16),
                 // Botones de acción
                 if (isMobile) ...[

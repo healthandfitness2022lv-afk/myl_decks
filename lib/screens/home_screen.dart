@@ -12,7 +12,6 @@ import '../widgets/drive_image_picker.dart';
 import '../utils/wallpaper_image.dart';
 import './admin_users_screen.dart';
 import './admin_bulk_assign_screen.dart';
-import './feature_grouping_screen.dart';
 import './ban_list_screen.dart';
 import './submissions_screen.dart';
 
@@ -655,18 +654,6 @@ class _SubmenuPanel extends StatelessWidget {
             'Busca por nombre, edición o tipo',
             onCatalog,
           ),
-          if (isAdmin)
-            _RowItem(
-              Icons.category_outlined,
-              'Agrupar características',
-              'Administrar grupos del catálogo',
-              () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder:
-                      (_) => const FeatureGroupingScreen(initialGroups: {}),
-                ),
-              ),
-            ),
         ];
       case MenuSection.social:
         return [

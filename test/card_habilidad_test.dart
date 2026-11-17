@@ -58,14 +58,6 @@ void main() {
     expect(card.toMap()['habilidades'], [destruir.toMap()]);
   });
 
-  test('sugerencias para características existentes', () {
-    expect(sugerirAccion('Robo'), Accion.robar);
-    expect(sugerirAccion('Daño Directo'), Accion.botar);
-    expect(sugerirAccion('Destierro Cementerio'), Accion.desterrar);
-    expect(sugerirAccion('No Anulable'), Accion.noAnulable);
-    expect(sugerirAccion('Bloquea Imbloqueables'), Accion.otra);
-  });
-
   test('efectos luego: ida y vuelta y resumen (Abhartach)', () {
     const abhartach = CardHabilidad(
       featureId: 'f3',

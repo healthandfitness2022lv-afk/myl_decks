@@ -127,26 +127,6 @@ class _CardZoomDialog extends StatelessWidget {
                               height: 1.4,
                             ),
                           ),
-                        ] else if (fullCard?.caracteristicasRaw.isNotEmpty ==
-                            true) ...[
-                          const Text(
-                            "CARACTERÃSTICAS",
-                            style: TextStyle(
-                              color: Color(0xFFF1D184),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children:
-                                fullCard!.caracteristicasRaw
-                                    .map((c) => _tagChip(c))
-                                    .toList(),
-                          ),
                         ],
                       ],
                     ),
@@ -214,21 +194,6 @@ class _CardZoomDialog extends StatelessWidget {
         const SizedBox(height: 4),
         Icon(icon, size: 12, color: Colors.white38),
       ],
-    );
-  }
-
-  Widget _tagChip(String tag) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Text(
-        tag,
-        style: const TextStyle(color: Colors.white60, fontSize: 13),
-      ),
     );
   }
 

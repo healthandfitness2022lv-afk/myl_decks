@@ -318,3 +318,29 @@ def test_nivel_5_juega_una_partida_completa_y_se_puede_reproducir():
     ganador = A.reproducir(cartas, (s.mazo_humano.nombre, s.mazo_ia.nombre), s.seed, s.grabacion,
                            metodos=s.metodos)
     assert ganador == resultado["ganadorLado"]
+
+
+def test_la_mesa_avisa_habilidad_perdida_usada_y_quien_bloquea_a_quien():
+    """Desafío de Héctor: Damarchus sin habilidad por Cleopatra VII no se podía
+    activar y la mesa no lo decía; tampoco se veía quién bloqueaba a quién."""
+    from myl_sim.desafio import vista_desafio
+    from myl_sim.jugadores import Heuristico
+    from myl_sim.motor import Partida
+    from test_motor import aliado, en_defensa
+
+    impulso = {"accion": "modificarFuerza", "cuando": "activada", "fase": "cualquiera", "valor": 2,
+               "limitePorTurno": 1, "costo": {"botar": 1},
+               "objetivo": {"seleccion": "elige", "zona": "en_juego", "tipos": ["Aliado"], "quien": "cualquiera"}}
+    p = Partida((_MazoPrueba("H").cartas, _MazoPrueba("I").cartas), (Heuristico(1), Heuristico(2)), seed=3)
+    damarchus = en_defensa(p, 0, aliado("Damarchus", 3, 3, (impulso,), raza="Titán"))
+    cleopatra = en_defensa(p, 1, aliado("Cleopatra VII", 4, 3, raza="Faraón"))
+    otro = en_defensa(p, 0, aliado("Temis", 2, 2, (impulso,), raza="Titán"))
+    damarchus.sin_habilidad_hasta, damarchus.sin_habilidad_fuente = "mientras_en_juego", cleopatra.uid
+    otro.usos_turno[0] = 1
+    p.atacantes, p.bloqueos = [otro], {otro.uid: cleopatra}
+    e = vista_desafio(p, 0)
+    por_id = {c["id"]: c for lado in e["lados"] for c in lado["defensa"]}
+    assert por_id[str(damarchus.uid)]["sinHabilidad"] and por_id[str(damarchus.uid)]["sinHabilidadPor"] == "Cleopatra VII"
+    assert por_id[str(otro.uid)]["usadaEsteTurno"] and "sinHabilidad" not in por_id[str(otro.uid)]
+    assert "sinHabilidad" not in por_id[str(cleopatra.uid)]
+    assert e["bloqueos"] == {str(otro.uid): str(cleopatra.uid)}

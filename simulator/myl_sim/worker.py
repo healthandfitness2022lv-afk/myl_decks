@@ -285,6 +285,12 @@ def procesar_desafio(doc) -> None:
     def correr() -> None:
         sesion = None
         try:
+            if data.get("modo") == "duda":
+                # Una duda de la IA: una sola decisión sobre el tablero (myl_sim.dudas).
+                from .dudas import atender_desafio
+
+                atender_desafio(ref, data)
+                return
             owner = data["ownerUid"]
             humano = reintentar_red(lambda: cargar_mazo(owner, data["deckHumano"]))
             ia = reintentar_red(lambda: cargar_mazo(owner, data["deckIa"]))

@@ -275,6 +275,17 @@ def mostrar_a(p: "Partida", i: int, titulo: str, cartas: list) -> None:
         ver(p, i, titulo, list(cartas))
 
 
+_MUESTRA_MAZO = re.compile(r"(mostrar|muestra)\s+(?:las?\s+)?(?:\w+\s+){0,2}cartas?\s+"
+                           r"(?:de\s+la\s+parte\s+superior\s+)?de\s+(?:tu|su)\s+mazo")
+
+
+def _dice_mostrar(fuente: Instancia) -> bool:
+    """El texto dice que las cartas del Mazo se muestran (Estrella de Belén,
+    Tom Thumb). Desafío LyCy: Látigo y Bastón "muestra un Guerrero de tu Mano"
+    pero solo *mira* la primera del Mazo: esa la ve solo quien la juega."""
+    return bool(_MUESTRA_MAZO.search((fuente.carta.texto or "").casefold()))
+
+
 def mostrar_mano_rival(p: "Partida", i: int, fuente: Instancia) -> None:
     """Una sola vez por resolución: la persona ve la mano rival completa."""
     clave = (p.e.turno, fuente.uid)  # Cultistas: mirar y luego barajar, una vez
@@ -322,6 +333,10 @@ def _arquetipo_ok(inst: Instancia, arquetipo: str) -> bool:
 
 def coincide(p: "Partida", inst: Instancia, obj: dict) -> bool:
     """¿La carta cumple tipos / coste / fuerza / raza del objetivo?"""
+    if obj.get("filtroSoloAliados") and inst.tipo != Tipo.ALIADO and (obj.get("raza") or obj.get("arquetipo")):
+        # Caturix: "Oros y/o Aliados de raza Desafiante": la raza filtra solo
+        # a los Aliados (simulación eTOU T14: los Oros nunca se barajaban).
+        obj = {**obj, "raza": "", "arquetipo": ""}
     tipos = obj.get("tipos") or []
     if tipos and inst.tipo.value not in tipos:
         return False
@@ -447,12 +462,26 @@ def candidatos(p: "Partida", i: int, fuente: Instancia, h: dict, *, zona: str | 
     if costo.get("destruirEstaCarta") or costo.get("desterrarEstaCarta"):
         # #2 UUOX: Guardia Gozosa se destruye para barajar: no se baraja a sí misma.
         out = [x for x in out if x is not fuente]
+    if h.get("cuando") == "al_jugar" and h.get("accion") in ("barajar", "destruir", "desterrar") \
+            and quien == "propio" and any(e.get("relacion") == "si_se_cumplio" for e in h.get("luego") or []):
+        # Desafío 5VXY T18: Vouivre "baraja un Aliado que controles para
+        # barajar 2 oponentes": el que se paga es otro, no ella misma.
+        out = [x for x in out if x is not fuente]
+    if fuente.tipo == Tipo.TALISMAN:
+        # Simulación yI09 T3: Desafiar a Arturo se barajaba a sí mismo. Un
+        # Talismán va al Cementerio recién al terminar de resolverse.
+        out = [x for x in out if x is not fuente]
     return out
+
+
+# fu7V (Conchobar): 14 cartas del catálogo dicen "defensa"/"ataque" en vez de
+# "linea_defensa"/"linea_ataque" y no encontraban ningún objetivo.
+_ALIAS_ZONA = {"defensa": "linea_defensa", "ataque": "linea_ataque", "apoyo": "linea_apoyo"}
 
 
 def zonas_de(obj: dict, defecto: str = "en_juego") -> list[str]:
     zonas = obj.get("zonas") or []
-    return list(zonas) if zonas else [obj.get("zona", defecto)]
+    return [_ALIAS_ZONA.get(z, z) for z in (zonas or [obj.get("zona", defecto)])]
 
 
 def _con_raza_nombrada(fuente: Instancia, obj: dict) -> dict:
@@ -799,7 +828,8 @@ def pagar_costo(p: "Partida", i: int, fuente: Instancia, h: dict, *, narrar: boo
             p._mover(x, Zona.MAZO)
         p.e.rng.shuffle(p.j(i).mazo)
         if elegidas:
-            p.anotar(f"J{i} baraja {', '.join(x.nombre for x in elegidas)} de su mano en el mazo")
+            # Piedra Roseta: lo que se baraja desde la mano solo lo sabe quien lo baraja.
+            p.anotar(f"J{i} baraja {privado(i, ', '.join(x.nombre for x in elegidas))} de su mano en el mazo")
     for clave, zona in (("desterrarAliados", Zona.DESTIERRO), ("destruirAliados", Zona.CEMENTERIO)):
         n = int(c.get(clave, 0))
         if n:
@@ -1080,6 +1110,10 @@ def disparar(
     habs = inst.carta.habilidades if (forzar and inst.carta.programada) else inst.habilidades
     i = inst.controlador
     if cuando == "al_jugar":
+        # Desafío 5VXY T13: Apophis ("cada vez que tu oponente juegue una
+        # carta") se dispara al jugarla, antes de que se resuelva: una Bola de
+        # Fuego que lo destruye igual hace botar 3.
+        _reacciones_oponente(p, inst)
         nombrar_raza(p, inst)
         nombrar_carta(p, inst)
     elegidos: set[str] = set()  # "elige una de las opciones" (Luz de Prometeo)
@@ -1116,8 +1150,6 @@ def disparar(
             continue
         if _intentar(p, i, inst, h) and grupo:
             elegidos.add(grupo)
-    if cuando == "al_jugar":
-        _reacciones_oponente(p, inst)
 
 
 def _elegir_del_grupo(p: "Partida", i: int, inst: Instancia, opciones: list[dict]) -> dict | None:
@@ -1498,8 +1530,10 @@ def prevenir(p: "Partida", inst: Instancia, *, combate: bool = False, destruir: 
             if h.get("accion") != "prevenir":
                 continue
             modo = (h.get("modo") or "destruir_desterrar")
-            if modo == "afectada" or modo.startswith("barajar_en_vez"):
-                continue  # se usan aparte (prevenir_afectar, _barajar_en_vez)
+            if modo in ("afectada", "barajar_mazo") or modo.startswith("barajar_en_vez"):
+                # Se usan aparte (prevenir_afectar, _barajar_en_vez). Desafío 2PE6:
+                # Amkh ("que sea barajada o puesta en el Mazo") prevenía una destrucción.
+                continue
             if modo == "por_habilidad_oponente" and (combate or lanzador is None or lanzador == c):
                 continue
             if modo == "destruir" and not destruir:
@@ -1527,6 +1561,10 @@ def prevenir(p: "Partida", inst: Instancia, *, combate: bool = False, destruir: 
                 continue
             pagar_costo(p, c, s, h)
             sumar_uso(p, c, s, h, k)
+            if s.tipo == Tipo.ALIADO and ventana_cancelar(p, c, s, h):
+                # Desafío 5VXY T26: Desafiar a Arturo cancela la prevención de
+                # Ra (descartó igual: el costo ya se pagó).
+                return False
             p.anotar(f"J{c} previene con {s.nombre}")
             if h.get("zonaDestino") == "mano" and inst.en_juego:
                 p.sale_del_juego(inst, Zona.MANO)
@@ -1825,7 +1863,8 @@ def _resolver_efecto(
             p._mover(t, Zona.MAZO)
         if elegidas:
             p.e.rng.shuffle(p.j(i).mazo)
-            p.anotar(f"{fuente.nombre}: baraja una carta de cada tipo ({len(elegidas)})")
+            # Lo que se baraja desde el Cementerio es público: se nombra cada carta.
+            p.anotar(f"{fuente.nombre}: baraja una carta de cada tipo: {', '.join(t.nombre for t in elegidas)}")
         return bool(elegidas), elegidas
     if accion == "mirarManoAzar":
         mano = p.j(1 - i).mano
@@ -2178,7 +2217,11 @@ def _resolver_efecto(
             if ok:
                 p.bloqueo_forzado[atk.uid] = t
         elif accion == "ganarControl":
-            ok = t.en_juego and t.controlador != i
+            # Héctor (fu7V): el control de Haquika dura mientras ella esté en
+            # juego; si la Capa ya la barajó, es como si nunca hubiera pasado.
+            # Una habilidad de entrada de un solo efecto (Conchobar) sí se resuelve.
+            ok = t.en_juego and t.controlador != i and not (
+                duracion == "mientras_en_juego" and not fuente.en_juego)
             if ok:
                 original = t.controlador
                 _cambiar_control(p, t, i)
@@ -2237,7 +2280,10 @@ def _resolver_efecto(
     for dueno in mazos_tocados:
         p.e.rng.shuffle(p.j(dueno).mazo)
     if objetivos:  # si todos se previnieron, la prevención ya quedó narrada
-        p.anotar(f"{fuente.nombre}: {describir(h)} {', '.join(_con_origen(t, origen) for t in objetivos)}")
+        p.anotar(f"{fuente.nombre}: {describir(h)} " + ", ".join(
+            # Lo que se baraja desde la propia mano no lo ve el rival.
+            privado(i, _con_origen(t, origen)) if accion == "barajar" and origen.get(t.uid) == Zona.MANO
+            and t.dueno == i else _con_origen(t, origen) for t in objetivos))
     p._comprobar_mazos("botar")
     return bool(afectadas), afectadas
 
@@ -2738,7 +2784,8 @@ def _mirar_tope(p: "Partida", i: int, fuente: Instancia, h: dict, n: int) -> tup
         obj = {**obj, "tipos": [nombrado]}
         h = {**h, "objetivo": obj}
     # Afrodita/Idmon la muestran al jugarla; Estrella de Belén "muestra" (ZTSY).
-    publica = h.get("zonaDestino") == "en_juego" or bool(h.get("muestra"))
+    publica = h.get("zonaDestino") == "en_juego" or bool(h.get("muestra")) \
+        or _dice_mostrar(fuente)
     nombres_vistas = ", ".join(x.nombre for x in vistas)
     p.anotar(f"{fuente.nombre}: mira {'la primera carta' if len(vistas) == 1 else f'las {len(vistas)} primeras'} "
              f"del Mazo de J{lado}: {nombres_vistas if publica else privado(i, nombres_vistas)}")
@@ -2789,6 +2836,12 @@ def _mirar_tope(p: "Partida", i: int, fuente: Instancia, h: dict, n: int) -> tup
     else:
         elegibles = [x for x in vistas if cumple(x)]
         tomar = int(h.get("valor") or 0)
+        if publica:
+            # Desafío 5VXY T4: "muestra las 3 primeras": el rival las ve, y
+            # quien la juega también aunque no haya qué tomar.
+            mostrar_a(p, 1 - i, f"{fuente.nombre} muestra", vistas)
+            if not (elegibles and tomar):
+                mostrar_a(p, i, f"{fuente.nombre} muestra", vistas)
         elegidas = decide.elegir_objetivos(p, i, elegibles, min(tomar, len(elegibles)), {**h, "accion": "mirarTope"}) \
             if elegibles and tomar else []
     destino = h.get("zonaDestino") or "mano"
@@ -2821,6 +2874,10 @@ def _mirar_tope(p: "Partida", i: int, fuente: Instancia, h: dict, n: int) -> tup
             p._mover(x, Zona.CEMENTERIO)
     if resto and resto_a != "mazo_tope":
         destino_resto = {"mazo_fondo": "al fondo del mazo", "barajar": "se baraja en el mazo"}.get(resto_a, "al Cementerio")
+        if resto_a == "cementerio" or publica:
+            # Lo que va al Cementerio es público aunque se haya mirado en
+            # privado; lo que vuelve al Mazo solo si se mostró.
+            destino_resto += ": " + ", ".join(x.nombre for x in resto)
         p.anotar(f"{fuente.nombre}: el resto {destino_resto}")
     # Con modos, ya se miró y se resolvió: las hermanas no vuelven a mirar.
     return bool(elegidas) or len(hermanas) > 1, elegidas
@@ -3468,8 +3525,9 @@ _VERBOS = {
     "ganarControl": "toma el control de",
     "ponerEnJuego": "pone en juego a",
     "anular": "anula a",
+    "elegir": "elige a",
 }
-_DESTINOS = {"mazo_fondo": "al fondo del mazo", "mazo_tope": "arriba del mazo", "mano": "a la mano"}
+_DESTINOS ={"mazo_fondo": "al fondo del mazo", "mazo_tope": "arriba del mazo", "mano": "a la mano"}
 
 
 def describir(h: dict) -> str:

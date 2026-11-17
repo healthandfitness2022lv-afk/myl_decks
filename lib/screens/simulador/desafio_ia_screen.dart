@@ -45,11 +45,12 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
     _total = urls.length;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final fin = precargarImagenesDesafio(context, urls, (h, t) {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _hechas = h;
             _total = t;
           });
+        }
       });
       // Si la red está muy lenta, a los 25 s se muestra la mesa igual (las
       // cartas que falten siguen cargando y reintentando solas).
@@ -103,7 +104,33 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
     }
   }
 
+  /// Pide la siguiente duda de la IA: el worker reproduce una partida suya
+  /// hasta la decisión donde no supo qué jugar y la muestra en la mesa.
+  Future<void> _resolverDuda() async {
+    setState(() => _creando = true);
+    try {
+      final ref = await FirebaseFirestore.instance
+          .collection('ai_challenges')
+          .add({
+            'ownerUid': _uid,
+            'modo': 'duda',
+            'status': 'pending',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+      if (mounted) setState(() => _desafio = ref);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('No se pudo pedir la duda: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _creando = false);
+    }
+  }
+
   Future<void> _reintentar(Map<String, dynamic> anterior) async {
+    if (anterior['modo'] == 'duda') return _resolverDuda();
     setState(() {
       _humano = anterior['deckHumano'] as String?;
       _ia = anterior['deckIa'] as String?;
@@ -130,6 +157,12 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
         style: TextStyle(color: _gold, fontWeight: FontWeight.bold),
       ),
       actions: [
+        if (_desafio == null)
+          TextButton.icon(
+            onPressed: _creando ? null : _resolverDuda,
+            icon: const Icon(Icons.psychology_alt_outlined, color: _gold),
+            label: const Text('Dudas de la IA', style: TextStyle(color: _gold)),
+          ),
         if (_desafio != null)
           IconButton(
             tooltip: 'Ver mis desafíos',
@@ -353,7 +386,9 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
             for (final doc in docs.take(10))
               ListTile(
                 title: Text(
-                  '${nombre(doc.data()['deckHumano'])} vs ${nombre(doc.data()['deckIa'])}',
+                  doc.data()['modo'] == 'duda'
+                      ? 'Duda de la IA · ${doc.data()['mazoDuda'] ?? '…'} vs ${doc.data()['rivalDuda'] ?? '…'}'
+                      : '${nombre(doc.data()['deckHumano'])} vs ${nombre(doc.data()['deckIa'])}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Colors.white),
@@ -428,18 +463,55 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
         final tablero = Stack(
           children: [
             Positioned.fill(child: tableroBase),
-            if (status == 'jugando' && accionIa != null)
+            // Duda de la IA: una sola decisión, desde el asiento del que dudaba.
+            if (d['modo'] == 'duda')
               Positioned(
                 top: 8,
                 left: 0,
                 right: 0,
+                child: IgnorePointer(
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 620),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xEE1F2A3A),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _gold),
+                      ),
+                      child: Text(
+                        status == 'esperando'
+                            ? 'La IA dudó en esta posición (${d['mazoDuda']} contra ${d['rivalDuda']}). Juega tu turno completo como lo harías tú.'
+                            : '${d['avisoDuda'] ?? 'Comparando tu turno con el de la IA…'}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (status == 'jugando' && accionIa != null)
+              Positioned(
+                key: ValueKey('ia-jugando-${accionIaMap?['id']}'),
+                top: 8,
+                left: 0,
+                right: 0,
                 child: Center(
-                  child: _AvisoIa(
-                    texto: accionIa,
-                    voto: VotoJugadaIa(
-                      ref: ref,
-                      accionId: '${accionIaMap?['id']}',
-                      voto: votosIa(d)['${accionIaMap?['id']}'],
+                  child: _AvisoTemporal(
+                    segundos: 3,
+                    child: _AvisoIa(
+                      texto: accionIa,
+                      voto: VotoJugadaIa(
+                        ref: ref,
+                        accionId: '${accionIaMap?['id']}',
+                        voto: votosIa(d)['${accionIaMap?['id']}'],
+                      ),
                     ),
                   ),
                 ),
@@ -454,8 +526,10 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
                 left: 0,
                 right: 0,
                 child: Center(
+                  // Héctor: 6 s tapaba la mesa rival y entorpecía; ahora
+                  // 3 s y se cierra al tocarlo (la jugada sigue al medio).
                   child: _AvisoTemporal(
-                    segundos: 6,
+                    segundos: 3,
                     child: _AvisoIa(
                       texto: accionIa,
                       voto: VotoJugadaIa(
@@ -480,7 +554,7 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
                 child: IgnorePointer(
                   child: Center(
                     child: _AvisoTemporal(
-                      segundos: 5,
+                      segundos: 3,
                       child: Container(
                         constraints: const BoxConstraints(maxWidth: 620),
                         padding: const EdgeInsets.symmetric(
@@ -572,7 +646,13 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
         padding: const EdgeInsets.all(12),
         children: [
           _estado(status, estado, d),
-          if (status == 'terminado') ...[
+          if (status == 'terminado' && d['modo'] == 'duda')
+            _ResultadoDuda(
+              resultado:
+                  (d['resultadoDuda'] as Map?)?.cast<String, dynamic>() ?? {},
+              siguiente: _creando ? null : _resolverDuda,
+            ),
+          if (status == 'terminado' && d['modo'] != 'duda') ...[
             const SizedBox(height: 10),
             AutopsiaIa(ref: ref, desafio: d),
             const SizedBox(height: 10),
@@ -593,7 +673,11 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
             FilledButton.icon(
               onPressed: _creando ? null : () => _reintentar(d),
               icon: const Icon(Icons.replay),
-              label: const Text('Iniciar otra partida con estos mazos'),
+              label: Text(
+                d['modo'] == 'duda'
+                    ? 'Pedir otra duda'
+                    : 'Iniciar otra partida con estos mazos',
+              ),
             ),
           if (status == 'esperando' ||
               status == 'jugando' ||
@@ -614,12 +698,14 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
     Map<String, dynamic> d,
   ) {
     if (status == 'pending' || status == 'preparando') {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(30),
+          padding: const EdgeInsets.all(30),
           child: Text(
-            'El worker está preparando la partida...',
-            style: TextStyle(color: Colors.white70),
+            d['modo'] == 'duda'
+                ? '${d['avisoDuda'] ?? 'El worker está buscando una duda de la IA...'}'
+                : 'El worker está preparando la partida...',
+            style: const TextStyle(color: Colors.white70),
           ),
         ),
       );
@@ -635,6 +721,9 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
         'Desafío abandonado.',
         style: TextStyle(color: Colors.white70),
       );
+    }
+    if (status == 'terminado' && d['modo'] == 'duda') {
+      return const SizedBox.shrink(); // el resultado va en su propia tarjeta
     }
     if (status == 'terminado') {
       final r = (d['resultado'] as Map?)?.cast<String, dynamic>() ?? {};
@@ -685,6 +774,97 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
       child: Text(
         '${l['nombre']} · castillo ${l['castillo']} · mano ${l['manoCantidad']}\n${mano.isEmpty ? '' : 'Tu mano: $mano\n'}Oros: ${oros.isEmpty ? '—' : oros}\nDefensa: ${defensa.isEmpty ? '—' : defensa}\nAtaque: ${ataque.isEmpty ? '—' : ataque}',
         style: const TextStyle(color: Colors.white70),
+      ),
+    );
+  }
+}
+
+/// Cierre de una duda de la IA: tu jugada, la suya y lo que dice la simulación.
+class _ResultadoDuda extends StatelessWidget {
+  const _ResultadoDuda({required this.resultado, required this.siguiente});
+
+  final Map<String, dynamic> resultado;
+  final VoidCallback? siguiente;
+
+  @override
+  Widget build(BuildContext context) {
+    final coincide = resultado['coincide'] == true;
+    String pct(dynamic v) => v is num ? '${(v * 100).round()}%' : '—';
+    // El turno completo, paso a paso; si es una sola jugada, tal cual.
+    String pasos(dynamic turno, dynamic jugada) =>
+        turno is List && turno.length > 1
+            ? [
+              for (var i = 0; i < turno.length; i++) '${i + 1}. ${turno[i]}',
+            ].join('\n')
+            : '${turno is List && turno.isNotEmpty ? turno.first : jugada}';
+    Widget fila(String quien, String jugada, dynamic estima) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 64,
+            child: Text(quien, style: const TextStyle(color: Colors.white60)),
+          ),
+          Expanded(
+            child: Text(
+              jugada,
+              style: const TextStyle(color: Colors.white, fontSize: 15),
+            ),
+          ),
+          if (!coincide)
+            Text(
+              pct(estima),
+              style: const TextStyle(color: _gold, fontWeight: FontWeight.bold),
+            ),
+        ],
+      ),
+    );
+    final quedan = resultado['quedan'];
+    return Card(
+      color: _surface,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Duda resuelta · ${resultado['mazo']} contra ${resultado['rival']} · turno ${resultado['turno']}',
+              style: const TextStyle(color: _gold, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            fila(
+              'Tú',
+              pasos(resultado['tuTurno'], resultado['tuJugada']),
+              resultado['estimaTuya'],
+            ),
+            fila(
+              'La IA',
+              pasos(resultado['turnoIa'], resultado['jugadaIa']),
+              resultado['estimaIa'],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${resultado['veredicto'] ?? ''}',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Tu turno quedó guardado como el correcto para esta posición.',
+              style: TextStyle(color: Colors.white38, fontSize: 12),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: siguiente,
+              icon: const Icon(Icons.psychology_alt_outlined),
+              label: Text(
+                quedan is num && quedan > 0
+                    ? 'Siguiente duda ($quedan en cola)'
+                    : 'Buscar más dudas',
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1206,10 +1386,14 @@ class _AvisoTemporalState extends State<_AvisoTemporal> {
   @override
   Widget build(BuildContext context) => IgnorePointer(
     ignoring: !_visible,
-    child: AnimatedOpacity(
-      opacity: _visible ? 1 : 0,
-      duration: const Duration(milliseconds: 400),
-      child: widget.child,
+    child: GestureDetector(
+      // Tocarlo lo cierra al tiro, sin esperar.
+      onTap: () => setState(() => _visible = false),
+      child: AnimatedOpacity(
+        opacity: _visible ? 1 : 0,
+        duration: const Duration(milliseconds: 250),
+        child: widget.child,
+      ),
     ),
   );
 }

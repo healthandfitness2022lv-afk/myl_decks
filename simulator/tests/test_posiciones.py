@@ -14,8 +14,10 @@ _TODAS = posiciones.cargar_todas()
 
 @pytest.mark.parametrize("pos", [p for _, p in _TODAS], ids=[f.stem for f, _ in _TODAS])
 def test_posicion_fijada(pos):
+    # Las posiciones del juez se revisan con el motor que cometió el error.
+    clase = posiciones._clase_de(pos["jugador"]) if pos.get("jugador") else None
     try:
-        ok, texto = posiciones.cumple(pos)
+        ok, texto = posiciones.cumple(pos, clase)
     except posiciones.PosicionObsoleta:
         pytest.skip("el motor ya no llega a esa decisión con lo grabado")
     if pos.get("pendiente") and not ok:
@@ -34,11 +36,11 @@ def test_mineria_encuentra_errores_y_se_fijan_como_posicion(tmp_path, monkeypatc
     monkeypatch.setattr(posiciones, "CARPETA", tmp_path)
     a, b = _mazo("A"), _mazo("B")
     lecciones = []
-    for seed in range(1, 40):
+    for seed in range(1, 80):  # con la mano rival oculta los errores firmes son más escasos
         lecciones += mineria.minar_partida(a, b, seed, revisar=2, muestras=4)
         if lecciones:
             break
-    assert lecciones, "en 40 partidas la heurística debería cometer algún error"
+    assert lecciones, "en 80 partidas la heurística debería cometer algún error"
     x = lecciones[0]
     assert x["revision"]["error"] and x["categoria"].startswith(x["revision"]["tipo"])
     assert mineria.resumen(lecciones)["patrones"][0]["veces"] >= 1

@@ -68,7 +68,7 @@ def que_haria_la_ia(cartas, nombres, seed: int, registro: list, k: int, metodos=
         })
 
     try:
-        reproducir(cartas, nombres, seed, registro, rama=k, opcion=opcion, metodos=metodos)
+        reproducir(cartas, nombres, seed, registro, rama=k, opcion=opcion, metodos=metodos, ocultar=False)
     except _Respuesta as r:
         return r.datos
     except _Desvio:
@@ -188,7 +188,7 @@ def verificar_reproduccion(cartas, nombres, seed: int, registro: list, metodos, 
                       for i in (0, 1))
     p = Partida(cartas, jugadores, nombres=nombres, inicial=None, seed=seed)
     p.cursor, p.cursor_rama = 0, None
-    p.al_ramificar = lambda: None
+    p.al_ramificar = lambda *a: None
     ref[0] = p
     try:
         r = p.jugar()

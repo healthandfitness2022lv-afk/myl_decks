@@ -51,15 +51,30 @@ VERSIONES = CARPETA / "versiones"
 CONFIG = CARPETA / "config.json"
 # Los archivos que deciden cómo juega la IA. Lo demás (reglas, cartas) lo
 # comparten los dos lados de una partida.
-ARCHIVOS_IA = ("jugadores.py", "creencias.py", "valor.py", "valor_estado.json",
+ARCHIVOS_IA = ("jugadores.py", "creencias.py", "valor.py", "valor_estado.json", "valor_estado_v2.json",
                "busqueda_ataques.py", "busqueda_bloqueos.py", "busqueda_vigilia.py")
 MOTORES = ("aleatorio", "nivel1", "nivel2", "nivel3", "heuristico", "experto",
            "busqueda_ataques", "busqueda_completa", "busqueda_vigilia", "vigilia_valor", "vigilia_x2",
-           "vigilia_h8")
+           "vigilia_h8", "vigilia_regla", "vigilia_sin_carta", "vigilia_base", "vigilia_sin_bloqueos",
+           "vigilia_sin_descartes", "vigilia_turno", "vigilia_valor2", "vigilia_turno_valor2", "vigilia_planes")
 # Variantes de la "IA buena": con la valoración aprendida (valor.py) al cortar
 # las continuaciones, y con el doble de muestras por decisión.
 _VIGILIA = {"busqueda_vigilia": {}, "vigilia_valor": {"aprendido": True},
-            "vigilia_x2": {"muestras": 8, "max_muestras": 32}, "vigilia_h8": {"horizonte": 8}}
+            "vigilia_x2": {"muestras": 8, "max_muestras": 32}, "vigilia_h8": {"horizonte": 8},
+            "vigilia_regla": {}, "vigilia_sin_carta": {}, "vigilia_base": {"aprendido": False},
+            "vigilia_sin_bloqueos": {},
+            "vigilia_sin_descartes": {}, "vigilia_turno": {}, "vigilia_valor2": {"aprendido": 2},
+            "vigilia_turno_valor2": {"aprendido": 2}, "vigilia_planes": {}}
+# Interruptores que no son argumentos del constructor. `vigilia_regla`: qué carta
+# propia traer lo decide la regla sola, sin simularlo.
+# `vigilia_base`: la IA buena sin lo agregado el 16-11 (bloqueos, descartes, turno completo y
+# valoración nueva). `vigilia_planes`: la de hoy con los 4 planes fijos en vez del turno completo.
+_AJUSTES = {"vigilia_regla": {"buscar_objetivos_propios": False}, "vigilia_sin_carta": {"buscar_carta": False},
+            "vigilia_base": {"buscar_bloqueos": False, "buscar_descartes": False, "buscar_turno": False},
+            "vigilia_sin_bloqueos": {"buscar_bloqueos": False},
+            "vigilia_sin_descartes": {"buscar_descartes": False},
+            "vigilia_turno": {"buscar_turno": True}, "vigilia_turno_valor2": {"buscar_turno": True},
+            "vigilia_planes": {"buscar_turno": False}}
 ELO_ANCLA = 1500.0
 _K = math.log(10) / 400
 
@@ -166,7 +181,10 @@ def crear(motor: str, seed: int):
         bloqueos = _modulo(etiqueta, "busqueda_bloqueos")
         return bloqueos.PoliticaConBusqueda(jug.Heuristico(seed), seed, max_segundos=None)
     if nombre in _VIGILIA:
-        return _modulo(etiqueta, "busqueda_vigilia").BuscadorVigilia(seed, **_VIGILIA[nombre])
+        jugador = _modulo(etiqueta, "busqueda_vigilia").BuscadorVigilia(seed, **_VIGILIA[nombre])
+        for atributo, valor in _AJUSTES.get(nombre, {}).items():
+            setattr(jugador, atributo, valor)
+        return jugador
     return getattr(_modulo(etiqueta, "busqueda_ataques"),
                    "BuscadorAtaques" if nombre == "busqueda_ataques" else "BuscadorCompleto")(seed)
 
@@ -263,7 +281,8 @@ def jugar(motores: list[str], mazos: list, pares: int, *, seed: int = 1,
 
 
 _DECISIONES = {"ataque": "", "vigilia": "_vigilia", "objetivo": "_objetivo", "guerra": "_guerra",
-               "oro": "_oro", "activar_oro": "_act_oro", "mano": "_mano"}
+               "oro": "_oro", "activar_oro": "_act_oro", "mano": "_mano", "carta": "_carta",
+               "bloqueo": "_bloqueo", "descarte": "_descarte", "turno": "_turno"}
 
 
 def _conteos(jugador, prefijo: str) -> dict[str, int]:
@@ -276,8 +295,8 @@ def precision_md(filas: list[dict]) -> str:
     búsqueda solo se aparta con ventaja clara, así que cada «distinta» es un
     error probable de la heurística."""
     def fila(nombre, grupo, tipos=tuple(_DECISIONES)):
-        rev = sum(f["revisadas"][t] for f in grupo for t in tipos)
-        dis = sum(f["distintas"][t] for f in grupo for t in tipos)
+        rev = sum(f["revisadas"].get(t, 0) for f in grupo for t in tipos)
+        dis = sum(f["distintas"].get(t, 0) for f in grupo for t in tipos)
         return rev, dis, f"| {nombre} | {rev} | {dis} | {(1 - dis / rev) * 100 if rev else 100:.1f}% |"
 
     lineas = ["| Decisión | Revisadas | Distintas | Precisión |", "|---|---|---|---|"]
@@ -455,6 +474,9 @@ def main(argv=None) -> int:
     pr.add_argument("--motor")
     sub.add_parser("motores")
     args = ap.parse_args(argv)
+    if hasattr(sys.stdout, "reconfigure"):
+        # Con la salida a un archivo (cp1252) la flecha del resultado botaba la corrida al final.
+        sys.stdout.reconfigure(errors="replace")
 
     if args.cmd == "congelar":
         print(congelar(args.etiqueta))

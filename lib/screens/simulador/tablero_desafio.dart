@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../models/card_myl.dart';
@@ -132,10 +134,17 @@ class _TableroDesafioState extends State<TableroDesafio> {
   final Set<String> _orosSel = {};
   // Bloqueos: atacante → bloqueador, y el bloqueador tocado esperando atacante.
   final Map<String, String> _bloqueos = {};
+  // Dónde quedó dibujada cada carta de la mesa, para unir con una flecha a
+  // cada bloqueador con el atacante que bloquea.
+  final Map<String, RenderBox> _anclas = {};
+  final GlobalKey _lienzo = GlobalKey();
   String? _bloqueadorSel;
   bool _enviando = false;
   final ScrollController _franjaScroll = ScrollController();
   String _filtroNombre = '';
+  // Celular en vertical: la mesa en una sola pantalla, nombres en las cartas
+  // y la instrucción con sus botones al medio.
+  bool _telefono = false;
 
   static String _sinTildes(String s) => s.toLowerCase()
       .replaceAll(RegExp('[áà]'), 'a').replaceAll(RegExp('[éè]'), 'e')
@@ -239,10 +248,199 @@ class _TableroDesafioState extends State<TableroDesafio> {
         gradient: RadialGradient(radius: 1.2,
           colors: [Color(0xAA000000), Color(0xE6000000)]),
       )),
-      LayoutBuilder(builder: (context, box) => _campo(rival, yo,
-          horizontal: box.maxWidth > box.maxHeight)),
+      LayoutBuilder(builder: (context, box) {
+        final horizontal = box.maxWidth > box.maxHeight;
+        _telefono = !horizontal && box.maxWidth < 600;
+        return _telefono
+            ? _campoTelefono(rival, yo)
+            : _campo(rival, yo, horizontal: horizontal);
+      }),
     ]);
   }
+
+  /// Héctor: «en el celular no quiero tener que acercarme para ver qué carta
+  /// es» y «una sola pantalla, sin scroll, con los mensajes al medio». La
+  /// mesa ocupa la pantalla entera: las líneas vacías se achican para que las
+  /// que tienen cartas crezcan, y entre los dos campos van la instrucción,
+  /// los botones y las cartas para elegir.
+  Widget _campoTelefono(Map<String, dynamic> rival, Map<String, dynamic> yo) {
+    Widget zona(String titulo, Map<String, dynamic> lado, String clave, String destino) =>
+        _zona(titulo, _cartas(lado, clave), destino, horizontal: false);
+    // Una línea sin cartas queda angosta (solo su título); las demás se reparten el alto.
+    Widget linea(Widget hijo, {required bool vacia, double angosta = 34}) =>
+        vacia ? SizedBox(height: angosta, child: hijo) : Expanded(flex: 3, child: hijo);
+    Widget fila(String titulo, Map<String, dynamic> lado, String clave, String destino,
+        String destinoTotems, {double angosta = 34}) {
+      final totems = _cartas(lado, 'apoyo');
+      return linea(Row(children: [
+        Expanded(child: zona(titulo, lado, clave, destino)),
+        const SizedBox(width: 4),
+        SizedBox(width: totems.isEmpty ? 72 : 96,
+            child: zona('Tótems', lado, 'apoyo', destinoTotems)),
+      ]), vacia: _cartas(lado, clave).isEmpty && totems.isEmpty, angosta: angosta);
+    }
+    final hayFranja = _franjaCartas().isNotEmpty || _franjaTextos().isNotEmpty;
+    return Stack(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+        child: Column(children: [
+          SizedBox(height: 44, child: _ficha(rival, activo: widget.estado['activo'] == 1)),
+          const SizedBox(height: 2),
+          fila('Defensa rival', rival, 'defensa', 'defensa_rival', 'apoyo_rival'),
+          linea(zona('Ataque rival', rival, 'ataque', 'ataque_rival'),
+              vacia: _cartas(rival, 'ataque').isEmpty, angosta: 26),
+          // El medio: qué pasa y qué hacer (y las cartas para elegir).
+          if (hayFranja)
+            Expanded(flex: 5, child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: _franja(),
+            )),
+          _centroTelefono(),
+          linea(zona('Tu Ataque', yo, 'ataque', 'ataque'),
+              vacia: _cartas(yo, 'ataque').isEmpty, angosta: 40),
+          fila('Tu Defensa', yo, 'defensa', 'defensa', 'apoyo'),
+          Expanded(flex: 4, child: zona('Tu mano', yo, 'mano', 'mano')),
+          const SizedBox(height: 2),
+          SizedBox(height: 54, child: Row(children: [
+            Expanded(flex: 3, child: zona('RESERVA · ${_cartas(yo, 'reserva').length}${_virtuales(yo)}', yo, 'reserva', 'reserva')),
+            const SizedBox(width: 4),
+            Expanded(flex: 2, child: zona('PAGADO · ${_cartas(yo, 'pagado').length}', yo, 'pagado', 'pagado')),
+          ])),
+          const SizedBox(height: 2),
+          SizedBox(height: 44, child: _ficha(yo, activo: widget.estado['activo'] == 0, tuyo: true)),
+        ]),
+      ),
+      Positioned.fill(child: IgnorePointer(child: _flechas())),
+    ]);
+  }
+
+  /// El centro del celular: con una decisión, la instrucción y los botones;
+  /// si no, el turno, la fase y lo último que pasó.
+  Widget _centroTelefono() {
+    if (widget.decision != null || _pagoOpcion != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: _controlFase(barra: true),
+      );
+    }
+    final lineas = [
+      for (final l in (widget.estado['log'] as List? ?? const []))
+        if (!'$l'.contains('[agrupacion]'))
+          '$l'.replaceFirst(RegExp(r'^T\d+ \[[^\]]*\] '), ''),
+    ];
+    final ultima = lineas.isEmpty ? '' : lineas.last;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: InkWell(
+        onTap: _verRegistro,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(color: const Color(0xF21A120C),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _boardGold.withValues(alpha: .7))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              'T${widget.estado['turno']} · ${'${widget.estado['fase']}'.replaceAll('_', ' ').toUpperCase()}'
+              ' · ${widget.estado['activo'] == 0 ? 'TU TURNO' : 'TURNO RIVAL'}',
+              style: const TextStyle(color: _boardGold, fontSize: 13, fontWeight: FontWeight.w800)),
+            if (ultima.isNotEmpty)
+              Text(ultima, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 13,
+                  color: ultima.startsWith('IA') ? const Color(0xFFFFB4A2) : Colors.white)),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// Una fila con lo esencial de un jugador (celular): nombre, Castillo,
+  /// mano y las pilas que se abren al tocarlas.
+  Widget _ficha(Map<String, dynamic> lado, {required bool activo, bool tuyo = false}) {
+    Widget pila(String titulo, String clave, int n) => InkWell(
+      onTap: () => _verPila(titulo, _cartas(lado, clave)),
+      child: Container(
+        margin: const EdgeInsets.only(left: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(color: Colors.black54,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _boardGold.withValues(alpha: .5))),
+        child: Text('$titulo $n', style: const TextStyle(color: Colors.white,
+          fontSize: 12, fontWeight: FontWeight.w700)),
+      ),
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xE62A1F14), Color(0xE6120D08)]),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: activo ? _boardGold : _boardGold.withValues(alpha: .3),
+          width: activo ? 2 : 1),
+      ),
+      child: Row(children: [
+        Expanded(child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${lado['nombre']}', maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: _boardGold, fontSize: 15, fontWeight: FontWeight.w900)),
+            Text('Castillo ${lado['castillo']} · Mano ${lado['manoCantidad']}',
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+          ],
+        )),
+        // En pantallas angostas las pilas se achican en vez de desbordar.
+        Flexible(flex: 2, child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            // La Reserva y lo Pagado del rival no ocupan mesa: se abren al tocarlos.
+            if (!tuyo) ...[
+              pila('Res.', 'reserva', _cartas(lado, 'reserva').length),
+              pila('Pag.', 'pagado', _cartas(lado, 'pagado').length),
+            ],
+            pila('Cem.', 'cementerioCartas', (lado['cementerio'] as num?)?.toInt() ?? 0),
+            pila('Dest.', 'destierroCartas', (lado['destierro'] as num?)?.toInt() ?? 0),
+            if (tuyo)
+              IconButton(
+                tooltip: 'Últimas jugadas',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                onPressed: _verRegistro,
+                icon: const Icon(Icons.history, color: _boardGold),
+              ),
+          ]),
+        )),
+      ]),
+    );
+  }
+
+  /// Todas las jugadas de la partida (celular: no caben en la mesa).
+  Future<void> _verRegistro() => showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: _boardSurface,
+    builder: (context) {
+      final lineas = [
+        for (final l in (widget.estado['log'] as List? ?? const []))
+          if (!'$l'.contains('[agrupacion]')) '$l',
+      ].reversed.toList();
+      return SafeArea(child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          const Text('ÚLTIMAS JUGADAS', style: TextStyle(color: _boardGold,
+            fontSize: 15, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          for (final l in lineas)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(l, style: TextStyle(fontSize: 14,
+                color: l.contains('] IA') ? const Color(0xFFFFB4A2) : Colors.white70)),
+            ),
+        ],
+      ));
+    },
+  );
 
   Widget _resumen(Map<String, dynamic> lado, {required bool activo}) =>
     Container(
@@ -272,8 +470,10 @@ class _TableroDesafioState extends State<TableroDesafio> {
     Map<String, dynamic> yo, {
     required bool horizontal,
   }) {
+    // Héctor 16-11: cartas más grandes. Las líneas de combate y la mano crecen;
+    // la mano rival (solo dorsos) y el divisor se achican.
     final ancho = horizontal ? 1600.0 : 900.0;
-    final alto = horizontal ? 920.0 : 1440.0;
+    final alto = horizontal ? 960.0 : 1540.0;
     Positioned poner(double x, double y, double w, double h, Widget child) =>
         Positioned(left: x, top: y, width: w, height: h, child: child);
     Widget zona(String titulo, Map<String, dynamic> lado, String clave,
@@ -289,24 +489,25 @@ class _TableroDesafioState extends State<TableroDesafio> {
           child: Stack(children: horizontal ? [
             poner(12, 12, 250, 125, _resumen(rival, activo: widget.estado['activo'] == 1)),
             poner(12, 148, 250, 125, _pilas(rival)),
-            poner(12, 647, 250, 125, _pilas(yo)),
-            poner(12, 783, 250, 125, _resumen(yo, activo: widget.estado['activo'] == 0)),
-            poner(274, 12, 1002, 124, zona('Mano rival · ${rival['manoCantidad']}', rival, 'mano', 'mano_rival',
+            poner(12, 687, 250, 125, _pilas(yo)),
+            poner(12, 823, 250, 125, _resumen(yo, activo: widget.estado['activo'] == 0)),
+            poner(274, 12, 1002, 86, zona('Mano rival · ${rival['manoCantidad']}', rival, 'mano', 'mano_rival',
                 ocultas: (rival['manoCantidad'] as num?)?.toInt() ?? 0)),
-            poner(274, 145, 750, 135, zona('Línea de Defensa rival', rival, 'defensa', 'defensa_rival')),
-            poner(1034, 145, 242, 135, zona('Tótems', rival, 'apoyo', 'apoyo_rival')),
-            poner(274, 290, 1002, 135, zona('Línea de Ataque rival', rival, 'ataque', 'ataque_rival')),
-            poner(274, 432, 1002, 48, _divisor()),
-            poner(274, 487, 1002, 135, zona('Tu Línea de Ataque', yo, 'ataque', 'ataque')),
-            poner(274, 632, 750, 135, zona('Tu Defensa', yo, 'defensa', 'defensa')),
-            poner(1034, 632, 242, 135, zona('Tótems', yo, 'apoyo', 'apoyo')),
-            poner(274, 777, 1002, 132, zona('Tu mano', yo, 'mano', 'mano')),
+            poner(274, 104, 750, 158, zona('Línea de Defensa rival', rival, 'defensa', 'defensa_rival')),
+            poner(1034, 104, 242, 158, zona('Tótems', rival, 'apoyo', 'apoyo_rival')),
+            poner(274, 268, 1002, 158, zona('Línea de Ataque rival', rival, 'ataque', 'ataque_rival')),
+            poner(274, 432, 1002, 34, _divisor()),
+            poner(274, 472, 1002, 158, zona('Tu Línea de Ataque', yo, 'ataque', 'ataque')),
+            poner(274, 636, 750, 158, zona('Tu Defensa', yo, 'defensa', 'defensa')),
+            poner(1034, 636, 242, 158, zona('Tótems', yo, 'apoyo', 'apoyo')),
+            poner(274, 800, 1002, 156, zona('Tu mano', yo, 'mano', 'mano')),
             poner(1288, 12, 300, 155, zona('RESERVA RIVAL · ${_cartas(rival, 'reserva').length}${_virtuales(rival)}', rival, 'reserva', 'reserva_rival')),
             poner(1288, 177, 300, 115, zona('PAGADO RIVAL · ${_cartas(rival, 'pagado').length}', rival, 'pagado', 'pagado_rival')),
             poner(1288, 297, 300, 140, _fase()),
-            poner(1288, 442, 300, 178, _registro()),
-            poner(1288, 627, 300, 115, zona('PAGADO · ${_cartas(yo, 'pagado').length}', yo, 'pagado', 'pagado')),
-            poner(1288, 752, 300, 155, zona('RESERVA · ${_cartas(yo, 'reserva').length}${_virtuales(yo)}', yo, 'reserva', 'reserva')),
+            poner(1288, 442, 300, 218, _registro()),
+            poner(1288, 667, 300, 115, zona('PAGADO · ${_cartas(yo, 'pagado').length}', yo, 'pagado', 'pagado')),
+            poner(1288, 792, 300, 160, zona('RESERVA · ${_cartas(yo, 'reserva').length}${_virtuales(yo)}', yo, 'reserva', 'reserva')),
+            Positioned.fill(child: IgnorePointer(child: _flechas())),
             if (_franjaCartas().isNotEmpty || _franjaTextos().isNotEmpty)
               poner(274, 12, 1002, 412, _franja()),
           ] : [
@@ -314,26 +515,53 @@ class _TableroDesafioState extends State<TableroDesafio> {
             poner(250, 10, 230, 145, _pilas(rival)),
             poner(490, 10, 400, 70, zona('RESERVA RIVAL · ${_cartas(rival, 'reserva').length}${_virtuales(rival)}', rival, 'reserva', 'reserva_rival')),
             poner(490, 85, 400, 70, zona('PAGADO RIVAL · ${_cartas(rival, 'pagado').length}', rival, 'pagado', 'pagado_rival')),
-            poner(10, 165, 880, 145, zona('Mano rival · ${rival['manoCantidad']}', rival, 'mano', 'mano_rival',
+            poner(10, 165, 880, 120, zona('Mano rival · ${rival['manoCantidad']}', rival, 'mano', 'mano_rival',
                 ocultas: (rival['manoCantidad'] as num?)?.toInt() ?? 0)),
-            poner(10, 320, 675, 140, zona('Línea de Defensa rival', rival, 'defensa', 'defensa_rival')),
-            poner(695, 320, 195, 140, zona('Tótems', rival, 'apoyo', 'apoyo_rival')),
-            poner(10, 470, 880, 160, zona('Línea de Ataque rival', rival, 'ataque', 'ataque_rival')),
-            poner(10, 640, 880, 60, _divisor()),
-            poner(10, 710, 880, 180, zona('Tu Línea de Ataque', yo, 'ataque', 'ataque')),
-            poner(10, 900, 675, 140, zona('Tu Defensa', yo, 'defensa', 'defensa')),
-            poner(695, 900, 195, 140, zona('Tótems', yo, 'apoyo', 'apoyo')),
-            poner(10, 1050, 880, 145, zona('Tu mano', yo, 'mano', 'mano')),
-            poner(10, 1205, 230, 225, _resumen(yo, activo: widget.estado['activo'] == 0)),
-            poner(250, 1205, 230, 225, _pilas(yo)),
-            poner(490, 1205, 400, 105, zona('PAGADO · ${_cartas(yo, 'pagado').length}', yo, 'pagado', 'pagado')),
-            poner(490, 1320, 400, 110, zona('RESERVA · ${_cartas(yo, 'reserva').length}${_virtuales(yo)}', yo, 'reserva', 'reserva')),
+            poner(10, 295, 675, 175, zona('Línea de Defensa rival', rival, 'defensa', 'defensa_rival')),
+            poner(695, 295, 195, 175, zona('Tótems', rival, 'apoyo', 'apoyo_rival')),
+            poner(10, 480, 880, 180, zona('Línea de Ataque rival', rival, 'ataque', 'ataque_rival')),
+            poner(10, 668, 880, 50, _divisor()),
+            poner(10, 726, 880, 185, zona('Tu Línea de Ataque', yo, 'ataque', 'ataque')),
+            poner(10, 921, 675, 175, zona('Tu Defensa', yo, 'defensa', 'defensa')),
+            poner(695, 921, 195, 175, zona('Tótems', yo, 'apoyo', 'apoyo')),
+            poner(10, 1106, 880, 185, zona('Tu mano', yo, 'mano', 'mano')),
+            poner(10, 1301, 230, 229, _resumen(yo, activo: widget.estado['activo'] == 0)),
+            poner(250, 1301, 230, 229, _pilas(yo)),
+            poner(490, 1301, 400, 110, zona('PAGADO · ${_cartas(yo, 'pagado').length}', yo, 'pagado', 'pagado')),
+            poner(490, 1420, 400, 110, zona('RESERVA · ${_cartas(yo, 'reserva').length}${_virtuales(yo)}', yo, 'reserva', 'reserva')),
+            Positioned.fill(child: IgnorePointer(child: _flechas())),
             if (_franjaCartas().isNotEmpty || _franjaTextos().isNotEmpty)
-              poner(10, 165, 880, 465, _franja()),
+              poner(10, 165, 880, 495, _franja()),
           ]),
         ),
       ),
     ));
+  }
+
+  /// (bloqueador, atacante): los que estás eligiendo, o los ya declarados.
+  List<(String, String)> _paresBloqueo() {
+    if (_tipo == 'bloqueos') {
+      return [for (final e in _bloqueos.entries) (e.value, e.key)];
+    }
+    final declarados = (widget.estado['bloqueos'] as Map?) ?? const {};
+    return [for (final e in declarados.entries) ('${e.value}', '${e.key}')];
+  }
+
+  Widget _flechas() {
+    final pares = _paresBloqueo();
+    if (pares.isEmpty) return const SizedBox.shrink();
+    final clave = pares.map((p) => '${p.$1}>${p.$2}').join(',');
+    // Se redibuja medio segundo: acompaña la entrada animada de las cartas.
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('flechas-$clave-${widget.estado['turno']}'),
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOut,
+      builder: (context, t, _) => CustomPaint(
+        key: _lienzo,
+        painter: _FlechasBloqueo(pares, _anclas, _lienzo, t),
+      ),
+    );
   }
 
   Widget _fase() => Center(child: FittedBox(fit: BoxFit.scaleDown, child: AnimatedSwitcher(
@@ -398,15 +626,16 @@ class _TableroDesafioState extends State<TableroDesafio> {
       ]),
       boxShadow: [BoxShadow(color: _boardGold.withValues(alpha: .6), blurRadius: 10)],
     )),
-    if (widget.decision != null || _pagoOpcion != null) _controlFase(),
+    // En el celular la barra de acciones va fija abajo, no en la mesa.
+    if (!_telefono && (widget.decision != null || _pagoOpcion != null)) _controlFase(),
   ]);
 
-  Widget _controlFase() {
+  Widget _controlFase({bool barra = false}) {
     final fase = '${widget.estado['fase']}';
     final pasar = _opciones.where((o) => o['tipoJugada'] == 'pasar');
     Widget instruccion(String texto) => Flexible(
-      child: Text(texto, maxLines: 1, overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Colors.white, fontSize: 14,
+      child: Text(texto, maxLines: barra ? 3 : 1, overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: Colors.white, fontSize: barra ? 15 : 14,
           fontWeight: FontWeight.w600)),
     );
     Widget boton(String texto, VoidCallback? accion, {bool principal = true}) =>
@@ -505,6 +734,32 @@ class _TableroDesafioState extends State<TableroDesafio> {
         default:
           hijos.add(instruccion('${_d['titulo'] ?? 'Elige una opción'}'));
       }
+    }
+    if (barra) {
+      // Celular (al medio de la mesa): qué hacer (hasta 3 líneas) y los botones.
+      final textos = [for (final w in hijos.whereType<Flexible>()) w.child];
+      final botones = [for (final w in hijos) if (w is! Flexible) w];
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+        decoration: BoxDecoration(color: const Color(0xF21A120C),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _boardGold, width: 1.5),
+          boxShadow: [BoxShadow(color: _boardGold.withValues(alpha: .3), blurRadius: 10)]),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('T${widget.estado['turno']} · ${fase.replaceAll('_', ' ').toUpperCase()}',
+              style: const TextStyle(color: _boardGold, fontSize: 13, fontWeight: FontWeight.w800)),
+            ...textos,
+            if (botones.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Wrap(alignment: WrapAlignment.end, spacing: 4, runSpacing: 4, children: botones),
+            ],
+          ],
+        ),
+      );
     }
     return DecoratedBox(
       decoration: BoxDecoration(color: const Color(0xF21A120C),
@@ -904,7 +1159,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
                     }
                     final alto = box.maxHeight;
                     // Héctor: cartas más grandes (títulos más chicos, sin tope bajo).
-                    final cartaAlto = alto.clamp(40.0, horizontal ? 150.0 : 180.0);
+                    final cartaAlto = alto.clamp(40.0, horizontal ? 176.0 : 210.0);
                     final cartaAncho = cartaAlto * 92 / 128;
                     final paso = total <= 1 ? 0.0 :
                         ((box.maxWidth - cartaAncho) / (total - 1)).clamp(1.0, cartaAncho + 5);
@@ -1003,6 +1258,8 @@ class _TableroDesafioState extends State<TableroDesafio> {
     final bloqueador = _bloqueos[uid];
     final nombreBloqueador = bloqueador == null ? null : _nombreCarta(bloqueador);
     final armas = (c['armas'] as List? ?? const []).whereType<Map>().toList();
+    // Celular: el nombre escrito al pie para no tener que acercarse.
+    final pie = _telefono && height >= 60 ? 19.0 : 0.0;
     final base = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       width: width,
@@ -1026,12 +1283,23 @@ class _TableroDesafioState extends State<TableroDesafio> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: _CaraCarta(
-              cartaId: '${c['cartaId']}',
-              nombre: '${c['nombre']}',
-              width: width,
-              height: height,
-            ),
+            // Héctor 16-11: un Aliado sin habilidad se ve en blanco y negro.
+            child: c['sinHabilidad'] == true
+                ? ColorFiltered(
+                    colorFilter: _blancoYNegro,
+                    child: _CaraCarta(
+                      cartaId: '${c['cartaId']}',
+                      nombre: '${c['nombre']}',
+                      width: width,
+                      height: height,
+                    ),
+                  )
+                : _CaraCarta(
+                    cartaId: '${c['cartaId']}',
+                    nombre: '${c['nombre']}',
+                    width: width,
+                    height: height,
+                  ),
           ),
           if (rotulo != null)
             Positioned(
@@ -1046,7 +1314,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
             ),
           if (armas.isNotEmpty)
             Positioned(
-              right: 2, bottom: 2,
+              right: 2, bottom: 2 + pie,
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 for (final a in armas.take(2))
                   GestureDetector(
@@ -1075,9 +1343,29 @@ class _TableroDesafioState extends State<TableroDesafio> {
                   ),
               ]),
             ),
+          // Desafío de Héctor: Damarchus no se podía activar porque Cleopatra VII
+          // le quitó la habilidad, y la mesa no lo decía.
+          if (c['sinHabilidad'] == true || c['usadaEsteTurno'] == true)
+            Positioned(
+              left: 2, right: 2, top: rotulo != null ? 22 : 2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+                color: c['sinHabilidad'] == true
+                    ? const Color(0xE67F1D1D)
+                    : const Color(0xE6424242),
+                child: Text(
+                  c['sinHabilidad'] == true
+                      ? 'SIN HABILIDAD${c['sinHabilidadPor'] != null ? ' · ${c['sinHabilidadPor']}' : ''}'
+                      : 'YA USADA ESTE TURNO',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 9,
+                    fontWeight: FontWeight.bold, height: 1.1)),
+              ),
+            ),
           if (nombreBloqueador != null)
             Positioned(
-              left: 2, right: 2, bottom: 26,
+              left: 2, right: 2, bottom: 26 + pie,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
                 color: const Color(0xDD0D3B4A),
@@ -1090,7 +1378,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
           if (c['fuerza'] != null)
             Positioned(
               left: 3,
-              bottom: 3,
+              bottom: 3 + pie,
               child: CircleAvatar(
                 radius: 12,
                 backgroundColor: const Color(0xFF7F1D1D),
@@ -1101,6 +1389,21 @@ class _TableroDesafioState extends State<TableroDesafio> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+              ),
+            ),
+          if (pie > 0)
+            Positioned(
+              left: 0, right: 0, bottom: 0, height: pie,
+              child: Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: const BoxDecoration(
+                  color: Color(0xE6000000),
+                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(5)),
+                ),
+                child: Text('${c['nombre']}', maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 13,
+                    fontWeight: FontWeight.w800, height: 1.1)),
               ),
             ),
         ],
@@ -1141,7 +1444,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
                 childWhenDragging: Opacity(opacity: .35, child: carta),
                 child: carta,
               );
-    return TweenAnimationBuilder<double>(
+    final animada = TweenAnimationBuilder<double>(
       key: ValueKey('$zona-$uid'),
       tween: Tween(begin: .82, end: 1),
       duration: const Duration(milliseconds: 300),
@@ -1155,7 +1458,19 @@ class _TableroDesafioState extends State<TableroDesafio> {
       ),
       child: interactiva,
     );
+    return _zonasMesa.contains(zona)
+        ? _Ancla(uid: uid, anclas: _anclas, child: animada)
+        : animada;
   }
+
+  static const _zonasMesa = {'defensa', 'ataque', 'defensa_rival', 'ataque_rival'};
+
+  static const _blancoYNegro = ColorFilter.matrix(<double>[
+    0.2126, 0.7152, 0.0722, 0, 0,
+    0.2126, 0.7152, 0.0722, 0, 0,
+    0.2126, 0.7152, 0.0722, 0, 0,
+    0, 0, 0, 1, 0,
+  ]);
 
   String? _nombreCarta(String uid) {
     for (final lado in (widget.estado['lados'] as List? ?? const []).whereType<Map>()) {
@@ -1338,6 +1653,120 @@ class _TableroDesafioState extends State<TableroDesafio> {
 }
 
 /// Con el mouse encima, la carta crece un poco y se eleva (web y escritorio).
+/// Anota dónde quedó dibujada una carta de la mesa (su RenderBox), para que
+/// las flechas de bloqueo sepan de dónde a dónde ir.
+class _Ancla extends SingleChildRenderObjectWidget {
+  const _Ancla({required this.uid, required this.anclas, super.child});
+
+  final String uid;
+  final Map<String, RenderBox> anclas;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderAncla(uid, anclas);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderAncla renderObject) {
+    renderObject.uid = uid;
+  }
+}
+
+class _RenderAncla extends RenderProxyBox {
+  _RenderAncla(this._uid, this._anclas);
+
+  String _uid;
+  final Map<String, RenderBox> _anclas;
+
+  set uid(String valor) {
+    if (valor == _uid) return;
+    if (_anclas[_uid] == this) _anclas.remove(_uid);
+    _uid = valor;
+    if (attached) _anclas[_uid] = this;
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _anclas[_uid] = this;
+  }
+
+  @override
+  void detach() {
+    if (_anclas[_uid] == this) _anclas.remove(_uid);
+    super.detach();
+  }
+}
+
+/// Flecha de cada bloqueador hacia el atacante que bloquea, un color por par.
+class _FlechasBloqueo extends CustomPainter {
+  _FlechasBloqueo(this.pares, this.anclas, this.lienzo, this.avance);
+
+  final List<(String, String)> pares;
+  final Map<String, RenderBox> anclas;
+  final GlobalKey lienzo;
+  final double avance;
+
+  static const _colores = [
+    Color(0xFF55D6FF),
+    Color(0xFFFFA726),
+    Color(0xFFE040FB),
+    Color(0xFFB2FF59),
+    Color(0xFFFFEB3B),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final propio = lienzo.currentContext?.findRenderObject();
+    if (propio is! RenderBox || !propio.attached) return;
+    for (var i = 0; i < pares.length; i++) {
+      final desde = anclas[pares[i].$1];
+      final hasta = anclas[pares[i].$2];
+      if (desde == null || hasta == null || !desde.attached || !hasta.attached ||
+          !desde.hasSize || !hasta.hasSize) {
+        continue;
+      }
+      final a = desde.localToGlobal(desde.size.center(Offset.zero), ancestor: propio);
+      final b = hasta.localToGlobal(hasta.size.center(Offset.zero), ancestor: propio);
+      final d = b - a;
+      final largo = d.distance;
+      if (largo < 1) continue;
+      final u = d / largo;
+      // Sale del borde del bloqueador y llega al borde del atacante.
+      final recorte = math.min(desde.size.height * .32, largo / 3);
+      final p1 = a + u * recorte;
+      final p2 = b - u * recorte;
+      final fin = Offset.lerp(p1, p2, avance)!;
+      final color = _colores[i % _colores.length];
+      canvas.drawLine(p1, fin, Paint()
+        ..color = Colors.black.withValues(alpha: .75)
+        ..strokeWidth = 12
+        ..strokeCap = StrokeCap.round);
+      canvas.drawLine(p1, fin, Paint()
+        ..color = color
+        ..strokeWidth = 6
+        ..strokeCap = StrokeCap.round);
+      canvas.drawCircle(p1, 10, Paint()..color = Colors.black.withValues(alpha: .75));
+      canvas.drawCircle(p1, 7, Paint()..color = color);
+      if (avance >= .99) {
+        final n = Offset(-u.dy, u.dx);
+        final punta = Path()
+          ..moveTo(p2.dx, p2.dy)
+          ..lineTo((p2 - u * 28 + n * 15).dx, (p2 - u * 28 + n * 15).dy)
+          ..lineTo((p2 - u * 28 - n * 15).dx, (p2 - u * 28 - n * 15).dy)
+          ..close();
+        canvas.drawPath(punta, Paint()
+          ..color = Colors.black.withValues(alpha: .75)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5
+          ..strokeJoin = StrokeJoin.round);
+        canvas.drawPath(punta, Paint()..color = color);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_FlechasBloqueo oldDelegate) => true;
+}
+
 class _Realce extends StatefulWidget {
   const _Realce({required this.child});
 

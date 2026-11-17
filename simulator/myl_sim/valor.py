@@ -30,6 +30,18 @@ NOMBRES = [
 ]
 _modelo: dict | None = None
 
+# Esquema 2 (16-11): los mismos rasgos más los que la fórmula fija y el esquema
+# 1 no ven: letal a la vista, daño que pasa aunque el rival bloquee con todo,
+# Oros disponibles y qué hay en mi mano. Va en otro archivo: el juez y las
+# versiones congeladas siguen usando el esquema 1 sin cambios.
+ARCHIVO_V2 = Path(__file__).with_name("valor_estado_v2.json")
+NOMBRES_V2 = NOMBRES + [
+    "oro_disponible_mio", "oro_disponible_rival", "letal_mio", "letal_rival",
+    "dano_que_pasa_mio", "dano_que_pasa_rival", "mano_aliados", "mano_talismanes", "mano_oros",
+    "coste_mano", "castillo_mio_bajo", "castillo_rival_bajo", "sin_mesa_mia", "sin_mesa_rival",
+]
+_modelo_v2: dict | None = None
+
 
 def rasgos(p, yo: int) -> list[float]:
     m, r = p.j(yo), p.j(1 - yo)
@@ -49,6 +61,40 @@ def rasgos(p, yo: int) -> list[float]:
         1 / (cm + 1), 1 / (cr + 1),
         min(3.0, sum(fr) / (cm + 1)), min(3.0, sum(fm) / (cr + 1)),
     ]
+
+
+def rasgos_v2(p, yo: int) -> list[float]:
+    from .modelo import Tipo
+
+    m, r = p.j(yo), p.j(1 - yo)
+    fm = sorted((max(0, hab.fuerza(p, a)) for a in m.aliados), reverse=True)
+    fr = sorted((max(0, hab.fuerza(p, a)) for a in r.aliados), reverse=True)
+    cm, cr = len(m.mazo), len(r.mazo)
+    # Daño que pasa si el otro bloquea a mis más fuertes con todos sus Aliados.
+    pasa_m, pasa_r = sum(fm[len(fr):]), sum(fr[len(fm):])
+    mano = [c for c in m.mano]
+    return rasgos(p, yo) + [
+        m.oro_disponible / 5, r.oro_disponible / 5,
+        1.0 if sum(fm) >= cr else 0.0, 1.0 if sum(fr) >= cm else 0.0,
+        min(3.0, pasa_m / (cr + 1)), min(3.0, pasa_r / (cm + 1)),
+        sum(1 for c in mano if c.tipo == Tipo.ALIADO) / 3,
+        sum(1 for c in mano if c.tipo == Tipo.TALISMAN) / 3,
+        sum(1 for c in mano if c.tipo == Tipo.ORO) / 3,
+        sum(c.carta.coste for c in mano) / 15,
+        1.0 if cm <= 8 else 0.0, 1.0 if cr <= 8 else 0.0,
+        1.0 if not fm else 0.0, 1.0 if not fr else 0.0,
+    ]
+
+
+def prob_ganar_v2(p, yo: int) -> float | None:
+    """Valoración con el esquema 2; None si no está entrenada."""
+    global _modelo_v2
+    if _modelo_v2 is None and ARCHIVO_V2.exists():
+        _modelo_v2 = json.loads(ARCHIVO_V2.read_text(encoding="utf-8"))
+    if _modelo_v2 is None:
+        return None
+    z = _modelo_v2["sesgo"] + sum(w * x for w, x in zip(_modelo_v2["pesos"], rasgos_v2(p, yo)))
+    return 1 / (1 + math.exp(-max(-30.0, min(30.0, z))))
 
 
 def cargar() -> dict | None:
@@ -72,12 +118,13 @@ def _jugar_registrando(args):
     from .jugadores import Heuristico
     from .motor import Partida
 
-    cartas_a, cartas_b, seed = args
+    cartas_a, cartas_b, seed = args[:3]
+    extraer = rasgos_v2 if len(args) > 3 and args[3] == 2 else rasgos
 
     class Registrada(Partida):
         def _cerrar_turno(self, a):
             super()._cerrar_turno(a)
-            self.filas.append((rasgos(self, 0), rasgos(self, 1)))
+            self.filas.append((extraer(self, 0), extraer(self, 1)))
 
     p = Registrada((cartas_a, cartas_b), (Heuristico(seed * 2), Heuristico(seed * 2 + 1)),
                    inicial=seed % 2, seed=seed)
@@ -88,7 +135,8 @@ def _jugar_registrando(args):
     return [(x0, 1.0 if r.ganador == 0 else 0.0, x1, 1.0 if r.ganador == 1 else 0.0) for x0, x1 in p.filas]
 
 
-def generar(mazos: list, partidas: int, seed: int = 1, procesos: int | None = None) -> list[list]:
+def generar(mazos: list, partidas: int, seed: int = 1, procesos: int | None = None,
+            esquema: int = 1) -> list[list]:
     """Una lista por partida de (rasgos, ganó) desde ambos lados."""
     import os
     from concurrent.futures import ProcessPoolExecutor
@@ -97,7 +145,7 @@ def generar(mazos: list, partidas: int, seed: int = 1, procesos: int | None = No
     trabajos = []
     for k in range(partidas):
         a, b = rng.sample(mazos, 2)
-        trabajos.append((a.cartas, b.cartas, seed * 1_000_003 + k))
+        trabajos.append((a.cartas, b.cartas, seed * 1_000_003 + k, esquema))
     with ProcessPoolExecutor(procesos or os.cpu_count() or 1) as ex:
         out = []
         for filas in ex.map(_jugar_registrando, trabajos, chunksize=8):
@@ -125,7 +173,8 @@ def entrenar(datos: list[tuple[list[float], float]], *, epocas: int = 30, tasa: 
             b -= t * g
             for j in range(k):
                 w[j] -= t * (g * x[j] + l2 * w[j])
-    return {"esquema": 1, "rasgos": NOMBRES, "pesos": w, "sesgo": b}
+    return {"esquema": 2 if k == len(NOMBRES_V2) else 1,
+            "rasgos": NOMBRES_V2 if k == len(NOMBRES_V2) else NOMBRES, "pesos": w, "sesgo": b}
 
 
 def evaluar(modelo: dict, datos, prob) -> dict:
@@ -150,6 +199,9 @@ def main(argv=None) -> int:
     e.add_argument("--partidas", type=int, default=3000)
     e.add_argument("--seed", type=int, default=1)
     e.add_argument("--cache", action="store_true")
+    e.add_argument("--esquema", type=int, choices=(1, 2), default=1,
+                   help="2: rasgos ampliados, se guarda en valor_estado_v2.json")
+    e.add_argument("--validos", action="store_true", help="solo mazos válidos (49 cartas y Ban List)")
     args = ap.parse_args(argv)
 
     from .datos import CACHE, Mazo
@@ -162,7 +214,11 @@ def main(argv=None) -> int:
         mazos = [Mazo.from_json(json.loads(f.read_text(encoding="utf-8")))
                  for f in sorted(CACHE.glob("mazo_*.json"))]
         mazos = [m for m in mazos if m.formato == "racial" and not m.sin_programar()]
-    juegos = generar(mazos, args.partidas, seed=args.seed)
+    if args.validos:
+        from .datos import solo_validos
+
+        mazos = solo_validos(mazos)
+    juegos = generar(mazos, args.partidas, seed=args.seed, esquema=args.esquema)
     corte = int(len(juegos) * 0.8)
     train = [f for j in juegos[:corte] for f in j]
     test = [f for j in juegos[corte:] for f in j]
@@ -170,8 +226,15 @@ def main(argv=None) -> int:
     modelo["mazos"] = [m.nombre for m in mazos]
     modelo["partidas"] = len(juegos)
     modelo["validacion"] = evaluar(modelo, test, _prob_modelo)
-    ARCHIVO.write_text(json.dumps(modelo, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(json.dumps(modelo["validacion"]), f"{len(train)} estados de entrenamiento → {ARCHIVO}")
+    if args.esquema == 2:
+        # Referencia: el esquema 1 entrenado con las mismas partidas (primeros 22 rasgos).
+        k1 = len(NOMBRES)
+        m1 = entrenar([(x[:k1], y) for x, y in train], seed=args.seed)
+        modelo["validacionEsquema1"] = evaluar(m1, [(x[:k1], y) for x, y in test], _prob_modelo)
+    destino = ARCHIVO_V2 if args.esquema == 2 else ARCHIVO
+    destino.write_text(json.dumps(modelo, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(json.dumps(modelo["validacion"]), json.dumps(modelo.get("validacionEsquema1")),
+          f"{len(train)} estados de entrenamiento en {destino}")
     return 0
 
 

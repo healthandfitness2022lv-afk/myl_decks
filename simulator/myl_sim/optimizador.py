@@ -86,10 +86,33 @@ def pool_de(base: Mazo, mazos: list[Mazo], *, ban: dict | None = None,
             maximo[cid] = min(MAX_COPIAS, (ban or {}).get(cid, MAX_COPIAS))
     cartas.update({c.id: c for c in base.cartas})
     cartas.pop(ORO_INICIAL.id, None)
+    for cid, c in cartas.items():
+        if "única" in (c.texto or "").lower():
+            maximo[cid] = min(maximo[cid], 1)  # carta Única, aunque la Ban List no la nombre
     # Sin programar solo juegan sus estadísticas: fuera, salvo `provisionales`.
     if not provisionales:
         cartas = {cid: c for cid, c in cartas.items() if c.programada or cid in {x.id for x in base.cartas}}
     return cartas, maximo
+
+
+def mazo_catalogo(base: Mazo, ban: dict, refrescar: bool = False) -> Mazo:
+    """Las cartas del catálogo que `base` podría llevar, como un mazo más del
+    que tomar cartas: programadas, de las ediciones que ya usa, Aliados de su
+    raza y cartas sin raza, y no prohibidas."""
+    from .datos import carta_desde_doc
+    from .sinergias import _edicion, documentos
+
+    docs = documentos(refrescar)
+    ediciones = {_edicion(docs[c.id]) for c in base.cartas if c.id in docs}
+    cartas = []
+    for cid, d in docs.items():
+        c = carta_desde_doc(cid, d)
+        if _edicion(d) not in ediciones or d.get("soloLibre") or ban.get(cid, MAX_COPIAS) <= 0 or not c.programada:
+            continue
+        if c.raza not in ("", base.raza) or (c.tipo.value == "Aliado" and c.raza != base.raza):
+            continue
+        cartas += [c] * MAX_COPIAS
+    return Mazo(id="catalogo", nombre="Catálogo", formato=base.formato, raza=base.raza, cartas=cartas, faltantes=[])
 
 
 def mutaciones(base: list, pool: dict, maximo: Counter, rng: random.Random, cuantas: int,
@@ -221,7 +244,7 @@ def ronda(base: Variante, pool: dict, maximo: Counter, rivales: list[Mazo], peso
 def optimizar(base: Mazo, rivales: list[Mazo], pesos: dict, pool_mazos: list[Mazo], *, rondas: int = 1,
               candidatos: int = 24, n0: int = 6, n_conf: int = 40, quedan: int = 3, seed: int = 1,
               jugador: str = "heuristico", procesos: int | None = None, ban: dict | None = None,
-              solo_side: bool = False, log=print) -> dict:
+              solo_side: bool = False, prioridad: set = frozenset(), log=print) -> dict:
     pool, maximo = pool_de(base, pool_mazos, ban=ban, solo_side=solo_side)
     actual = Variante(list(base.cartas))
     salida = {"base": {"id": base.id, "nombre": base.nombre, "huella": huella_mazo(base)},
@@ -231,7 +254,7 @@ def optimizar(base: Mazo, rivales: list[Mazo], pesos: dict, pool_mazos: list[Maz
               "banList": ban is not None, "rondas": []}
     for k in range(rondas):
         log(f"Ronda {k + 1}: {base.nombre} · {' · '.join(f'−{a} +{b}' for a, b in actual.cambios) or 'lista original'}")
-        r = ronda(actual, pool, maximo, rivales, pesos, prioridad={c.id for c in base.side},
+        r = ronda(actual, pool, maximo, rivales, pesos, prioridad={c.id for c in base.side} | set(prioridad),
                   candidatos=candidatos, n0=n0, n_conf=n_conf,
                   quedan=quedan, seed=seed + 1000 * k, jugador=jugador, procesos=procesos, log=log)
         aceptada = next((x for x in r["confirmadas"] if x["ic95"][0] > 0), None)
@@ -283,6 +306,9 @@ def main(argv=None) -> int:
     ap.add_argument("--notables", action="store_true", help="(siempre incluidas sin --cache)")
     ap.add_argument("--cache", action="store_true", help="mazos y Ban List desde simulator/cache")
     ap.add_argument("--salida", type=Path)
+    ap.add_argument("--catalogo", action="store_true",
+                    help="probar todas las cartas legales del catálogo (misma raza y ediciones del mazo), "
+                         "no solo las que ya están en otros mazos")
     ap.add_argument("--incluir-pendientes", action="store_true",
                     help="no excluir rivales con cartas sin programar (esas cartas juegan sin habilidad)")
     a = ap.parse_args(argv)
@@ -337,9 +363,15 @@ def main(argv=None) -> int:
     print(f"Rivales: {len(rivales)}")
     pool_mazos = [Mazo.from_json(json.loads(f.read_text(encoding="utf-8"))) for f in CACHE.glob("mazo_*.json")]
     pool_mazos += rivales
+    prioridad = set()
+    if a.catalogo:
+        # Primero lo que ya usan otros mazos válidos de la raza; después el resto del catálogo.
+        prioridad = {c.id for m in rivales if m.raza == base.raza for c in m.cartas}
+        pool_mazos.append(mazo_catalogo(base, ban or {}))
+        print(f"Catálogo: {len({c.id for c in pool_mazos[-1].cartas})} cartas legales para {base.raza}")
     r = optimizar(base, rivales, pesos, pool_mazos, rondas=a.rondas, candidatos=a.candidatos, n0=a.n0,
                   n_conf=a.confirmar, seed=a.seed, jugador=a.jugador, procesos=a.procesos,
-                  ban=ban, solo_side=solo_side)
+                  ban=ban, solo_side=solo_side, prioridad=prioridad)
     r["creado"] = datetime.now(timezone.utc).isoformat()
     salida = a.salida or CARPETA / "optimizacion" / f"opt_{base.id}_{datetime.now():%Y%m%d_%H%M}"
     salida.parent.mkdir(parents=True, exist_ok=True)

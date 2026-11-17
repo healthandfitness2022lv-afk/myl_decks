@@ -81,6 +81,46 @@ def _valor_carta(p, inst: Instancia) -> float:
     return inst.carta.coste + 0.7 * len(inst.habilidades)
 
 
+# Sinergias del propio mazo (Faerie Control: Taliesin → Dama del Lago → Escudo
+# Tryamour → Dame Tryamour → Morgana, 17–19 Oros en cartas pagando 4). Una
+# carta vale también lo que arrastra gratis al entrar, según lo que hay hoy en
+# el Mazo y el Cementerio; y una entrada que hoy no trae nada se desperdicia
+# (Dame Tryamour sin Pixie ni Morgana en el Cementerio: mejor Mago Merlín).
+_VALOR_CADENA = True
+_PESO_CADENA = 1.5
+_CASTIGO_ENTRADA_VACIA = 2.0
+_NIVELES_CADENA = 4
+
+
+def _trae_gratis(h: dict) -> bool:
+    return (h.get("accion") == "jugarDesde" and h.get("cuando") in ("al_jugar", None)
+            and (h.get("modo") or "sin_pagar") == "sin_pagar" and not hab.es_permiso_jugar(h)
+            and (h.get("objetivo") or {}).get("quien", "propio") == "propio")
+
+
+def _valor_cadena(p, yo, c: Instancia, usadas: frozenset = frozenset(), nivel: int = 0) -> float:
+    """Oros en cartas que `c` pone en juego sin pagar al entrar, sumando lo que
+    esas cartas traen a su vez. Negativo si su entrada hoy no tiene qué traer."""
+    if not _VALOR_CADENA:
+        return 0.0
+    en_juego = {x.nombre for x in p.e.instancias_en_juego(yo)}
+    total = 0.0
+    for h in c.habilidades:
+        if not _trae_gratis(h):
+            continue
+        opciones = [
+            x for x in hab.candidatos_validos(p, yo, c, h)
+            if x is not c and x.uid not in usadas
+            and not (x.nombre in en_juego and any(e.get("accion") == "errante" for e in x.habilidades))
+        ]
+        if not opciones:
+            total -= _CASTIGO_ENTRADA_VACIA
+        elif nivel < _NIVELES_CADENA:
+            sigue = usadas | {c.uid}
+            total += max(x.carta.coste + _valor_cadena(p, yo, x, sigue | {x.uid}, nivel + 1) for x in opciones)
+    return total
+
+
 _RESPUESTAS = {"anular", "cancelarAtaque", "redirigir"}
 _DURACIONES_PERMANENTES = {"permanente", "mientras_en_juego"}
 
@@ -2265,6 +2305,18 @@ def _rebaja_disponible(p, yo) -> int:
     return mejor
 
 
+def _rebaja_total(p, yo) -> int:
+    """Fuerza que puedo quitar en total a los atacantes: cada Oro con esa
+    habilidad (Toro Apis) se usa una vez, sobre un solo Aliado."""
+    total = 0
+    for c in p.j(yo).reserva:
+        total += max((-int(h.get("valor", 0)) for h in c.habilidades
+                      if h.get("accion") == "modificarFuerza" and h.get("cuando") == "activada"
+                      and int(h.get("valor", 0)) < 0 and (h.get("objetivo") or {}).get("quien") == "oponente"
+                      and int((h.get("costo") or {}).get("oros", 0)) <= p.j(yo).oro_disponible), default=0)
+    return total
+
+
 def _decisivo(p, t: Instancia, cambio: int) -> bool:
     """¿Cambiarle `cambio` de fuerza a este combatiente da vuelta su pelea?"""
     for a in p.atacantes:
@@ -2783,7 +2835,9 @@ def _aliado_conviene(p, yo, inst: Instancia) -> bool:
         )
         sin_mesa = not p.j(yo).aliados and not otro and (p.j(1 - yo).aliados or len(p.j(yo).mazo) <= 15)
         para_ay = any(_es_salida(c) for c in p.j(yo).aliados + p.j(yo).mano if c is not inst)
-        if not (sin_mesa or para_ay):
+        # Duda de Héctor 79832239497_54: Conchobar (4, ataca al entrar) con la
+        # mesa rival vacía son 4 de daño seguro hoy; no se guarda por su habilidad.
+        if not (sin_mesa or para_ay or _pega_ya(p, yo, inst)):
             return False
     if not habs or inst.carta.fuerza >= inst.carta.coste:
         return True
@@ -2791,6 +2845,26 @@ def _aliado_conviene(p, yo, inst: Instancia) -> bool:
 
 
 _REMOCION = {"destruir", "desterrar", "subirMano", "mover", "ganarControl"}
+_PEGA_YA = True
+
+
+def _ataca_al_entrar(p, yo, inst: Instancia) -> bool:
+    """Puede atacar el turno en que entra (por sí mismo o por algo mío en juego)."""
+    return hab.tiene_prop(p, inst, "furia") or any(
+        h.get("cuando") == "al_jugar" and h.get("modo") == "puede_atacar_este_turno" and hab.condicion_ok(p, yo, h)
+        for h in inst.habilidades) or any(
+        h.get("cuando") == "continua" and h.get("modo") == "puede_atacar_este_turno"
+        for a in p.e.instancias_en_juego(yo) for h in a.habilidades)
+
+
+def _pega_ya(p, yo, inst: Instancia) -> bool:
+    """Entra en mi Vigilia, ataca este turno y el rival no tiene con qué
+    bloquearlo: su fuerza es daño seguro hoy, valga o no su habilidad."""
+    if not _PEGA_YA or p.e.activo != yo or p.e.fase != "vigilia" or inst.carta.fuerza <= 0:
+        return False
+    if any(not hab.tiene_estado(p, b, "no_puede_bloquear") for b in p.j(1 - yo).defensa):
+        return False
+    return _ataca_al_entrar(p, yo, inst)
 
 
 def _refuerzo_desde_cementerio(p, quien: int) -> int:
@@ -3123,6 +3197,19 @@ def _gana_al_morir(c: Instancia) -> bool:
     )
 
 
+_DANA_AL_MORIR = True
+
+
+def _dana_al_morir(c: Instancia) -> bool:
+    """Irgoll, Slaine, Tuthu: al salir del juego le quitan algo al rival
+    (destierran de su Mazo, botan, destruyen). Perderlos bloqueando rinde."""
+    return _DANA_AL_MORIR and any(
+        h.get("cuando") == "al_salir_del_juego" and h.get("accion") in _DANINO
+        and (h.get("objetivo") or {}).get("quien") == "oponente"
+        for h in c.habilidades
+    )
+
+
 def _oro_defiende(c: Instancia) -> bool:
     """Oro que me defiende de un ataque: Codex Arturicus (daño a 0),
     Jeroglíficos (sube un atacante a la mano), Toro Apis (−1 a un atacante)."""
@@ -3185,12 +3272,16 @@ def _letal_conjunto(p, yo, candidatos, libres, rebaja, su_castillo) -> list:
     atacan = [c for c in candidatos if hab.fuerza(p, c) > 0]
     if not atacan:
         return []
-    bloqueables = [c for c in atacan if not hab.tiene_prop(p, c, "imbloqueable")]
+    # Auditoría 2026-11-15: bloqueable solo si alguno de sus bloqueadores libres
+    # puede bloquearlo (a Melisende no la bloquean Aliados de fuerza 3 o más).
+    bloqueables = [c for c in atacan if any(p.puede_bloquear(c, b) for b in libres)]
     seguros = [c for c in atacan if c not in bloqueables]
     # El rival bloquea a los más fuertes que pueda; pasan los demás.
-    resto = sorted(max(0, hab.fuerza(p, c) - rebaja) for c in bloqueables)
-    pasan = resto[:max(0, len(resto) - len(libres))]
-    dano = sum(pasan) + sum(max(0, hab.fuerza(p, c) - rebaja) for c in seguros)
+    resto = sorted(hab.fuerza(p, c) for c in bloqueables)
+    pasan = resto[:max(0, len(resto) - len(libres))] + [hab.fuerza(p, c) for c in seguros]
+    # Auditoría 2026-11-15: cada Toro Apis le baja la fuerza a UN atacante, no
+    # a todos (dos Werin de 3 contra castillo 5 y un Toro: 3 + 2 = letal).
+    dano = sum(pasan) - min(sum(pasan), _rebaja_total(p, 1 - yo) if rebaja else 0)
     dano += sum(_bota_seguro_al_atacar(p, c) for c in atacan)
     return atacan if dano >= su_castillo else []
 
@@ -3449,13 +3540,18 @@ def _sacrificio_de_aliados_conviene(p, yo, fuente: Instancia, h: dict) -> bool:
         return False
     if h.get("accion") == "robar" and not _necesito_robar(p, yo, fuente):
         return False  # #1 0VzQ: con jugadas en la mano, desterrar un Aliado (que sigue pegando) sobra
+    ganancia = 2.5 * int(h.get("cantidad", 1)) + 1 if h.get("accion") == "robar" else 4.0
+    if h.get("accion") in ("destruir", "desterrar") and (h.get("objetivo") or {}).get("quien") == "oponente":
+        # Desafío CfHJ T12: Morgana no destruía a Dama del Lago (ya usada)
+        # para desterrar a Beleth: la ganancia es lo que se remueve, no 4 fijo.
+        rivales = [x for x in hab.candidatos_validos(p, yo, fuente, h) if x.controlador != yo]
+        ganancia = max((_valor_carta(p, x) for x in rivales), default=0.0)
     for a in sorted(otros, key=lambda x: _valor_carta(p, x))[:n]:
         if _pieza_clave(a):
             return False  # Neferite (aunque Resplandor la dejara sin habilidad) no se paga por robar
         if any((x.get("duracion") == "mientras_en_juego" or x.get("cuando") == "continua")
                and x.get("accion") not in hab.PROPIEDADES for x in a.habilidades):
             return False
-        ganancia = 2.5 * int(h.get("cantidad", 1)) + 1 if h.get("accion") == "robar" else 4.0
         if _valor_carta(p, a) > ganancia:
             return False
     return True
@@ -4614,11 +4710,14 @@ class Heuristico:
                 amenaza = -1
         else:
             amenaza = bote
+        # Auditoría 2026-11-15: con 1 carta de castillo el robo de la Fase Final
+        # me hace perder igual. Si el ataque gana, se ataca aunque puedan cancelarlo.
+        sin_salida = mi_castillo <= 1
         if amenaza >= mi_castillo - 1:
             riesgo = _prob_cancelador_con_bote(p, yo)
             if riesgo >= _UMBRAL_CANCELADOR:
                 candidatos = []
-                if riesgo >= _UMBRAL_CANCELADOR_LETAL:
+                if riesgo >= _UMBRAL_CANCELADOR_LETAL and not sin_salida:
                     letales = []
         agresivo = su_castillo <= 12 or su_castillo < mi_castillo - 8
         if su_castillo > 12:
@@ -4640,7 +4739,7 @@ class Heuristico:
             # Héctor 2026-11-12: si las Flechas no me matan y tengo letal, ataco
             # igual (si las usa, los atacantes vuelven a defensa). Atacar sin
             # letal solo para quemarla rindió −0,6 pts (botar duele).
-            if _FLECHAS_QUEMAR and amenaza < mi_castillo - 1:
+            if (_FLECHAS_QUEMAR and amenaza < mi_castillo - 1) or sin_salida:
                 letal = _letal_conjunto(p, yo, letales, libres, rebaja, su_castillo)
                 if letal:
                     return letal
@@ -4826,7 +4925,9 @@ class Heuristico:
             # Héctor 2026-11-12: con Lady en el Cementerio, Draig Ifanc se guarda
             # para destruirlo con ella (vuelve Lady a la mano), no para bloquear.
             lady_cem = any(any(_rescate_lady(x) for x in c.habilidades) for c in p.j(yo).cementerio)
-            ganan = [b for b in libres if _gana_al_morir(b) and not arriesga(b)
+            # Duda de Héctor 4000013_59: Irgoll bloquea a Pixie; al morir destierra
+            # una carta del Mazo rival. Perderlo así también es ganancia.
+            ganan = [b for b in libres if (_gana_al_morir(b) or _dana_al_morir(b)) and not arriesga(b)
                      and not (lady_cem and "Dragón" in (b.raza or ""))]
             if not mata and ganan and _castigo_si_lo_bloquean(p, atk) == 0:
                 b = ganan[0]
@@ -4860,6 +4961,9 @@ class Heuristico:
 
     def elegir_objetivos(self, p, yo, candidatos, n, h):
         accion = h.get("accion")
+        if accion == "elegir" and any(e.get("cantidadSegun") == "coste_afectada" for e in h.get("luego") or []):
+            # 1bXc: Ayu del Veneno hace botar el coste del Tótem elegido: el más caro.
+            return sorted(candidatos, key=lambda c: -c.carta.coste)[:n]
         fuente_contexto = getattr(p, "ctx_fuente_habilidad", None)
         marca = getattr(p, "_carnwennan_objetivo", None)
         if accion == "perderHabilidad" and marca and marca[0] == p.e.turno and h.get("duracion") == "hasta_fase_final":
@@ -5138,7 +5242,8 @@ class Heuristico:
             # #19: Jentakus no busca siempre a Ramsés: lo que arma combo con la
             # mesa (Ay si tengo Amyrteos; Amyrteos si tengo Ay) y nada que el
             # rival anule a la vista.
-            return sorted(candidatos, key=lambda c: -_valor_para_el_plan(p, yo, c))[:n]
+            return sorted(candidatos, key=lambda c: -(_valor_para_el_plan(p, yo, c)
+                                                      + _PESO_CADENA * _valor_cadena(p, yo, c)))[:n]
         if accion == "jugarDesde" and candidatos and all(c.tipo == Tipo.ARMA for c in candidatos):
             corto = len(p.j(yo).mazo) <= 12
 
@@ -5167,6 +5272,7 @@ class Heuristico:
                     h.get("cuando") == "continua" and h.get("modo") == "puede_atacar_este_turno"
                     for a in p.e.instancias_en_juego(yo) for h in a.habilidades)
                 return 1.5 * c.carta.fuerza if furia else 0.0
+            # `_puntaje` ya suma la cadena que arrastra cada candidata (`_valor_cadena`).
             return sorted(candidatos, key=lambda c: -(self._puntaje(p, yo, Jugada("jugar", c)) + ataca_ya(c)))[:n]
         if accion == "restringirCombate" and h.get("modo") in ("no_puede_atacar", "no_puede_bloquear"):
             def amenaza(c):
@@ -7087,6 +7193,85 @@ def _elegir_objetivos_7(self, p, yo, candidatos, n, h):
 
 
 Heuristico.elegir_objetivos = _elegir_objetivos_7
+
+
+# ── Reportes de simulaciones 14/16-11: a quién apunta cada efecto ────────────
+_CRITERIOS_1116 = True
+_elegir_objetivos_previo_1116 = Heuristico.elegir_objetivos
+
+
+def _dano_al_castillo(p, atk: Instancia) -> int:
+    """Lo que ese atacante le hace a mi castillo si nadie cambia nada."""
+    if atk not in p.atacantes:
+        return 0
+    f = max(0, hab.fuerza(p, atk))
+    b = p.bloqueos.get(atk.uid)
+    return f if b is None or not b.en_juego else max(0, f - max(0, hab.fuerza(p, b)))
+
+
+def _impacto_para_el_rival(p, c: Instancia) -> float:
+    """Cuánto le sirve al rival una carta de su Mazo: además de su tamaño,
+    las que dan cartas (Espada Larga roba 2) y las que lo defienden o sacan
+    lo mío valen más que un cuerpo chico."""
+    v = _valor_carta(p, c)
+    for h in c.habilidades:
+        accion = h.get("accion")
+        if accion in ("robar", "buscar") and h.get("cuando") in ("al_jugar", "activada", "al_inicio_fase", None):
+            v += 1.5 * max(1, int(h.get("cantidad") or 1))
+        elif accion in _REMOCION or accion in ("anular", "cancelarAtaque", "reducirDano", "perderHabilidad"):
+            v += 2.0
+    if c.tipo == Tipo.ORO and _oro_defiende(c):
+        v += 2.0
+    return v
+
+
+def _elegir_objetivos_1116(self, p, yo, candidatos, n, h):
+    h = h or {}
+    accion = h.get("accion")
+    if _CRITERIOS_1116 and candidatos:
+        if accion == "reducirDano" and h.get("modo") == "aliado_sin_dano" and p.atacantes:
+            # Sim. eTOU T17: Salmón del Saber iba a un Bodb Derg que no atacaba
+            # y el Caturix que sí pegaba hizo 3 igual. Al que más daño me hace.
+            return sorted(candidatos, key=lambda c: -_dano_al_castillo(p, c))[:n]
+        obj = h.get("objetivo") or {}
+        del_mazo_rival = obj.get("quien") == "oponente" and all(
+            c.dueno != yo and c.zona == Zona.MAZO for c in candidatos)
+        if del_mazo_rival and accion in ("mirarTope", "desterrar"):
+            copias = any((e.get("objetivo") or {}).get("referencia") == "copias" for e in h.get("luego") or [])
+
+            def valor(c):
+                v = _impacto_para_el_rival(p, c)
+                if copias:
+                    # Sim. eTOU T8: Magia Amatista desterró a Nuada y no al Bodb
+                    # Derg del Mazo, que además destruía el que tenía en juego.
+                    vivos = [a for a in p.j(1 - yo).aliados if a.nombre == c.nombre]
+                    if vivos:
+                        v += 10 + max(_valor_vivo(p, a) for a in vivos)
+                return v
+
+            # Sim. yI09 T9: Oillipheist desterraba a Sir Dinadan y dejaba la
+            # Espada Larga (roba 2).
+            return sorted(candidatos, key=lambda c: -valor(c))[:n]
+    return _elegir_objetivos_previo_1116(self, p, yo, candidatos, n, h)
+
+
+Heuristico.elegir_objetivos = _elegir_objetivos_1116
+
+
+# ── Sinergias: jugar una carta vale también por la cadena que arrastra ───────
+_puntaje_previo_cadena = Heuristico._puntaje
+
+
+def _puntaje_con_cadena(self, p, yo, j):
+    """Taliesin vale la cadena entera (Dama del Lago → Escudo → Dame Tryamour →
+    Morgana); Dame Tryamour sin nada que revivir espera a que haya."""
+    v = _puntaje_previo_cadena(self, p, yo, j)
+    if _VALOR_CADENA and j.tipo == "jugar" and j.carta is not None:
+        v += _PESO_CADENA * _valor_cadena(p, yo, j.carta)
+    return v
+
+
+Heuristico._puntaje = _puntaje_con_cadena
 
 
 _elegir_atacantes_previo_7 = Heuristico.elegir_atacantes

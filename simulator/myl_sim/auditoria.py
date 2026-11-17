@@ -61,7 +61,8 @@ DESCRIPCIONES = {
     "partida_sin_fin": "La partida llegó al límite de turnos",
     # jugada
     "no_ataca_letal": "No atacó teniendo daño letal y el rival sin bloqueadores",
-    "no_ataca_letal_con_respuesta": "No atacó con letal: el rival tenía un cancelador revelado y pagable",
+    "no_ataca_letal_con_respuesta": "No atacó con letal: el rival tenía en la mano un cancelador que podía pagar",
+    "no_ataca_letal_por_riesgo": "No atacó con letal por riesgo de cancelador (el rival no lo tenía)",
     "no_bloquea_letal": "Perdió por daño de combate teniendo bloqueadores libres",
     "posible_autodano": "Perdió el castillo en su propio turno por un efecto (no combate ni robo)",
     "no_juega_oro": "Terminó la Vigilia sin jugar Oro teniendo uno jugable",
@@ -79,7 +80,8 @@ GRAVEDAD_PATRON = {
     "oro_virtual_negativo": "alta", "mano_excedida": "alta",
     "jugada_no_ofrecida": "alta", "excepcion_motor": "alta", "partida_sin_fin": "alta",
     "no_ataca_letal": "alta", "no_bloquea_letal": "alta",
-    "posible_autodano": "media", "no_ataca_letal_con_respuesta": "baja", "no_juega_oro": "media", "oro_temporal_sin_uso": "media",
+    "posible_autodano": "media", "no_ataca_letal_con_respuesta": "baja",
+    "no_ataca_letal_por_riesgo": "media", "no_juega_oro": "media", "oro_temporal_sin_uso": "media",
     "ataque_perdido": "media", "bloqueo_perdido": "baja", "objetivo_menor": "baja",
     "guarda_jugables": "baja", "no_ataca_mesa_vacia": "baja",
 }
@@ -217,11 +219,19 @@ class Observado:
         elegido = sum(max(0, hab.fuerza(p, c)) for c in (elegidos or []))
         castillo = len(rival.mazo)
         if not puede_bloquear and total >= castillo and elegido < castillo:
-            from .jugadores import _cancelador_revelado
+            from .jugadores import _UMBRAL_CANCELADOR_LETAL, _defensivo, _prob_cancelador_con_bote
 
-            # Con un cancelador a la vista (Flechas de Lava) no atacar es
-            # razonable: queda como dato, no como error grave.
-            patron = "no_ataca_letal_con_respuesta" if _cancelador_revelado(p, 1 - yo) else "no_ataca_letal"
+            # Si el rival tenía en la mano un cancelador que podía pagar
+            # (Flechas de Lava), no atacar fue correcto: queda como dato. Si no
+            # lo tenía pero por lo visto era probable, es una decisión con
+            # riesgo, no un error grave. Con 1 carta de castillo no atacar
+            # pierde igual: ahí siempre es error.
+            patron = "no_ataca_letal"
+            if len(p.j(yo).mazo) > 1:
+                if any(_defensivo(c) and p.coste_de(1 - yo, c) <= rival.oro_disponible for c in rival.mano):
+                    patron = "no_ataca_letal_con_respuesta"
+                elif _prob_cancelador_con_bote(p, yo) >= _UMBRAL_CANCELADOR_LETAL:
+                    patron = "no_ataca_letal_por_riesgo"
             self._p.registrar(
                 patron, yo, max(candidatos, key=lambda c: hab.fuerza(p, c)).nombre,
                 f"fuerza disponible {total} ≥ castillo rival {castillo}; atacó con {elegido}")

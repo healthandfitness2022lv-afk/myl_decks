@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from .modelo import Carta, Tipo, normalizar_tipo
@@ -95,6 +96,31 @@ def _corregir(nombre: str, habs: list[dict]) -> list[dict]:
         return [{**h, "modo": "barajar_mazo", "objetivo": {**(h.get("objetivo") or {}), "quien": "propio",
                                                            "tipos": []}}
                 if h.get("accion") == "prevenir" else h for h in habs]
+    if n == "piedra roseta":
+        # Duda 1GfZ (Héctor): "En tu Fase de Vigilia... si tienes dos o más
+        # Aliados Sacerdote": no exige que el Oro esté en la Reserva ni pagarlo;
+        # también se activa ya pagado.
+        return [{**h, "zonaActivacion": "reserva_o_pagado"}
+                if h.get("cuando") == "activada" and not h.get("zonaActivacion") else h for h in habs]
+    if n == "escudo celestial":
+        # Desafío 15cB: "barajar tantas cartas como daño haya hecho": era 1 fija.
+        return [{**h, "cantidadSegun": "dano_hecho"}
+                if h.get("accion") == "barajar" and h.get("cuando") == "al_hacer_dano" else h for h in habs]
+    if n == "apophis":
+        # "Cada vez que tu oponente juegue una carta que no sea un Oro": los
+        # Oros también le hacían botar 3.
+        return [{**h, "disparoTipos": ["Aliado", "Talismán", "Arma", "Tótem"]}
+                if h.get("cuando") == "oponente_juega" and not h.get("disparoTipos") else h for h in habs]
+    if n == "ayu del veneno":
+        # Desafío 1bXc T13: "puedes elegir un Tótem en juego para que tu oponente
+        # bote tantas como su coste". Estaba como "+0 de fuerza al Tótem", y la
+        # fuerza solo va a Aliados: nunca hacía botar.
+        return [{**h, "accion": "elegir", "opcional": True}
+                if h.get("cuando") == "al_jugar" and h.get("accion") == "modificarFuerza" else h for h in habs]
+    if n == "ayu":
+        # Desafío 1bXc T14: "Una vez por turno, tu oponente bota…" no dice fase:
+        # también se activa en la Guerra de Talismanes del turno rival.
+        return [{**h, "fase": "cualquiera"} if h.get("cuando") == "activada" else h for h in habs]
     if n == "soteira":
         # "prevenir que sea destruido por daño de combate" (no por Talismanes).
         return [{**h, "modo": "combate"} if h.get("accion") == "prevenir" else h for h in habs]
@@ -181,11 +207,40 @@ PROGRAMADAS_AQUI = {"wep renpet", "antorcha olimpica", "mochuelo", "glas gaibhen
 CORRECCIONES_APAGADAS: set[str] = set()  # nombres normalizados (mediciones)
 
 
+# Fuerza impresa distinta de la cargada en el catálogo (desafío gXXd: Sir Erec es 2).
+FUERZA_CORREGIDA = {"sir erec": 2}
+# Coste impreso distinto del catálogo (desafío 1bXc T15: Saqqara es 2).
+COSTE_CORREGIDO = {"saqqara": 2}
+
+# Costos con los que un Oro se saca a sí mismo: también se pagan si ya está pagado.
+_SE_SACA = ("desterrarEstaCarta", "destruirEstaCarta", "subirEstaCarta", "barajarEstaCarta")
+
+
+def _oro_activable_pagado(texto: str, habs: list[dict]) -> list[dict]:
+    """Desafío BwBe (Clochafarmore) y duda 1GfZ (Piedra Roseta): un Oro que se
+    activa desterrándose, destruyéndose o subiéndose a la mano también se usa
+    ya pagado, salvo que su texto pida estar en la Reserva («de tu Reserva»:
+    Joya Amatista, Rito de Atón) o que el costo sea pagarlo a él mismo."""
+    if re.search(r"reserva", texto, re.IGNORECASE):
+        return habs
+    out = []
+    for h in habs:
+        costo = h.get("costo") or {}
+        if h.get("cuando") == "activada" and h.get("zonaActivacion") in (None, "reserva_oro", "en_juego") \
+                and not costo.get("pagarEstaCarta") and h.get("accion") != "convertirEnAliado" \
+                and any(costo.get(k) for k in _SE_SACA):
+            h = {**h, "zonaActivacion": "reserva_o_pagado"}
+        out.append(h)
+    return out
+
+
 def carta_desde_doc(cid: str, d: dict) -> Carta:
     habs = tuple(h for h in (d.get("habilidades") or []) if isinstance(h, dict))
     if CORRECCIONES_ACTIVAS:
         habs = tuple(_corregir(str(d.get("nombre", cid)), [dict(h) for h in habs]))
     tipo = normalizar_tipo(str(d.get("tipo", "")))
+    if CORRECCIONES_ACTIVAS and tipo == Tipo.ORO:
+        habs = tuple(_oro_activable_pagado(str(d.get("habilidadTextoIA") or d.get("habilidad") or ""), list(habs)))
 
     def entero(v, defecto=0):
         try:
@@ -197,8 +252,11 @@ def carta_desde_doc(cid: str, d: dict) -> Carta:
         id=cid,
         nombre=str(d.get("nombre", cid)),
         tipo=tipo,
-        coste=0 if tipo == Tipo.ORO else entero(d.get("coste")),
-        fuerza=entero(d.get("fuerza")) if tipo == Tipo.ALIADO else 0,
+        coste=0 if tipo == Tipo.ORO else (
+            COSTE_CORREGIDO.get(_norm(str(d.get("nombre", cid))), entero(d.get("coste")))
+            if CORRECCIONES_ACTIVAS else entero(d.get("coste"))),
+        fuerza=(FUERZA_CORREGIDA.get(_norm(str(d.get("nombre", cid))), entero(d.get("fuerza")))
+                if CORRECCIONES_ACTIVAS else entero(d.get("fuerza"))) if tipo == Tipo.ALIADO else 0,
         raza=str(d.get("raza") or ""),
         # El texto leído de la imagen por la IA (campo aparte de las notas)
         # primero: muchas cartas tienen solo "." en el campo oficial.

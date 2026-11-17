@@ -22,7 +22,7 @@ from .busqueda_bloqueos import PoliticaConBusqueda
 from .datos import CACHE
 from .jugadores import Heuristico
 from .politica_meta import jugador_para
-from .modelo import Instancia
+from .modelo import Instancia, Zona
 from .motor import Jugada, Partida
 from .simulacion import _sin_ids_reservados, _solo_cambios
 
@@ -37,13 +37,36 @@ def reintentar_red(operacion):
 
 
 def _carta(inst: Instancia, partida: Partida) -> dict[str, Any]:
-    return {
+    out = {
         "id": str(inst.uid),
         "cartaId": inst.carta.id,
         "nombre": inst.nombre,
         "tipo": inst.tipo.value,
         "fuerza": hab.fuerza(partida, inst) if inst.en_juego and inst.tipo.value == "Aliado" else None,
     }
+    if inst.en_juego:
+        out.update(_estado_habilidad(inst, partida))
+    return out
+
+
+def _estado_habilidad(inst: Instancia, partida: Partida) -> dict[str, Any]:
+    """Lo que la mesa debe avisar de una carta en juego: que perdió su
+    habilidad (y por quién: Cleopatra VII sobre los Titanes) o que ya usó su
+    habilidad de «una vez por turno» (Damarchus)."""
+    out: dict[str, Any] = {}
+    if inst.carta.habilidades and not inst.habilidades:
+        out["sinHabilidad"] = True
+        fuente = next((x for x in partida.e.instancias_en_juego(0) + partida.e.instancias_en_juego(1)
+                       if x.uid == inst.sin_habilidad_fuente), None) if inst.sin_habilidad_fuente else None
+        if fuente is not None:
+            out["sinHabilidadPor"] = fuente.nombre
+        return out
+    for k, h in enumerate(inst.habilidades):
+        limite = int(h.get("limitePorTurno") or 0)
+        if h.get("cuando") == "activada" and limite and hab.usos(partida, inst.controlador, inst, h, k) >= limite:
+            out["usadaEsteTurno"] = True
+            break
+    return out
 
 
 def _carta_mesa(inst: Instancia, partida: Partida) -> dict[str, Any]:
@@ -117,11 +140,16 @@ def vista_desafio(partida: Partida, humano: int) -> dict[str, Any]:
             "cementerioCartas": [_carta(x, partida) for x in jugador.cementerio],
             "destierroCartas": [_carta(x, partida) for x in jugador.destierro],
         })
+    # Quién bloquea a quién en el combate en curso (uid del atacante → uid del
+    # bloqueador): la mesa los une con una flecha.
+    bloqueos = {str(a): str(b.uid) for a, b in partida.bloqueos.items()
+                if b.en_juego and any(x.uid == a for x in partida.atacantes)} if partida.atacantes else {}
     return {
         "turno": partida.e.turno,
         "fase": partida.e.fase,
         "activo": partida.e.activo,
         "lados": lados,
+        **({"bloqueos": bloqueos} if bloqueos else {}),
         "log": [texto_publico(x, humano) for x in (partida.e.log or [])[-30:]],
     }
 
@@ -163,7 +191,10 @@ class HumanoRemoto:
         opciones = [
             {
                 "id": str(k),
-                "titulo": str(x),
+                # Desafío 5VXY T4: Gaspar y Pixie mostraban dos «activar»
+                # iguales; ahora dicen qué hace cada una.
+                "titulo": f"{x} · {describir_habilidad(x.carta.habilidades[x.habilidad])}"
+                if x.tipo == "activar" else str(x),
                 "tipoJugada": x.tipo,
                 "carta": x.carta.nombre if x.carta else None,
                 "cartaUid": str(x.carta.uid) if x.carta else None,
@@ -199,14 +230,32 @@ class HumanoRemoto:
                     motivo = "No se cumple la condición de la habilidad."
             elif not hab.puede_pagar_costo(p, yo, inst, h):
                 costo = h.get("costo") or {}
-                if costo.get("barajarMano"):
+                impide = _quien_impide_desterrar(p, yo, inst) if costo.get("desterrarEstaCarta") else None
+                if impide is not None:
+                    # Desafío gXXd: «¿por qué no puedo activar la Llama de Brigit?»: tu Carmix.
+                    motivo = (f"No se puede desterrar: {impide.nombre}"
+                              f"{' (tuyo)' if impide.controlador == yo else ' (del rival)'} dice que los Oros"
+                              " en juego no pueden ser desterrados.")
+                elif costo.get("barajarMano"):
                     motivo = f"Necesitas {costo['barajarMano']} carta(s) en la mano para barajar como coste."
                 else:
                     motivo = "No puedes pagar el coste de esta habilidad."
             elif hab._necesita_objetivo(h) and not hab.candidatos_validos(p, yo, inst, h):
                 costo = h.get("costo") or {}
-                motivo = ("No hay objetivo legal o faltan cartas en tu Cementerio para pagar su coste."
-                          if costo.get("desterrarCementerioSegun") else "No hay un objetivo legal para esta habilidad.")
+                impide = _quien_impide_desterrar_cementerio(p, yo) if (
+                    h.get("accion") == "desterrar"
+                    and "cementerio" in hab.zonas_de(h.get("objetivo") or {})) else None
+                if impide is not None:
+                    # Desafío fu7V: «no siempre tengo disponible Anillos de Badbury»:
+                    # el Cinturón De Lady Ann del rival estaba en su Reserva.
+                    en_reserva = any(x.get("zonaActivacion") == "reserva_oro" for x in impide.habilidades
+                                     if x.get("modo") == "desterrar_cementerio")
+                    motivo = (f"No se puede desterrar del Cementerio: {impide.nombre}"
+                              f"{' (tuyo)' if impide.controlador == yo else ' (del rival)'} lo impide"
+                              f"{' mientras esté en la Reserva' if en_reserva else ''}.")
+                else:
+                    motivo = ("No hay objetivo legal o faltan cartas en tu Cementerio para pagar su coste."
+                              if costo.get("desterrarCementerioSegun") else "No hay un objetivo legal para esta habilidad.")
             else:
                 motivo = "Esta habilidad no tiene una activación legal ahora."
             motivos[str(inst.uid)] = motivo
@@ -220,8 +269,11 @@ class HumanoRemoto:
                 motivos[str(inst.uid)] = (f"No se puede jugar: {quien.nombre}"
                                           f"{' (tuyo)' if quien.controlador == yo else ' (del rival)'} lo impide."
                                           if quien else "Una carta en juego impide jugarla ahora.")
-        if all(x.tipo == "pasar" for x in jugadas) and not motivos:
-            # Reporte w8nI: sin nada que jugar, activar ni explicar, la fase pasa sola.
+        propia_vigilia = p.e.fase == "vigilia" and p.e.activo == yo
+        if all(x.tipo == "pasar" for x in jugadas) and (not motivos or not propia_vigilia):
+            # Reporte w8nI: sin nada que jugar, activar ni explicar, la fase pasa
+            # sola. Desafío gXXd: fuera de tu Vigilia (Guerra de Talismanes) pasa
+            # sola aunque haya cartas que expliquen por qué no se usan.
             return jugadas[0]
         elegido = int(self._respuesta_con_pago("jugada", opciones, {
             "titulo": "Elige tu jugada",
@@ -254,14 +306,19 @@ class HumanoRemoto:
         return [x for x in candidatos if x.uid in ids]
 
     def elegir_bloqueos(self, p, yo, atacantes, bloqueadores):
-        opciones = [{"atacante": _carta(a, p), "bloqueadores": [_carta(b, p) for b in bloqueadores]} for a in atacantes]
+        # Desafío 1bXc T14: cada atacante con sus bloqueadores posibles
+        # (Melisende no puede ser bloqueada por fuerza 3 o más); antes se
+        # ofrecían todos a todos.
+        opciones = [{"atacante": _carta(a, p), "bloqueadores": [_carta(b, p) for b in bloqueadores
+                                                              if p.puede_bloquear(a, b)]} for a in atacantes]
         elegidos = self._pedir("bloqueos", opciones, {"titulo": "Declara tus bloqueos"}) or {}
         por_uid = {x.uid: x for x in bloqueadores}
         usados: set[int] = set()
         out = {}
         for atacante in atacantes:
             uid = elegidos.get(str(atacante.uid))
-            if uid is not None and int(uid) in por_uid and int(uid) not in usados:
+            if uid is not None and int(uid) in por_uid and int(uid) not in usados \
+                    and p.puede_bloquear(atacante, por_uid[int(uid)]):
                 out[atacante.uid] = por_uid[int(uid)]
                 usados.add(int(uid))
         return out
@@ -303,6 +360,19 @@ class HumanoRemoto:
                  for k, (x, _) in enumerate(opciones)]
         r = self._respuesta_con_pago("anular", datos, {
             "titulo": f"¿Anular {carta.nombre}?",
+            "oros": [_carta(x, p) for x in p.j(yo).reserva],
+        })
+        return int(r) if r not in (None, "", "pasar") else None
+
+    def cancelar_habilidad(self, p, yo, fuente, h, opciones):
+        """Desafiar a Arturo / Siete contra Tebas en respuesta a una habilidad
+        del rival que se activa o dispara (desafío 5VXY: Mut, la prevención de
+        Ra). Antes no había esta ventana para la persona."""
+        datos = [{"id": str(k), "titulo": x.nombre, "cartaUid": str(x.uid),
+                  "cantidadPago": self._coste_pendiente(p, yo, x) if x.zona == Zona.MANO else 0}
+                 for k, (x, _) in enumerate(opciones)]
+        r = self._respuesta_con_pago("responder", datos, {
+            "titulo": f"¿Cancelar la habilidad de {fuente.nombre}? ({describir_habilidad(h)})",
             "oros": [_carta(x, p) for x in p.j(yo).reserva],
         })
         return int(r) if r not in (None, "", "pasar") else None
@@ -511,6 +581,68 @@ def _modo_de(modos: list[dict], ids: list[str]) -> int | None:
     return None
 
 
+_ACCIONES_TEXTO = {
+    "robar": "roba", "barajar": "baraja", "buscar": "busca", "destruir": "destruye", "desterrar": "destierra",
+    "botar": "hace botar", "subirMano": "sube a la mano", "perderHabilidad": "quita la habilidad",
+    "mirarTope": "mira el tope", "jugarDesde": "juega", "ponerEnJuego": "pone en juego", "generarOro": "genera Oro",
+    "convertirEnAliado": "se vuelve Aliado", "cancelarAtaque": "cancela el ataque", "reducirDano": "reduce el daño",
+    "mover": "mueve", "ganarControl": "toma el control", "descartar": "descarta", "prevenir": "previene",
+}
+
+
+def describir_habilidad(h: dict) -> str:
+    """Qué hace una habilidad, en pocas palabras: «baraja 2 Aliado Dragón del
+    Cementerio», «roba 3», «+2 de fuerza»."""
+    accion = h.get("accion", "")
+    obj = h.get("objetivo") or {}
+    if accion == "modificarFuerza":
+        v = int(h.get("valor") or 0)
+        return f"{'+' if v >= 0 else ''}{v} de fuerza"
+    if accion == "generarOro":
+        return f"genera {int(h.get('valor') or 1)} Oro"
+    partes = [_ACCIONES_TEXTO.get(accion, h.get("featureName") or accion)]
+    n = int(h.get("cantidad") or 1)
+    if accion in ("robar", "barajar", "botar", "buscar", "destruir", "desterrar", "descartar", "mirarTope") and (
+            n > 1 or accion in ("robar", "botar")):
+        partes.append(str(n))
+    tipos = [t for t in obj.get("tipos") or [] if t]
+    if tipos and accion not in ("robar", "botar"):
+        partes.append("/".join(tipos))
+    if obj.get("raza") and accion not in ("robar", "botar"):
+        partes.append(str(obj["raza"]))
+    zonas = hab.zonas_de(obj, "")
+    if "cementerio" in zonas:
+        partes.append("del Cementerio")
+    elif "mazo" in zonas and accion not in ("robar", "botar"):
+        partes.append("del Mazo")
+    if obj.get("quien") == "oponente" and accion not in ("botar",):
+        partes.append("rival")
+    destino = {"mazo_fondo": "al fondo del Mazo", "mazo_tope": "arriba del Mazo", "mano": "a la mano"}.get(
+        h.get("zonaDestino") or "")
+    if destino and accion in ("mover", "buscar", "subirMano"):
+        partes.append(destino)
+    return " ".join(partes)
+
+
+def _quien_impide_desterrar(p, yo: int, inst: Instancia) -> Instancia | None:
+    """La carta en juego que prohíbe desterrar este Oro (Carmix)."""
+    if inst.tipo.value != "Oro" or not hab.prohibido(p, "desterrar", yo, inst):
+        return None
+    return next((s for s in p.e.instancias_en_juego(0) + p.e.instancias_en_juego(1) for h in s.habilidades
+                 if h.get("accion") == "restriccion" and h.get("modo") == "desterrar"), None)
+
+
+def _quien_impide_desterrar_cementerio(p, yo: int) -> Instancia | None:
+    """La carta en juego que prohíbe desterrar de los Cementerios (Cinturón De
+    Lady Ann en la Reserva)."""
+    if not hab.prohibido(p, "desterrar_cementerio", yo):
+        return None
+    return next((s for s in p.e.instancias_en_juego(0) + p.e.instancias_en_juego(1) for h in s.habilidades
+                 if h.get("accion") == "restriccion" and h.get("modo") == "desterrar_cementerio"
+                 and hab._en_zona_activacion(s, h) and not (h.get("objetivo") or {}).get("cementerioPropio")),
+                None)
+
+
 def respuesta_valida(tipo: str, opciones: list[dict], config: dict, valor: Any) -> bool:
     """Rechaza entradas viejas o inválidas antes de reanudar el motor."""
     ids = {str(o["id"]) for o in opciones if "id" in o}
@@ -666,6 +798,10 @@ class _AnotarEnVivo:
         return None if copia is None else types.MethodType(type(copia).anotar, copia)
 
 
+SEGUNDOS_NIVEL5 = 5.0   # tope por búsqueda del nivel 5 en el Desafío
+MUESTRAS_NIVEL5 = 28    # 4 de criba + hasta 24 de confirmación
+
+
 class SesionDesafio:
     """Ejecuta una sesión y bloquea solo su hilo mientras espera a la app."""
 
@@ -687,7 +823,11 @@ class SesionDesafio:
             # los ataques, los objetivos, los Oros y la Guerra de Talismanes.
             from .busqueda_vigilia import BuscadorVigilia
 
-            self.politica_ia = BuscadorVigilia(seed * 2 + 1)
+            # En vivo piensa hasta `SEGUNDOS_NIVEL5` por búsqueda y confirma con
+            # más muestras que en las simulaciones (donde no hay tope, para que
+            # el resultado se repita).
+            self.politica_ia = BuscadorVigilia(seed * 2 + 1, max_segundos=SEGUNDOS_NIVEL5,
+                                               max_muestras=MUESTRAS_NIVEL5)
         elif buscar_bloqueos:
             self.politica_ia = PoliticaConBusqueda(self.politica_ia, seed * 2 + 1)
         if NIVELES[self.nivel][1]:

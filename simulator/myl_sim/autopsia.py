@@ -173,7 +173,7 @@ class Reproductor:
             p.cursor += 1
             if k == self.rama:
                 p.cursor_rama = p.cursor
-                p.al_ramificar()
+                p.al_ramificar(args)
                 return self.opcion(p, nombre, args)
             try:
                 return _decodificar(p, entrada["v"], args)
@@ -188,9 +188,50 @@ class Reproductor:
 ULTIMA_PARTIDA: list = [None]  # la última reproducida (turno final, castillos)
 
 
+def remuestrear_ocultas(p: Partida, quien: int, rng: random.Random, usadas: tuple = ()) -> None:
+    """Reparte de nuevo lo que `1 - quien` no puede ver de `quien`: su mano
+    oculta y su Mazo se juntan, se barajan y se vuelven a repartir (mismos
+    tamaños; las cartas reveladas se quedan en la mano). Si la decisión en
+    curso ya nombra una carta de esa mano (`usadas`), la mano no se toca."""
+    from .modelo import Zona
+
+    r = p.j(quien)
+    ocultas = [x for x in r.mano if not getattr(x, "revelada", False)]
+    en_uso = {id(x) for x in _instancias_en(usadas)}
+    if not ocultas or any(id(x) in en_uso for x in r.mano):
+        rng.shuffle(r.mazo)
+        return
+    reveladas = [x for x in r.mano if getattr(x, "revelada", False)]
+    bolsa = ocultas + r.mazo
+    bolsa.sort(key=lambda x: (x.carta.id, x.uid))
+    rng.shuffle(bolsa)
+    r.mano = reveladas + bolsa[:len(ocultas)]
+    r.mazo = bolsa[len(ocultas):]
+    for x in r.mano:
+        x.zona = Zona.MANO
+    for x in r.mazo:
+        x.zona = Zona.MAZO
+
+
+def _instancias_en(valor) -> list:
+    if isinstance(valor, Instancia):
+        return [valor]
+    if isinstance(valor, Jugada):
+        return [x for x in (valor.carta, valor.portador) if isinstance(x, Instancia)]
+    if isinstance(valor, dict):
+        return [y for v in valor.values() for y in _instancias_en(v)]
+    if isinstance(valor, (list, tuple)):
+        return [y for v in valor for y in _instancias_en(v)]
+    return []
+
+
 def reproducir(cartas, nombres, seed: int, registro: list, *, rama: int | None = None,
-               opcion=None, muestra: int = 0, metodos=None) -> int | None:
-    """Ganador (0/1/-1) de la partida reproducida; None si no se pudo."""
+               opcion=None, muestra: int = 0, metodos=None, ocultar: bool = True) -> int | None:
+    """Ganador (0/1/-1) de la partida reproducida; None si no se pudo.
+
+    Con `ocultar` (por defecto), al ramificar el rival de quien decide recibe
+    otra mano de las que podía tener: la decisión se juzga con lo que su autor
+    sabía, no con la mano que el rival tenía esa vez."""
     ref: list = [None]
     jugadores = tuple(Reproductor(i, registro, ref, rama=rama, opcion=opcion, seed=seed * 31 + muestra * 2 + i,
                                   metodos=(metodos or [None, None])[i])
@@ -198,11 +239,15 @@ def reproducir(cartas, nombres, seed: int, registro: list, *, rama: int | None =
     p = Partida(cartas, jugadores, nombres=nombres, inicial=None, seed=seed)
     p.cursor, p.cursor_rama = 0, None
 
-    def al_ramificar():
+    def al_ramificar(args: tuple = ()):
         # Variedad entre muestras: el futuro (robos) cambia, el pasado no.
         rng = random.Random(seed * 7919 + muestra)
+        lado = registro[rama]["lado"] if rama is not None and rama < len(registro) else None
         for j in p.e.jugadores:
-            rng.shuffle(j.mazo)
+            if ocultar and lado is not None and j.indice == 1 - lado:
+                remuestrear_ocultas(p, j.indice, rng, args)
+            else:
+                rng.shuffle(j.mazo)
         p.e.rng = random.Random(rng.random())
 
     p.al_ramificar = al_ramificar

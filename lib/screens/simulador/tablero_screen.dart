@@ -28,6 +28,8 @@ const _fondo = 'assets/wallpaper/2.jpg';
 // Lienzos de la mesa.
 const _horizontal = Size(1600, 920);
 const _vertical = Size(900, 1440);
+// Celular en vertical: lienzo angosto (cartas casi al doble) que se desplaza.
+const _anchoTelefono = 480.0;
 
 class TableroScreen extends StatefulWidget {
   final Map<String, dynamic> resultado;
@@ -314,11 +316,18 @@ class _TableroScreenState extends State<TableroScreen> {
                     child: LayoutBuilder(
                       builder: (context, box) {
                         final horizontal = box.maxWidth > box.maxHeight;
-                        final lienzo = horizontal ? _horizontal : _vertical;
-                        return Center(
-                          child: FittedBox(
-                            fit: BoxFit.contain,
-                            child: SizedBox(
+                        // Héctor: en el celular las cartas se veían muy chicas.
+                        final telefono = !horizontal && box.maxWidth < 600;
+                        mesa.conNombres = telefono;
+                        // Celular: 480 de ancho y el alto de la pantalla, así
+                        // la mesa entera cabe sin desplazar.
+                        final lienzo = horizontal
+                            ? _horizontal
+                            : telefono
+                                ? Size(_anchoTelefono, math.max(760.0,
+                                    _anchoTelefono * box.maxHeight / box.maxWidth))
+                                : _vertical;
+                        final contenido = SizedBox(
                               width: lienzo.width,
                               height: lienzo.height,
                               child: Stack(
@@ -327,7 +336,9 @@ class _TableroScreenState extends State<TableroScreen> {
                                     child:
                                         horizontal
                                             ? mesa.horizontal()
-                                            : mesa.vertical(),
+                                            : telefono
+                                                ? mesa.telefono()
+                                                : mesa.vertical(),
                                   ),
                                   // Robo: la carta se muestra en grande, se da
                                   // vuelta y baja a la mano de quien roba.
@@ -365,7 +376,11 @@ class _TableroScreenState extends State<TableroScreen> {
                                     ),
                                 ],
                               ),
-                            ),
+                            );
+                        return Center(
+                          child: FittedBox(
+                            fit: BoxFit.contain,
+                            child: contenido,
                           ),
                         );
                       },
@@ -653,6 +668,8 @@ class _Mesa {
   final List<List<String>?> cementerios; // por jugador (0 = tuyo, 1 = rival)
   final List<List<String>?> destierros;
   final void Function(String titulo, List<String>? ids) verPila;
+  // Celular: el nombre va escrito bajo cada carta (no hace falta acercarse).
+  bool conNombres = false;
 
   _Mesa({
     required this.previo,
@@ -688,6 +705,7 @@ class _Mesa {
       fuerza: fuerza,
       armas: armas.map((a) => nombres['$a'] ?? '$a').toList(),
       pagado: pagado,
+      conNombre: conNombres && ancho >= 60,
     );
     // La clave cambia en cada paso para que la entrada se vuelva a animar.
     return nueva ? _Entrada(key: ValueKey('$indice-$clave-$id'), child: c) : c;
@@ -890,6 +908,95 @@ class _Mesa {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ── Lienzo de celular: 480 de ancho y el alto justo de la pantalla (sin
+  //    desplazar). Cada jugador en una ficha de una fila (los Oros como
+  //    número); las líneas vacías se achican y la jugada va al medio.
+  Widget telefono() {
+    const gap = 6.0;
+    const ancho = _anchoTelefono - 2 * gap;
+
+    Widget ficha(Map j, String nombre, bool activo) {
+      final k = identical(j, tuyo) ? 0 : 1;
+      final v = (j['v'] as num? ?? 0).toInt();
+      Widget pila(String titulo, int n, List<String>? ids) => GestureDetector(
+        onTap: () => verPila('$titulo · $nombre', ids),
+        child: Container(
+          margin: const EdgeInsets.only(left: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _gold.withValues(alpha: .5)),
+          ),
+          child: Text('$titulo $n', style: const TextStyle(color: Colors.white,
+              fontSize: 14, fontWeight: FontWeight.w700)),
+        ),
+      );
+      return Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xE62A1F14), Color(0xE6120D08)]),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: activo ? _gold : _gold.withValues(alpha: .3),
+              width: activo ? 2 : 1),
+        ),
+        child: Row(children: [
+          Expanded(child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(nombre, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: _gold, fontSize: 16, fontWeight: FontWeight.w900)),
+              Text('Castillo ${j['m']} · Mano ${(j['h'] as List).length}'
+                  ' · Oros ${(j['r'] as List).length}${v > 0 ? '+$v' : ''}'
+                  ' · Pag. ${(j['p'] as List).length}',
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+            ],
+          )),
+          pila('Cem.', (j['c'] as num).toInt(), cementerios[k]),
+          pila('Dest.', (j['d'] as num).toInt(), destierros[k]),
+        ]),
+      );
+    }
+
+    // Una línea sin cartas queda angosta; las otras se reparten el alto.
+    Widget linea(Map j, String clave, Widget Function(double alto) zona) {
+      final vacia = (j[clave] as List).isEmpty &&
+          (clave != 'def' || (j['ap'] as List).isEmpty);
+      return vacia
+          ? SizedBox(height: 24, child: zona(24))
+          : Expanded(flex: 3, child: LayoutBuilder(builder: (_, b) => zona(b.maxHeight)));
+    }
+    Widget defensa(Map j) => linea(j, 'def', (h) => _Zona(ancho: ancho, alto: h,
+        cartas: _aliados(j, 'def', (h - 6) / 1.4),
+        derecha: _simples(j, 'ap', (h - 6) / 1.4)));
+    Widget ataque(Map j) => linea(j, 'atk', (h) => _Zona(ancho: ancho, alto: h,
+        cartas: _aliados(j, 'atk', (h - 6) / 1.4)));
+    Widget mano(Map j, bool arriba, int flex) => Expanded(flex: flex,
+        child: LayoutBuilder(builder: (_, b) => _mano(j, arriba, ancho, b.maxHeight)));
+
+    return Padding(
+      padding: const EdgeInsets.all(gap),
+      child: Column(
+        children: [
+          ficha(rival, nombreRival, _rivalActivo),
+          mano(rival, true, 2),
+          defensa(rival),
+          ataque(rival),
+          const _Divisor(),
+          _fase(ancho),
+          const _Divisor(),
+          ataque(tuyo),
+          defensa(tuyo),
+          mano(tuyo, false, 3),
+          ficha(tuyo, nombreTuyo, !_rivalActivo),
         ],
       ),
     );
@@ -1726,6 +1833,7 @@ class _Carta extends StatelessWidget {
   final int? fuerza;
   final List<String> armas;
   final bool pagado;
+  final bool conNombre;
 
   const _Carta({
     required this.id,
@@ -1735,7 +1843,35 @@ class _Carta extends StatelessWidget {
     this.fuerza,
     this.armas = const [],
     this.pagado = false,
+    this.conNombre = false,
   });
+
+  /// Tocar una carta la muestra en grande (en cualquier tamaño de pantalla).
+  void _ampliar(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      final pantalla = MediaQuery.sizeOf(dialogContext);
+      final ancho = math.min(pantalla.width * .85, pantalla.height * .75 / 1.4);
+      return GestureDetector(
+        onTap: () => Navigator.pop(dialogContext),
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _Carta(id: id, nombre: nombre, url: url, ancho: ancho, fuerza: fuerza),
+              const SizedBox(height: 8),
+              Text(
+                [nombre, if (armas.isNotEmpty) 'Armas: ${armas.join(', ')}'].join('\n'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -1765,12 +1901,15 @@ class _Carta extends StatelessWidget {
       ),
     );
     final badge = (ancho / 6).clamp(7.0, 13.0);
+    final pie = conNombre ? 20.0 : 0.0;
     return Tooltip(
       message: [
         nombre,
         if (armas.isNotEmpty) 'Armas: ${armas.join(', ')}',
       ].join('\n'),
-      child: Opacity(
+      child: GestureDetector(
+        onTap: () => _ampliar(context),
+        child: Opacity(
         opacity: pagado ? .5 : 1,
         child: Container(
           width: ancho,
@@ -1800,7 +1939,7 @@ class _Carta extends StatelessWidget {
               if (fuerza != null)
                 Positioned(
                   left: 1,
-                  bottom: 1,
+                  bottom: 1 + pie,
                   child: Container(
                     width: badge * 2,
                     height: badge * 2,
@@ -1841,10 +1980,46 @@ class _Carta extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (conNombre)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: pie,
+                  child: _NombreCarta(nombre),
+                ),
             ],
           ),
         ),
       ),
+      ),
     );
   }
+}
+
+/// Nombre de la carta en una franja oscura al pie (celular).
+class _NombreCarta extends StatelessWidget {
+  final String nombre;
+  const _NombreCarta(this.nombre);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    alignment: Alignment.center,
+    padding: const EdgeInsets.symmetric(horizontal: 2),
+    decoration: const BoxDecoration(
+      color: Color(0xE6000000),
+      borderRadius: BorderRadius.vertical(bottom: Radius.circular(4)),
+    ),
+    child: Text(
+      nombre,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: FontWeight.w800,
+        height: 1.1,
+      ),
+    ),
+  );
 }

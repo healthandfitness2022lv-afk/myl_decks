@@ -30,7 +30,7 @@ def posicion(g: dict, paso: int) -> Partida:
     p = Partida(tuple(m.cartas for m in mazos), jugadores, nombres=tuple(m.nombre for m in mazos), inicial=None,
                 seed=g["seed"], log=True)
     p.cursor, p.cursor_rama = 0, None
-    p.al_ramificar = lambda: None
+    p.al_ramificar = lambda *a: None
     ref[0] = p
     try:
         p.jugar()

@@ -609,7 +609,9 @@ def test_piedra_roseta():
     en_defensa(p, 0, aliado("S2", 1, 1, raza="Sacerdote"))
     p.ejecutar_jugada(0, next(o for o in p.jugadas_legales(0, "vigilia") if o.tipo == "activar" and o.carta is pr))
     assert len(p.j(0).mano) == 1 and x.zona in (Zona.MAZO, Zona.MANO)  # barajó 1 y robó 1
-    assert any("baraja X de su mano en el mazo" in linea and "roba" in linea for linea in p.e.log)
+    assert any("baraja X de su mano en el mazo" in hab.sin_marcas(linea) and "roba" in linea for linea in p.e.log)
+    # Lo que se baraja desde la mano solo lo sabe quien lo baraja.
+    assert not any("baraja X" in hab._MARCA_PRIVADA.sub("", linea) for linea in p.e.log)
 
 
 def test_quemar_los_templos():

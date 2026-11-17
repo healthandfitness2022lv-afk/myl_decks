@@ -77,9 +77,9 @@ def valor_estado(p: Partida, yo: int, aprendido: bool = True) -> float:
         g = p.e.ganador
         return 1.0 if g == yo else 0.5 if g == -1 else 0.0
     if aprendido:
-        from .valor import prob_ganar
+        from .valor import prob_ganar, prob_ganar_v2
 
-        q = prob_ganar(p, yo)
+        q = prob_ganar_v2(p, yo) if aprendido == 2 else prob_ganar(p, yo)
         if q is not None:
             return q
     mio, suyo = p.j(yo), p.j(1 - yo)
@@ -158,6 +158,64 @@ def elegido_dudoso(valores, base, margen):
     return mejor
 
 
+MIN_FRESCAS = 8  # pares nuevos (no usados para elegir candidata) antes de apartarse
+
+
+def comparar_opciones(evaluar, cuantas: int, rng, *, muestras: int, max_muestras: int, margen: float,
+                      z: float, base: int = 0, limite: float | None = None,
+                      min_frescas: int = MIN_FRESCAS) -> tuple[int, list[list[float]], dict]:
+    """Elige entre `cuantas` opciones; `evaluar(i, seed)` da el valor 0–1 de la
+    opción `i` en la muestra `seed` (pareadas: misma semilla para todas).
+
+    1. Criba: `muestras` muestras a todas. Siguen como finalistas las (hasta) 2
+       mejores que superan a `base` por `margen`. Sin finalistas, gana `base`.
+    2. Confirmación con muestras NUEVAS solo para `base` y las finalistas. La
+       decisión usa solo esas: elegir a la mejor de 8 y medirla con las mismas
+       muestras infla la ventaja (así salían desviaciones de puro ruido).
+    3. Se aparta de `base` solo con al menos `min_frescas` pares nuevos, ventaja
+       ≥ `margen` y diferencia pareada > `z` errores estándar. Una finalista que
+       no va ganando con los pares nuevos se descarta.
+
+    `limite`: instante (time.monotonic) en que se corta; sin confirmación, `base`.
+    Devuelve (elegida, valores por opción, {"muestras", "z"} de la confirmación)."""
+    valores: list[list[float]] = [[] for _ in range(cuantas)]
+
+    def tanda(indices, k):
+        for _ in range(k):
+            seed = rng.randrange(1, 2**31)
+            for i in indices:
+                valores[i].append(evaluar(i, seed))
+
+    tanda(range(cuantas), muestras)
+    medias = [sum(v) / len(v) for v in valores]
+    finalistas = sorted((i for i in range(cuantas) if i != base and medias[i] >= medias[base] + margen),
+                        key=lambda i: -medias[i])[:2]
+    info = {"muestras": 0, "z": None}
+    tope = max(min_frescas, max_muestras - muestras)
+    frescas = 0
+    while finalistas and frescas < tope:
+        if limite is not None and time.monotonic() >= limite:
+            break
+        k = min(4, tope - frescas)
+        tanda([base] + finalistas, k)
+        frescas += k
+        if frescas < min_frescas:
+            continue
+        datos = {}
+        for i in finalistas:
+            d = [a - b for a, b in zip(valores[i][muestras:], valores[base][muestras:])]
+            media = sum(d) / len(d)
+            ee = math.sqrt(sum((x - media) ** 2 for x in d) / (len(d) - 1) / len(d)) if len(d) > 1 else 0.0
+            datos[i] = (media, ee)
+        mejor = max(finalistas, key=lambda i: datos[i][0])
+        media, ee = datos[mejor]
+        if media >= margen and media > z * ee:
+            return mejor, valores, {"muestras": frescas, "z": round(media / ee, 1) if ee else 99.0}
+        finalistas = [i for i in finalistas if datos[i][0] > 0]
+    info["muestras"] = frescas
+    return base, valores, info
+
+
 class BuscadorAtaques(Heuristico):
     """Heurística en todo, salvo la declaración de ataque, que se simula."""
 
@@ -176,30 +234,24 @@ class BuscadorAtaques(Heuristico):
         self.segundos = 0.0
         self.ultimo_analisis: dict | None = None
 
+    def _comparar(self, evaluar, cuantas: int, rng, *, base: int = 0, muestras: int | None = None,
+                  max_muestras: int | None = None):
+        """`comparar_opciones` con el presupuesto de este jugador."""
+        limite = None if self.max_segundos is None else time.monotonic() + self.max_segundos
+        return comparar_opciones(evaluar, cuantas, rng, muestras=muestras or self.muestras,
+                                 max_muestras=max_muestras or self.max_muestras, margen=self.margen,
+                                 z=self.z, base=base, limite=limite)
+
     def elegir_atacantes(self, p, yo, candidatos):
         referencia = super().elegir_atacantes(p, yo, candidatos)
         opciones = alternativas(p, candidatos, referencia, self.max_opciones)
         if len(opciones) < 2:
             return referencia
         inicio = time.monotonic()
-        valores: list[list[float]] = [[] for _ in opciones]
-
-        def tanda(k):
-            for _ in range(k):
-                seed = self.rng_busqueda.randrange(1, 2**31)
-                for i, o in enumerate(opciones):
-                    valores[i].append(continuar(_copia(p, yo, seed), yo, o, self.horizonte, seed,
-                                                self.aprendido))
-
-        tanda(self.muestras)
-        while True:
-            elegido, claro = _decidir(valores, 0, self.margen, self.z)
-            n = len(valores[0])
-            sin_tiempo = self.max_segundos is not None and time.monotonic() - inicio >= self.max_segundos
-            # Solo vale la pena muestrear más si hay una candidata a desviarse sin ventaja clara.
-            if claro or elegido_dudoso(valores, 0, self.margen) is None or n >= self.max_muestras or sin_tiempo:
-                break
-            tanda(min(4, self.max_muestras - n))
+        elegido, valores, conf = self._comparar(
+            lambda i, seed: continuar(_copia(p, yo, seed), yo, opciones[i], self.horizonte, seed, self.aprendido),
+            len(opciones), self.rng_busqueda)
+        n = len(valores[elegido])
         medias = [sum(v) / len(v) for v in valores]
         self.busquedas += 1
         self.desviaciones += elegido != 0

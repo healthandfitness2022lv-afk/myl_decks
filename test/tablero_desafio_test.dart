@@ -55,7 +55,9 @@ void main() {
         ),
       )));
       expect(tester.takeException(), isNull);
-      expect(find.textContaining('Mano rival · 3'), findsOneWidget);
+      // Celular en vertical: la mano rival va como número en su ficha.
+      final telefono = size.width < size.height && size.width < 600;
+      expect(find.textContaining(telefono ? 'Mano 3' : 'Mano rival · 3'), findsOneWidget);
       expect(find.text('Tu mano'), findsOneWidget);
       expect(find.byType(ListView), findsNothing);
       await tester.tap(find.text('Acciones 1'));
@@ -65,6 +67,53 @@ void main() {
       expect(enviados, ['1']); // sin costo: se juega de inmediato
     });
   }
+
+  testWidgets('celular: una sola pantalla, cartas grandes y los botones al medio', (tester) async {
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: TableroDesafio(
+      estado: estado, decision: decision, enviar: (_) async {},
+    ))));
+    expect(tester.takeException(), isNull);
+    // «Una sola pantalla, sin scroll».
+    expect(find.byType(Scrollable), findsNothing);
+    // «No quiero tener que acercarme para ver qué carta es».
+    final enMano = find.ancestor(of: find.text('Carta de prueba').last,
+        matching: find.byType(AnimatedContainer)).first;
+    expect(tester.getSize(enMano).height, greaterThan(95)); // antes ~70
+    expect(tester.getRect(enMano).bottom, lessThan(800));
+    // La instrucción y sus botones, entre los dos campos.
+    final batalla = tester.getRect(find.text('Batalla'));
+    expect(batalla.top, greaterThan(tester.getRect(find.text('Defensa rival')).bottom));
+    expect(batalla.bottom, lessThan(tester.getRect(find.text('Tu mano')).top));
+  });
+
+  testWidgets('celular: mesa llena en combate cabe sin desplazar', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    List<Map<String, Object>> varias(int n, String prefijo) => [
+      for (var i = 0; i < n; i++)
+        {'id': '$prefijo-$i', 'cartaId': '__test__', 'nombre': 'Carta $i',
+          'tipo': 'Aliado', 'fuerza': 2},
+    ];
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: TableroDesafio(
+      estado: {...estado, 'lados': [
+        {...lado('Tú', humano: true), 'mano': varias(8, 'm'),
+          'defensa': varias(5, 'd'), 'ataque': varias(3, 't'),
+          'reserva': varias(6, 'r'), 'apoyo': varias(2, 'a')},
+        {...lado('IA'), 'defensa': varias(5, 'rd'), 'ataque': varias(3, 'rt'),
+          'apoyo': varias(2, 'ra')},
+      ]},
+      decision: decision, enviar: (_) async {},
+    ))));
+    expect(tester.takeException(), isNull);
+    expect(find.byType(Scrollable), findsNothing);
+    expect(tester.getRect(find.text('Batalla')).bottom, lessThan(640));
+  });
 
   testWidgets('cancelar pago conserva la jugada y confirmar elige Oro', (tester) async {
     tester.view.physicalSize = const Size(400, 760);
@@ -163,9 +212,10 @@ void main() {
       enviar: (valor) async { enviados.add(valor); },
     ))));
     await tester.pump();
-    await tester.tap(find.text('Piedra Roseta'));
+    // En el celular el nombre también va escrito al pie de la carta.
+    await tester.tap(find.text('Piedra Roseta').first);
     await tester.pump();
-    await tester.tap(find.text('Neferite I'));
+    await tester.tap(find.text('Neferite I').first);
     expect(enviados, ['1', '2']);
   });
 
@@ -378,5 +428,66 @@ void main() {
     }
     expect(find.byType(ListView), findsNothing);
   });
-}
 
+  testWidgets('Damarchus muestra por qué no puede activar su habilidad', (tester) async {
+    final damarchus = {
+      ...carta,
+      'id': 'damarchus',
+      'nombre': 'Damarchus',
+      'sinHabilidad': true,
+      'sinHabilidadPor': 'Cleopatra VII',
+    };
+    final usada = {
+      ...carta,
+      'id': 'usada',
+      'nombre': 'Otra Titán',
+      'usadaEsteTurno': true,
+    };
+    await mesaCon(
+      tester,
+      {
+        ...estado,
+        'lados': [
+          {...lado('Tú', humano: true), 'mano': <Map>[], 'defensa': [damarchus, usada]},
+          lado('IA'),
+        ],
+      },
+      decision,
+    );
+    expect(find.textContaining('SIN HABILIDAD · Cleopatra VII'), findsOneWidget);
+    expect(find.text('YA USADA ESTE TURNO'), findsOneWidget);
+  });
+
+  for (final size in [const Size(400, 760), const Size(900, 430),
+      const Size(320, 568), const Size(568, 320)]) {
+    testWidgets('bloqueos unidos por flecha y Aliado sin habilidad en gris en $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final atacante = {...carta, 'id': 'atk', 'nombre': 'Caturix', 'fuerza': 6};
+      final bloqueador = {
+        ...carta, 'id': 'blk', 'nombre': 'Damarchus', 'sinHabilidad': true, 'sinHabilidadPor': 'Cleopatra VII',
+      };
+      final conBloqueo = {
+        ...estado,
+        'fase': 'guerra_talismanes',
+        'activo': 1,
+        'bloqueos': {'atk': 'blk'},
+        'lados': [
+          {...lado('Tú', humano: true), 'mano': <Map>[], 'defensa': [bloqueador]},
+          {...lado('IA'), 'ataque': [atacante]},
+        ],
+      };
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: TableroDesafio(
+        estado: conBloqueo, decision: null, enviar: (valor) async {},
+      ))));
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.takeException(), isNull);
+      final flechas = find.byWidgetPredicate(
+          (w) => w is CustomPaint && w.painter.runtimeType.toString() == '_FlechasBloqueo');
+      expect(flechas, findsOneWidget);
+      expect(find.byType(ColorFiltered), findsOneWidget); // solo el que perdió la habilidad
+    });
+  }
+}

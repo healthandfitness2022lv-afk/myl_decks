@@ -33,10 +33,12 @@ Máximo **una tarea por ejecución**. Si el presupuesto de la tarea se agota, de
 - Docs actualizadas si cambió la arquitectura.
 
 ## Comandos del proyecto
-<!-- Completar por proyecto: cómo instalar, testear, analizar. -->
-- Stack: Flutter/Dart
+Proyecto: **MyL Mazos** — app Flutter (web/Android, Firebase) + simulador/IA en Python (`simulator/`) + dashboard web (`dashboard/index.html`). Detalle en `docs/ARCHITECTURE.md`.
+- Stack: Flutter/Dart (SDK ^3.7, go_router + provider, Firebase) · Python 3 (`simulator/myl_sim`).
 - Instalar: `flutter pub get`
-- Tests: `flutter test`
+- Tests: `flutter test` (19 suites en `test/`)
 - Análisis estático: `flutter analyze`
-- Web/Node: `npm install`; scripts disponibles: ninguno
-- Desplegar está prohibido para los agentes (lo hace el humano).
+- Simulador Python (desde `simulator/`): `python -m venv .venv` · `.venv/bin/python -m pip install -r requirements.txt` (en Windows `.venv/Scripts/python`) · tests: `.venv/bin/python -m pytest`. Varias suites dependen de `simulator/cache/` local o de credenciales Firestore; registrar como omitidas/fallidas por entorno, no "arreglarlas" accediendo a datos reales.
+- Prohibido para agentes: `myl_sim.worker`, `myl_sim.cli` y cualquier comando del simulador que lea/escriba Firestore o use OpenAI; los scripts de `tools/` (`node tools/*.js`, `python tools/*.py`) porque modifican datos reales con firebase-admin; leer `secrets/` (credencial Admin y clave OpenAI).
+- Web/Node: no hay scripts npm propios (`package.json` raíz y `tools/package.json` solo declaran dependencias de administración). No ejecutar `npm install` salvo necesidad justificada.
+- Desplegar está prohibido para los agentes (lo hace el humano): `deploy.ps1`, `firebase deploy`, `flutter build web` con fines de publicación. Cambios a `firestore.rules` son decisión crítica (PROPUESTA): el proyecto Firebase se comparte con NexusTCG/marketplace.

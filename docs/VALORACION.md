@@ -11,14 +11,15 @@
 - **Precio a un cliente:** Premium $2.000–$5.000/mes por jugador; licencia a tiendas u organizadores de torneos $20.000–$50.000/mes
 - **Venta exclusiva a un cliente:** $2.000.000 – $5.000.000 (venta a una tienda/editorial de MyL)
 - **Valor hoy como producto (sin clientes):** $3.000.000 – $8.000.000
+- **Actualización T-003:** precios propuestos de planes (Pro $2.990/mes, Liga $14.990/mes, Tienda $150.000 + $39.900/mes) caen dentro del rango anterior y están ancladas en Deckbox/MTGGoldfish/YGOPRODeck (US$5-6/mes); el valor de mercado no cambia hasta validar con jugadores y resolver la consulta de propiedad intelectual. Detalle en `docs/SALES.md`.
 - **Nota:** Valor alto por ser único en su nicho, pero depende del tamaño de la comunidad que pague; validar con 20–30 jugadores antes de invertir más.
 - Fuentes: apps.shopify.com/bsale · guiadesoftware.com/blog/mejor-software-gestion-inventario-pymes-latam · capterra.es (GymMaster, Fitco, Boxmagic) · zenoti.com/es/thecheckin/best-fitness-gym-software-2026 · ecosistemastartup.com (easycancha) · 2x3.cl/p/precios-desarrollo-aplicacion-movil
 
 
 ## Resumen
-- **Costo de desarrollo estimado (horas × tarifa): $67.250.000 CLP**
-- Horas acumuladas: 2.690 h
-- Última actualización: 2026-11-15 (valoración inicial, T-001)
+- **Costo de desarrollo estimado (horas × tarifa): $67.850.000 CLP**
+- Horas acumuladas: 2.714 h
+- Última actualización: 2026-11-17 (T-003, análisis comercial)
 - Referencia de mercado (funcional, sin precio de desarrollo comparable verificado):
   - Moxfield — constructor de mazos y colección para Magic: The Gathering, de uso gratuito: https://www.moxfield.com/ (equivale a los módulos de catálogo, mazos y colección; no tiene simulador).
   - Forge — motor de reglas e IA open source para Magic: The Gathering: https://github.com/Card-Forge/forge (referencia del alcance de un motor de reglas con IA; proyecto comunitario de muchos años).
@@ -46,6 +47,7 @@ Criterio: estimación conservadora de un desarrollador senior con el dominio ya 
 | Worker e integración app-IA | Worker con colas Firestore (simulaciones, desafíos, trabajos ML, lectura de cartas con OpenAI), sesión humano-vs-IA mediada por documento, latido (~2.900 líneas) | 100 | $2.500.000 | 2026-11-15 | inicial |
 | Infraestructura y herramientas | `firestore.rules` (~620 líneas) e índices, `deploy.ps1`, scripts de mantenimiento en `tools/` | 50 | $1.250.000 | 2026-11-15 | inicial |
 | Suites de pruebas de regresión | 19 suites Flutter (~2.400 líneas) y 36 archivos pytest (~12.000 líneas, casos reportados reproducidos); solo la parte que excede lo incluido en cada módulo | 100 | $2.500.000 | 2026-11-15 | inicial |
+| Análisis comercial y planes | `docs/SALES.md`: segmentos, competidores con precios verificados, planes en CLP (PROPUESTA ADR-002), 3 mejoras priorizadas | 24 | $600.000 | 2026-11-17 | T-003 (borrador) |
 
 ## Notas
 - Valor de venta sugerido como producto (instalación + mensualidad): por definir tras la valoración inicial (T-003, subagente `sales`).

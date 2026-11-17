@@ -7,7 +7,7 @@ Prioridad: P0 (urgente) · P1 · P2. Solo el humano mueve tareas a `HECHA` (al h
 |----|-----------|--------|--------|------|--------------------|----|-------------|
 | T-001 | P1 | HECHO | Completar ARCHITECTURE.md inspeccionando el código real | claude/T-001-architecture | QA APROBADO; docs + valoración inicial | — | $67.250.000 |
 | T-002 | P2 | PENDIENTE | Diagnóstico de calidad: análisis estático y tests, registrar fallos como tareas | — | — | — | por estimar |
-| T-003 | P2 | EN_REVISION | Análisis comercial (sales): cliente objetivo, propuesta de valor, precios y 3 mejoras prioritarias | claude/T-003-analisis-comercial | QA APROBADO (solo docs; sin Flutter SDK en el entorno). SALES.md + T-004..T-006 + ADR-002 (PROPUESTA) | PR borrador (ver RUNLOG) | $600.000 |
+| T-003 | P2 | EN_REVISION | Análisis comercial (sales): cliente objetivo, propuesta de valor, precios y 3 mejoras prioritarias | claude/T-003-analisis-comercial | QA APROBADO (solo docs; sin Flutter SDK en el entorno). SALES.md + T-004..T-006 + ADR-002 (PROPUESTA) | https://github.com/healthandfitness2022lv-afk/myl_decks/pull/9 | $600.000 |
 | T-004 | P1 | PENDIENTE | Planes y cuotas por plan (entitlements) para simulador/IA | — | Propuesta T-003; requiere aprobación de ADR-002 (precios) y del cambio de esquema | — | por estimar |
 | T-005 | P1 | PENDIENTE | Dashboard de liga compartible con marca de tienda | — | Propuesta T-003 | — | por estimar |
 | T-006 | P2 | PENDIENTE | Informe público "Meta de la semana" compartible | — | Propuesta T-003 | — | por estimar |

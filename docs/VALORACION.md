@@ -16,9 +16,9 @@
 
 
 ## Resumen
-- **Costo de desarrollo estimado (horas × tarifa): $67.250.000 CLP**
-- Horas acumuladas: 2.690 h
-- Última actualización: 2026-11-15 (valoración inicial, T-001)
+- **Costo de desarrollo estimado (horas × tarifa): $67.500.000 CLP**
+- Horas acumuladas: 2.700 h
+- Última actualización: 2026-11-18 (diagnóstico parcial, T-002)
 - Referencia de mercado (funcional, sin precio de desarrollo comparable verificado):
   - Moxfield — constructor de mazos y colección para Magic: The Gathering, de uso gratuito: https://www.moxfield.com/ (equivale a los módulos de catálogo, mazos y colección; no tiene simulador).
   - Forge — motor de reglas e IA open source para Magic: The Gathering: https://github.com/Card-Forge/forge (referencia del alcance de un motor de reglas con IA; proyecto comunitario de muchos años).
@@ -45,6 +45,7 @@ Criterio: estimación conservadora de un desarrollador senior con el dominio ya 
 | Aprendizaje, arena, auditoría y meta | Autojuego y políticas aprendidas con criterios estadísticos, arena Elo, auditor de reglas, autopsias, matriz del meta y optimizador de mazos (~5.000 líneas) | 180 | $4.500.000 | 2026-11-15 | inicial |
 | Worker e integración app-IA | Worker con colas Firestore (simulaciones, desafíos, trabajos ML, lectura de cartas con OpenAI), sesión humano-vs-IA mediada por documento, latido (~2.900 líneas) | 100 | $2.500.000 | 2026-11-15 | inicial |
 | Infraestructura y herramientas | `firestore.rules` (~620 líneas) e índices, `deploy.ps1`, scripts de mantenimiento en `tools/` | 50 | $1.250.000 | 2026-11-15 | inicial |
+| Diagnóstico de calidad (parcial) | Ejecución de la suite pytest y registro de hallazgos (`docs/DIAGNOSTICO.md`); sin cambios de producto, no altera el valor de mercado | 10 | $250.000 | 2026-11-18 | T-002 (borrador) |
 | Suites de pruebas de regresión | 19 suites Flutter (~2.400 líneas) y 36 archivos pytest (~12.000 líneas, casos reportados reproducidos); solo la parte que excede lo incluido en cada módulo | 100 | $2.500.000 | 2026-11-15 | inicial |
 
 ## Notas

@@ -6,7 +6,8 @@ Prioridad: P0 (urgente) · P1 · P2. Solo el humano mueve tareas a `HECHA` (al h
 | ID | Prioridad | Estado | Título | Rama | Checkpoint / Notas | PR | Valor (CLP) |
 |----|-----------|--------|--------|------|--------------------|----|-------------|
 | T-001 | P1 | HECHO | Completar ARCHITECTURE.md inspeccionando el código real | claude/T-001-architecture | QA APROBADO; docs + valoración inicial | — | $67.250.000 |
-| T-002 | P2 | PENDIENTE | Diagnóstico de calidad: análisis estático y tests, registrar fallos como tareas | — | — | — | por estimar |
+| T-002 | P2 | BLOQUEADA (entorno: sin SDK Flutter en sesión nube) | Diagnóstico de calidad: análisis estático y tests, registrar fallos como tareas | claude/T-002-diagnostico-calidad | Parte Python hecha (ver docs/DIAGNOSTICO.md). Falta `flutter analyze` y `flutter test`: el proxy de la sesión bloquea storage.googleapis.com (403), no se puede descargar el SDK. Ejecutar esa parte en un entorno con Flutter o allowlistear el dominio. | — | $250.000 |
+| T-004 | P2 | PENDIENTE | Test `test_trabajos_comandos_y_evaluador` depende de credenciales Firestore: aislarlo (mock de `cargar_carta`/skip sin credencial) | — | Hallazgo de T-002. Único fallo de pytest (1 failed, 571 passed, 244 skipped, 39 xfailed). No acceder a datos reales. | — | por estimar |
 | T-003 | P2 | PENDIENTE | Análisis comercial (sales): cliente objetivo, propuesta de valor, precios y 3 mejoras prioritarias | — | — | — | por estimar |
 ## Detalle de tareas
 

@@ -859,6 +859,17 @@ def _sacrificio_sin_combo(p, yo, inst: Instancia) -> bool:
     return not (_en_peligro(p, yo) or len(p.j(yo).mano) <= 1)
 
 
+def _bota_el_coste_de_lo_que_trae(h: dict) -> bool:
+    """Men: juega un Aliado y después bota tantas cartas como su coste."""
+    return h.get("accion") == "jugarDesde" and any(
+        e.get("accion") == "botar" and e.get("cantidadSegun") == "coste_afectada"
+        and (e.get("objetivo") or {}).get("quien") == "propio" for e in h.get("luego") or [])
+
+
+def _coste_me_deja_sin_castillo(p, yo, c: Instancia) -> bool:
+    return len(p.j(yo).mazo) - c.carta.coste <= max(3, _alcance_rival(p, yo))
+
+
 def _aliado_temporal(h: dict) -> bool:
     """Cruz Templaria: el Aliado que trae se destierra en la Fase Final."""
     return h.get("accion") == "jugarDesde" and any(
@@ -4243,6 +4254,23 @@ class Heuristico:
         accion = h.get("accion")
         obj = h.get("objetivo") or {}
         quien = obj.get("quien", "oponente")
+        if accion == "desterrar" and quien == "propio" and "cementerio" in hab.zonas_de(obj) and any(
+                e.get("accion") == "modificarFuerza" and int(e.get("valor", 0) or 0) > 0
+                and (e.get("objetivo") or {}).get("quien") in ("esta_carta", "propio") for e in h.get("luego") or []):
+            # Goblin Berserker: desterrar Goblins de mi Cementerio le da fuerza
+            # para el ataque de este turno.
+            return p.e.activo == yo and bool(hab.candidatos_validos(p, yo, fuente, h))
+        if accion == "mover" and h.get("zonaDestino") == "linea_defensa" and quien == "oponente":
+            # Enialio: sacar a un rival de su Línea de Ataque solo sirve mientras
+            # me ataca (deja de pegar); en mi turno le devolvería un bloqueador.
+            return p.e.activo != yo and any(
+                c in p.atacantes and c.zona == Zona.ATAQUE for c in hab.candidatos_validos(p, yo, fuente, h))
+        if accion in ("destruir", "desterrar", "barajar") and quien == "cualquiera" and h.get("opcional") \
+                and h.get("cuando") == "al_jugar" and not h.get("luego") and hab._necesita_objetivo(h) \
+                and "en_juego" in hab.zonas_de(obj):
+            # Oberón: "puedes barajar una carta en juego": nunca una mía si el
+            # rival no tiene ninguna que sacar.
+            return any(c.controlador != yo for c in hab.candidatos_validos(p, yo, fuente, h))
         if accion in _DANINO:
             # No usar removal sobre lo propio, salvo que sea su intención.
             if quien == "propio" and accion not in ("barajar", "subirMano"):
@@ -4344,6 +4372,11 @@ class Heuristico:
         utiles = self._utiles_jugar_desde(p, yo, fuente, h, pagando)
         if not utiles:
             return False
+        if any(e.get("modo") == "entra_atacando" for e in h.get("luego") or []):
+            return True  # Nathair-Teine: un atacante más, gratis, en este mismo ataque
+        if _bota_el_coste_de_lo_que_trae(h):
+            # Men: "luego, bota tantas cartas como coste tenga ese Aliado".
+            return any(not _coste_me_deja_sin_castillo(p, yo, c) for c in utiles)
         if gratis and fuente.tipo == Tipo.TALISMAN and fuente.carta.coste >= 4 \
                 and "mazo" in hab.zonas_de(h.get("objetivo") or {}, ""):
             # UBsS #2: La Llama Fría (5) es para Lady o Killgharrah: traer a
@@ -4978,6 +5011,27 @@ class Heuristico:
                 return sorted(candidatos, key=lambda c: (_vale_en_cementerio(c),
                                                          self._valor_descarte(p, yo, c)))[:n]
             return sorted(candidatos, key=lambda c: self._valor_descarte(p, yo, c))[:n]
+        if accion == "desterrar" and candidatos and (h.get("objetivo") or {}).get("quien") == "propio" \
+                and all(c.dueno == yo and c.zona == Zona.CEMENTERIO for c in candidatos):
+            # Sir Tor / Goblin Berserker: de mi Cementerio se destierra lo que
+            # menos vale (mismo criterio que al pagar un costo).
+            return self.elegir_destierro_costo(p, yo, fuente_contexto or candidatos[0], candidatos, n)
+        if accion == "desterrar" and fuente_contexto is not None and candidatos \
+                and all(c.zona == Zona.CEMENTERIO for c in candidatos):
+            filtros = [f for x in fuente_contexto.habilidades if x.get("valorPorCada") == "destierro_propio"
+                       for f in (x.get("porCadaFiltros") or [])]
+            if filtros:
+                # Martillo de Galehaut: de mi Cementerio, solo lo que le suma
+                # fuerza (Armas y Aliados Sir); del rival, lo que más vale.
+                mias = [c for c in candidatos if c.dueno == yo
+                        and any(hab.coincide(p, c, {**f, "quien": None}) for f in filtros)]
+                suyas = sorted((c for c in candidatos if c.dueno != yo), key=lambda c: -_valor_carta(p, c))
+                return (mias + suyas)[:n]
+        if accion == "mover" and h.get("zonaDestino") == "linea_defensa" and candidatos \
+                and all(c.controlador != yo for c in candidatos):
+            # Enialio: el atacante sin bloquear que más daño hace.
+            atacando = [c for c in candidatos if c in p.atacantes] or candidatos
+            return sorted(atacando, key=lambda c: (c.uid in p.bloqueos, -hab.fuerza(p, c)))[:n]
         if accion == "mover" and h.get("zonaDestino") == "mazo_tope" and p.e.activo == yo \
                 and p.e.fase == "vigilia" and all(c.controlador != yo for c in candidatos):
             # FqvR #1: Focea saca al bloqueador para que mi Aliado ataque (y en
@@ -5253,9 +5307,15 @@ class Heuristico:
                 return (baraja if corto else bota), c.carta.coste
 
             return sorted(candidatos, key=arma, reverse=True)[:n]
+        if accion == "jugarDesde" and any(e.get("modo") == "entra_atacando" for e in h.get("luego") or []):
+            # Nathair-Teine: entra atacando y se destruye al final: el que más pega.
+            return sorted(candidatos, key=lambda c: -c.carta.fuerza)[:n]
         if accion == "jugarDesde":
             from .motor import Jugada
 
+            if _bota_el_coste_de_lo_que_trae(h):
+                # Men: no traer un Aliado cuyo coste me deje sin castillo.
+                candidatos = [c for c in candidatos if not _coste_me_deja_sin_castillo(p, yo, c)] or candidatos
             # #77: la que más rinde al jugarse ahora (Haquika sobre Djedefhor).
             if _aliado_temporal(h):
                 # Cruz Templaria: el Aliado se destierra en la Fase Final; vale

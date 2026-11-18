@@ -208,7 +208,8 @@ CORRECCIONES_APAGADAS: set[str] = set()  # nombres normalizados (mediciones)
 
 
 # Fuerza impresa distinta de la cargada en el catálogo (desafío gXXd: Sir Erec es 2).
-FUERZA_CORREGIDA = {"sir erec": 2}
+# Enialio está cargado con fuerza 22 (error de tipeo: coste 2, fuerza 2).
+FUERZA_CORREGIDA = {"sir erec": 2, "enialio": 2}
 # Coste impreso distinto del catálogo (desafío 1bXc T15: Saqqara es 2).
 COSTE_CORREGIDO = {"saqqara": 2}
 
@@ -463,6 +464,15 @@ TAMANO_MAZO = 49  # cartas del Mazo Castillo (sin el Oro inicial)
 _ban_cache: dict[str, dict[str, int]] = {}
 
 
+SIN_LIMITE_DE_COPIAS = re.compile(r"puedes\s+tener\s+m[áa]s\s+de\s+(?:3|tres)\b", re.IGNORECASE)
+
+
+def copias_maximas(carta: Carta) -> int:
+    """Copias permitidas si la Ban List no dice otra cosa: 3, salvo que la
+    carta diga "Puedes tener más de 3 … en tu Mazo Castillo" (Draco Águila)."""
+    return TAMANO_MAZO if SIN_LIMITE_DE_COPIAS.search(carta.texto or "") else 3
+
+
 def problemas_mazo(mazo: "Mazo", ban: dict[str, int] | None = None) -> list[str]:
     """Por qué un mazo no se puede simular: debe tener 49 cartas y respetar la
     Ban List de su formato. Lista vacía si cumple. Sin `ban` se usa la del
@@ -480,7 +490,7 @@ def problemas_mazo(mazo: "Mazo", ban: dict[str, int] | None = None) -> list[str]
     for c in mazo.cartas:
         conteo[c.id] = conteo.get(c.id, 0) + 1
     for cid, k in sorted(conteo.items(), key=lambda x: nombres[x[0]]):
-        maximo = ban.get(cid, 3)
+        maximo = ban.get(cid, copias_maximas(next(c for c in mazo.cartas if c.id == cid)))
         if cid != ORO_INICIAL_ID and k > maximo:
             out.append(f"{nombres[cid]} ×{k} (prohibida)" if maximo == 0 else f"{nombres[cid]} ×{k} (máximo {maximo})")
     return out

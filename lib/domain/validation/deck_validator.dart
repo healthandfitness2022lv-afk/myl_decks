@@ -64,7 +64,23 @@ String _keyFor(DeckCardEntry e) {
   return normalizeBanListKey(name.isNotEmpty ? name : (e.cardId ?? ''));
 }
 
-int _copyLimitForEntry(DeckCardEntry entry, Map<String, int> copyLimitsByKey) {
+/// "Puedes tener más de 3 Draco Águila en tu Mazo Castillo": la carta no tiene
+/// el tope de 3 copias, salvo que la Ban List le fije uno. Mismo criterio que
+/// `copias_maximas` del simulador (`simulator/myl_sim/datos.py`).
+final _sinLimiteDeCopias = RegExp(
+  r'puedes\s+tener\s+m[áa]s\s+de\s+(?:3|tres)\b',
+  caseSensitive: false,
+);
+
+bool cartaSinLimiteDeCopias(dynamic card) =>
+    card is CardMyL &&
+    _sinLimiteDeCopias.hasMatch('${card.habilidadTextoIA}\n${card.habilidad}');
+
+int _copyLimitForEntry(
+  DeckCardEntry entry,
+  Map<String, int> copyLimitsByKey, {
+  bool sinLimite = false,
+}) {
   final cardId = entry.cardId?.trim();
   if (cardId != null && cardId.isNotEmpty) {
     final fromId = copyLimitsByKey[normalizeBanListKey(cardId)];
@@ -81,7 +97,8 @@ int _copyLimitForEntry(DeckCardEntry entry, Map<String, int> copyLimitsByKey) {
     }
   }
 
-  return entry.unica ? 1 : 3;
+  if (entry.unica) return 1;
+  return sinLimite ? 99 : 3;
 }
 
 ValidationResult validateDeck({
@@ -106,7 +123,16 @@ ValidationResult validateDeck({
     final key = _keyFor(entry);
     copyCounter[key] = (copyCounter[key] ?? 0) + entry.count;
     labelByKey[key] = entry.name;
-    limitByKey[key] = _copyLimitForEntry(entry, copyLimitsByKey);
+    final enCatalogo =
+        entry.cardId != null
+            ? catalogById[entry.cardId!]
+            : catalogByName[entry.name] ??
+                catalogByName[entry.name.trim().toLowerCase()];
+    limitByKey[key] = _copyLimitForEntry(
+      entry,
+      copyLimitsByKey,
+      sinLimite: cartaSinLimiteDeCopias(enCatalogo),
+    );
   }
   for (final entry in deck.sideboardCards) {
     final key = _keyFor(entry);

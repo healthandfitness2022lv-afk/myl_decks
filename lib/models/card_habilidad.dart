@@ -248,6 +248,10 @@ const kCuando = [
   Opcion('al_hacer_dano', 'Cuando hace daño al Mazo Castillo oponente'),
   Opcion('propia_entra', 'Cuando una carta tuya entra en juego'),
   Opcion('propia_sale', 'Cuando una carta tuya sale del juego'),
+  // "Cuando juegues un Talismán…" (Fruto Fiodhain, Jared el Mago): también
+  // vale para cartas que no entran en juego.
+  Opcion('propia_juega', 'Cuando juegas una carta (aunque no entre en juego)'),
+  Opcion('al_ser_destruido', 'Al ser destruido (no desterrado ni barajado)'),
   Opcion(
     'al_botar_por_oponente',
     'Cuando botas cartas por una habilidad oponente',
@@ -312,6 +316,7 @@ List<Opcion> quienPara(String tipoCarta, Accion accion, {String cuando = ''}) {
   final conDisparadora = const {
     'propia_entra',
     'propia_sale',
+    'propia_juega',
     'oponente_juega',
   }.contains(cuando);
   final base =
@@ -449,6 +454,10 @@ List<Opcion> cuandoPara(String tipoCarta) {
       Opcion('al_jugar', 'Al jugarse en la Reserva'),
       Opcion('propia_entra', 'Cuando una carta tuya entra en juego'),
       Opcion('propia_sale', 'Cuando una carta tuya sale del juego'),
+      Opcion(
+        'propia_juega',
+        'Cuando juegas una carta (aunque no entre en juego)',
+      ),
       Opcion('al_inicio_fase', 'Al comienzo de la fase indicada'),
       Opcion('oponente_juega', 'Cuando el oponente juega una carta'),
       Opcion(
@@ -535,6 +544,7 @@ const kCondiciones = [
     'destierro_vs_oponente',
     'Tus cartas desterradas menos las del oponente (> 0 = tienes más)',
   ),
+  Opcion('armas_propias', 'Armas que controlas'),
 ];
 
 /// Valor multiplicado "por cada…" (Djoser: +2 por cada Arma que porta).
@@ -1604,12 +1614,17 @@ class CondicionHabilidad {
   /// Para 'aliados_arquetipo' y 'mano_arquetipo' (Druida, Goblin…).
   final String arquetipo;
 
+  /// Campos que este editor no conoce (los agrega el agente para el
+  /// simulador: `nombre`, `zona`, `incluyeFuente`…). Se conservan al guardar.
+  final Map<String, dynamic> extra;
+
   const CondicionHabilidad({
     this.tipo = 'ninguna',
     this.op = '>=',
     this.valor = 1,
     this.raza = '',
     this.arquetipo = '',
+    this.extra = const {},
   });
 
   bool get esNinguna => tipo == 'ninguna';
@@ -1622,6 +1637,7 @@ class CondicionHabilidad {
       valor: (m['valor'] as num?)?.toInt() ?? 1,
       raza: (m['raza'] ?? '').toString(),
       arquetipo: (m['arquetipo'] ?? '').toString(),
+      extra: _extra(m, const {'tipo', 'op', 'valor', 'raza', 'arquetipo'}),
     );
   }
 
@@ -1629,6 +1645,7 @@ class CondicionHabilidad {
       esNinguna
           ? {'tipo': 'ninguna'}
           : {
+            ...extra,
             'tipo': tipo,
             'op': op,
             'valor': valor,
@@ -1876,6 +1893,7 @@ class CardHabilidad {
       if (const {
             'propia_entra',
             'propia_sale',
+            'propia_juega',
             'oponente_juega',
           }.contains(cuando) &&
           disparoTipos.isNotEmpty)

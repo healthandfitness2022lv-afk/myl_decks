@@ -460,7 +460,9 @@ class _HabilidadEditorState extends State<_HabilidadEditor> {
           permitidos: const ['Aliado', 'Arma', 'Talismán', 'Tótem', 'Oro'],
         ),
       ],
-      if (h.cuando == 'propia_entra' || h.cuando == 'propia_sale') ...[
+      if (h.cuando == 'propia_entra' ||
+          h.cuando == 'propia_sale' ||
+          h.cuando == 'propia_juega') ...[
         const SizedBox(height: 8),
         const Text(
           '¿Qué tipo de carta tuya? (vacío = cualquiera; no cuenta esta misma)',
@@ -1182,6 +1184,9 @@ class _HabilidadEditorState extends State<_HabilidadEditor> {
     valor: valor ?? c.valor,
     raza: raza ?? c.raza,
     arquetipo: arquetipo ?? c.arquetipo,
+    // Los campos del simulador pertenecen a ese tipo de condición: si se
+    // cambia el tipo, ya no aplican.
+    extra: tipo != null && tipo != c.tipo ? const {} : c.extra,
   );
 
   Widget _check(String label, bool value, ValueChanged<bool> onChanged) =>

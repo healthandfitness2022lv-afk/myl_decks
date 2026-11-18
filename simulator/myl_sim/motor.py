@@ -36,6 +36,9 @@ FIN_SIN_CASTILLO = True
 # 2026-11-15: pagar a mano también dispara el Broche de Tara (apagar para
 # reproducir partidas grabadas antes).
 PAGO_MANUAL_DISPARA = True
+# 2026-11-17: el Oro jugado en la Vigilia dispara "cuando una carta tuya entra
+# en juego" (Rey Midas, Musa Calíope). Apagar para reproducir partidas grabadas antes.
+ORO_JUGADO_DISPARA_ENTRADA = True
 
 
 class FinPartida(Exception):
@@ -453,6 +456,10 @@ class Partida:
                 self.anotar(f"J{a} juega oro {elegida.carta.nombre}")
                 hab.errante(self, elegida.carta)
                 hab.disparar(self, elegida.carta, "al_jugar")
+                if ORO_JUGADO_DISPARA_ENTRADA:
+                    # Musa Calíope / Rey Midas: "cuando un Oro entre en juego
+                    # bajo tu control" también vale para el Oro del turno.
+                    hab.disparar_entrada(self, elegida.carta)
             else:
                 self.ejecutar_jugada(a, elegida)
             # El Oro solo se juega como primera acción de la Vigilia.
@@ -609,6 +616,7 @@ class Partida:
             inst.listo = False  # #118: sin habilidad (Cleopatra) no tiene Furia para atacar
         hab.disparar(self, inst, "al_jugar")
         hab.disparar_entrada(self, inst)
+        hab.disparar_jugada(self, i, inst)  # "cuando juegues un Talismán" (Fruto Fiodhain, Jared)
         if self.e.fase == "vigilia" and self.e.activo == inst.controlador and inst.en_juego:
             # GdWO: "En tu fase de Vigilia, Saladino genera 2 Oros": jugado en
             # la Vigilia, genera ya en esa misma Vigilia.
@@ -786,7 +794,7 @@ class Partida:
             # bloquear y le quita la habilidad a Djoser) va antes de que se
             # jueguen las demás cartas: el Escudo Miliciano ya no le hace
             # destruir a Djoser.
-            for x in atacantes:
+            for x in list(atacantes):
                 if x.en_juego:
                     hab.disparar_con_armas(self, x, "al_atacar", declaracion=True)
             # Canceladores de ataque: se juegan en este paso (D.A.R. 5.3.1).
@@ -798,7 +806,9 @@ class Partida:
                 if x.zona == Zona.ATAQUE:
                     self._mover(x, Zona.DEFENSA)
             return
-        for x in atacantes:
+        # Copia de la lista: Nathair-Teine suma un atacante que no fue
+        # "declarado" (no dispara su propio "al ser declarado atacante").
+        for x in list(atacantes):
             if x.en_juego:
                 hab.disparar_con_armas(self, x, "al_atacar", declaracion=False)
         hab.disparar_ataque_propio(self, a)  # Coliseo: roba por cada atacante
@@ -1034,6 +1044,8 @@ class Partida:
             inst.estados.clear()
             inst.sin_habilidad_hasta = None
             inst.listo = False
+            if getattr(inst, "copia_permanente", False):  # Fiodhain: fuera del juego vuelve a ser ella
+                inst.copia, inst.copia_permanente = (), False
             # Las Armas portadas siguen a su portador (4.2.2).
             for arma in [a for a in self.e.portadas if a.portador == inst.uid]:
                 self._mover(arma, zona if zona != Zona.MAZO else Zona.CEMENTERIO)

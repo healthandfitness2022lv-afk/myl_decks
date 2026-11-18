@@ -940,6 +940,36 @@ def fuerza(p: "Partida", inst: Instancia) -> int:
     return max(0, valor * 2 ** duplicar)
 
 
+def desglose_fuerza(p: "Partida", inst: Instancia) -> list[tuple[str, str]]:
+    """Desafío vUsU T9: «al tocar un Aliado debe mostrar quién lo bonifica o
+    perjudica». [(carta, «+2» / «-1» / «= 0» / «×2»)], en el orden de `fuerza`."""
+    if inst.tipo != Tipo.ALIADO:
+        return []
+    out: list[tuple[str, str]] = []
+
+    def texto(modo: str, valor: int) -> str:
+        return {"fijar": f"= {valor}", "duplicar": "×2", "base": "sin bonos"}.get(modo, f"{valor:+d}")
+
+    def nombre(uid):
+        # Forma de Lince ya está en el Cementerio: se busca en todas las zonas.
+        for j in p.e.jugadores:
+            for x in [*p.e.instancias_en_juego(j.indice), *j.cementerio, *j.destierro, *j.mano, *j.pagado]:
+                if x.uid == uid:
+                    return x.nombre
+        return "efecto"
+
+    for m in inst.mods:
+        if m.modo != "sumar" or m.valor:
+            out.append((nombre(m.fuente), texto(m.modo, m.valor)))
+    for s, h in _continuas(p, "modificarFuerza"):
+        if _afecta_continua(p, s, h, inst):
+            v = int(h.get("valor", 0)) * por_cada(p, s, h)
+            modo = h.get("modoFuerza", "sumar")
+            if modo != "sumar" or v:
+                out.append((s.nombre, texto(modo, v)))
+    return out
+
+
 def _afecta_continua(p: "Partida", s: Instancia, h: dict, inst: Instancia) -> bool:
     """¿La fuerza continua `h` de `s` alcanza a `inst`?"""
     if inmune(p, inst, s):
@@ -1013,6 +1043,12 @@ def _habilidades_al_jugar(inst: Instancia) -> list[dict]:
 def _objetivos_suficientes(p: "Partida", i: int, inst: Instancia, h: dict) -> bool:
     if not _necesita_objetivo(h):
         return True
+    obj = h.get("objetivo") or {}
+    if NOMBRAR_SOLO_AL_ACTIVAR and obj.get("nombrarCarta") and h.get("cuando") in ("activada", "al_hacer_dano"):
+        # Desafío vUsU T5 (y g9FE «ya no me deja activar el Orfeo»): Orfeo
+        # nombra al activarse; antes se buscaban copias de un nombre que aún no
+        # existía y nunca se ofrecía. Basta con que haya dónde buscar.
+        h = {**h, "objetivo": {**obj, "nombrarCarta": False}}
     minimo = int(h.get("cantidad", 1)) if h.get("cantidadExacta") else 1
     return len(candidatos_validos(p, i, inst, h)) >= minimo
 

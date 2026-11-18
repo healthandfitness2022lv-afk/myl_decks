@@ -46,6 +46,12 @@ def _carta(inst: Instancia, partida: Partida) -> dict[str, Any]:
     }
     if inst.en_juego:
         out.update(_estado_habilidad(inst, partida))
+        desglose = hab.desglose_fuerza(partida, inst)
+        if desglose:
+            # Desafío vUsU T9: al tocar un Aliado se ve quién lo sube o lo baja.
+            base = inst.fuerza_temporal if inst.fuerza_temporal is not None else inst.carta.fuerza
+            out["fuerzaBase"] = base
+            out["fuerzaDesglose"] = [{"de": de, "valor": v} for de, v in desglose]
     return out
 
 
@@ -332,7 +338,11 @@ class HumanoRemoto:
     def elegir_objetivos(self, p, yo, candidatos, n, h):
         obj = (h or {}).get("objetivo") or {}
         barajar_todo = (h or {}).get("accion") == "barajar" and obj.get("zona") == "cementerio"             and obj.get("quien") in ("propio", None)  # Escudo Celestial: n o menos en el Cementerio
-        if candidatos and len(candidatos) <= n and (barajar_todo or not (h or {}).get("opcional"))                 and (h or {}).get("accion") not in ("descartar",):
+        # Desafío BibK T12: la Corona es opcional («¿Usar?» ya se preguntó) y
+        # su objetivo es el Aliado que acaba de entrar: no se vuelve a elegir.
+        obvio = obj.get("quien") in ("disparadora", "esta_carta")
+        if candidatos and len(candidatos) <= n and (barajar_todo or obvio or not (h or {}).get("opcional")) \
+                and (h or {}).get("accion") not in ("descartar",):
             # Corona Faraónica: el único objetivo posible (el Aliado que
             # entra) se toma solo, sin preguntar lo obvio.
             return list(candidatos)
@@ -347,6 +357,13 @@ class HumanoRemoto:
 
     def usar_opcional(self, p, yo, fuente, h):
         que = _texto_habilidad(h) if h.get("accion") else ""
+        if h.get("modo") == "puede_atacar_este_turno":
+            # Desafío BibK T12: decía «restringirCombate 1 en juego».
+            x = getattr(p, "ctx_disparadora", None)
+            que = f"que {x.nombre if x is not None else 'el Aliado'} pueda atacar este turno"
+        costo = describir_costo(h.get("costo") or {})
+        if que and costo != "Sin costo":
+            que += f" · {costo.lower()}"
         return self._pedir("confirmar", [], {
             "titulo": f"¿Usar {fuente.nombre}" + (f" ({que})" if que else "") + "?"}) == "si"
 
@@ -394,9 +411,13 @@ class HumanoRemoto:
         return int(r) if r not in (None, "", "pasar") else None
 
     def preferir_alternativo(self, p, yo, fuente, h):
-        return self._pedir("confirmar", [], {
-            "titulo": f"¿Pagar el costo alternativo de {fuente.nombre}?"
-        }) == "si"
+        # Desafío dJ00 T7: «no preguntes por costes alternativos, sé explícito
+        # entre las opciones»: Ptolomeo II → «Botar 3» o «Pagar 1 Oro».
+        r = self._pedir("opcion", [
+            {"id": "normal", "titulo": describir_costo(h.get("costo") or {})},
+            {"id": "alternativo", "titulo": describir_costo(h.get("costoAlternativo") or {})},
+        ], {"titulo": f"{fuente.nombre}: ¿cómo pagas?"})
+        return r == "alternativo"
 
     def redirigir(self, p, yo, objetivo, opciones):
         datos = [{"id": str(k), "titulo": x.nombre} for k, x in enumerate(opciones)]
@@ -561,7 +582,7 @@ def _texto_habilidad(h: dict) -> str:
     obj = h.get("objetivo") or {}
     if h.get("accion") == "modificarFuerza":
         # Bereber: «+1 de fuerza a esta carta» · «+2 de fuerza a otro Guerrero».
-        quien = "esta carta" if obj.get("quien") == "esta_carta" else             f"otro {obj.get('arquetipo') or obj.get('raza') or 'Aliado'}" if obj.get("excluirEstaCarta")             else (obj.get("arquetipo") or obj.get("raza") or "un Aliado")
+        quien = "esta carta" if obj.get("quien") == "esta_carta" else             f"otro {obj.get('arquetipo') or obj.get('raza') or 'Aliado'}" if (obj.get("excluirEstaCarta") or obj.get("excluirFuente"))             else (obj.get("arquetipo") or obj.get("raza") or "un Aliado")
         return f"{int(h.get('valor', 0) or 0):+d} de fuerza a {quien}"
     texto = f"{_VERBOS.get(h.get('accion'), str(h.get('accion')))} {h.get('cantidad', 1) or 1}"
     que = " ".join(x for x in ("/".join(obj.get("tipos") or []), obj.get("raza") or obj.get("arquetipo") or "") if x)
@@ -594,6 +615,26 @@ _ACCIONES_TEXTO = {
     "convertirEnAliado": "se vuelve Aliado", "cancelarAtaque": "cancela el ataque", "reducirDano": "reduce el daño",
     "mover": "mueve", "ganarControl": "toma el control", "descartar": "descarta", "prevenir": "previene",
 }
+
+
+def describir_costo(c: dict) -> str:
+    """«Pagar 1 Oro», «Botar 3», «Descartar 1 carta», «Destruir 1 Aliado tuyo»."""
+    def n(k):
+        return int(c.get(k) or 0)
+    partes = []
+    if n("oros"):
+        partes.append(f"Pagar {n('oros')} Oro{'s' if n('oros') != 1 else ''}")
+    if n("botar"):
+        partes.append(f"Botar {n('botar')}")
+    if n("descartar"):
+        partes.append(f"Descartar {n('descartar')} carta{'s' if n('descartar') != 1 else ''}")
+    if n("destruirAliados"):
+        partes.append(f"Destruir {n('destruirAliados')} Aliado{'s' if n('destruirAliados') != 1 else ''} tuyo")
+    if n("desterrarCementerio"):
+        partes.append(f"Desterrar {n('desterrarCementerio')} de tu Cementerio")
+    if c.get("desterrarEstaCarta"):
+        partes.append("Desterrar esta carta")
+    return " y ".join(partes) or "Sin costo"
 
 
 def describir_habilidad(h: dict) -> str:

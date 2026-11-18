@@ -195,6 +195,25 @@ def _corregir(nombre: str, habs: list[dict]) -> list[dict]:
                  "zonaActivacion": R, "costo": {"oros": 2, "desterrarEstaCarta": True}, "zonaDestino": "mano",
                  "objetivo": {"seleccion": "elige", "zona": "cementerio", "tipos": ["Talismán"], "quien": "propio",
                               "coste": {"valor": 3, "op": "<="}}}]
+    if n == "djoser":
+        # Desafío BibK T6: "puedes destruir un Aliado oponente": es opcional.
+        return [{**h, "opcional": True} if h.get("accion") == "destruir" and h.get("cuando") == "propia_entra"
+                else h for h in habs]
+    if n == "guerrero bereber":
+        # Desafío w3a6 T5: "otro Guerrero que controles" incluye a otro Bereber
+        # (excluirEstaCarta sacaba también las copias del mismo nombre).
+        out = []
+        for h in habs:
+            obj = h.get("objetivo") or {}
+            if h.get("accion") == "modificarFuerza" and obj.get("excluirEstaCarta"):
+                obj = {k: v for k, v in obj.items() if k != "excluirEstaCarta"}
+                h = {**h, "objetivo": {**obj, "excluirFuente": True}}
+            out.append(h)
+        return out
+    if n == "escudo miliciano":
+        # Desafíos BibK T12 y AkOg T13: "en respuesta a un Ataque" es cualquier
+        # ataque, también el tuyo (al declarar tus atacantes); era solo el rival.
+        return [{**h, "turno": "cualquiera"} if h.get("accion") == "jugarDesde" else h for h in habs]
     if n == "corona faraonica":
         # "si este Oro está en tu Reserva de Oros": pagado no dispara.
         return [{**h, "zonaActivacion": "reserva_oro"} if h.get("cuando") == "propia_entra" else h for h in habs]

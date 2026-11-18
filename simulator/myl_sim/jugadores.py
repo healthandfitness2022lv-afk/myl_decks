@@ -5093,6 +5093,14 @@ class Heuristico:
             oros = [c for c in candidatos if c.tipo == Tipo.ORO]
             if oros:
                 return sorted(oros, key=lambda c: -_valor_carta(p, c))[:n]
+        if fuente_contexto is not None and fuente_contexto.nombre.casefold() == "eros" \
+                and accion == "buscar":
+            # Desafío vUsU T3 (Héctor): «por lo general el Olímpico se busca
+            # las 2 Coronas del Día y si no, una Corona y una Ofrenda a los
+            # Dioses». La IA tomaba Olímpicos + 1 Corona.
+            orden = {"corona del día": 0, "ofrenda a los dioses": 1}
+            return sorted(candidatos, key=lambda c: (
+                orden.get(c.nombre.casefold(), 2), -_valor_carta(p, c)))[:n]
         def ya_jugable(c):
             return c.controlador == yo and (
                 _zona_de(c) in _se_juega_desde(c) or _recupera_desde_cementerio(c)

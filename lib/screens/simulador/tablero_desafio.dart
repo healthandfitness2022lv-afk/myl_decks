@@ -95,6 +95,21 @@ Future<dynamic> elegirAccionConOros(
   );
 }
 
+/// Desafío vUsU T9: quién sube o baja la fuerza de un Aliado.
+/// «base 3 · +2 Guerrero Bereber · -1 Toro Apis». Null si no tiene cambios.
+String? desgloseFuerza(Map carta) {
+  final partes = (carta['fuerzaDesglose'] as List? ?? const []).whereType<Map>();
+  if (partes.isEmpty) return null;
+  return [
+    'base ${carta['fuerzaBase']}',
+    for (final p in partes) '${p['valor']} ${p['de']}',
+  ].join(' · ');
+}
+
+/// Fuerza total de los Aliados elegidos para atacar (contador del ataque).
+int fuerzaAtaque(Iterable<Map> atacantes) => atacantes.fold(
+    0, (s, c) => s + ((c['fuerza'] as num?)?.toInt() ?? 0));
+
 /// Mesa interactiva del desafío. Los gestos solo proponen una acción: el
 /// worker sigue siendo quien valida su legalidad y aplica las reglas.
 class TableroDesafio extends StatefulWidget {
@@ -701,8 +716,30 @@ class _TableroDesafioState extends State<TableroDesafio> {
             }, pasar.isEmpty ? null : () => _mandar('${pasar.first['id']}')),
           ]);
         case 'atacantes':
+          // Desafío vUsU T9: contador animado de la fuerza del ataque y se
+          // puede bajar un atacante (tocarlo o arrastrarlo a la Defensa).
+          final total = fuerzaAtaque(
+              _opciones.where((o) => _seleccion.contains('${o['id']}')));
           hijos.addAll([
-            instruccion('Toca o arrastra los Aliados que atacan'),
+            TweenAnimationBuilder<double>(
+              tween: Tween(end: total.toDouble()),
+              duration: const Duration(milliseconds: 450),
+              curve: Curves.easeOutCubic,
+              builder: (context, v, _) => Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7A1F12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _boardGold, width: 2)),
+                child: Text('⚔ ${v.round()}', key: const ValueKey('fuerza-ataque'),
+                  style: const TextStyle(color: Colors.white, fontSize: 18,
+                    fontWeight: FontWeight.w900)),
+              ),
+            ),
+            instruccion(_seleccion.isEmpty
+                ? 'Toca o arrastra los Aliados que atacan'
+                : 'Toca un atacante para bajarlo'),
             boton(_seleccion.isEmpty ? 'Sin ataque' : 'Atacar con ${_seleccion.length}',
                 () => _mandar(_seleccion.toList())),
           ]);
@@ -954,6 +991,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
       return destino == 'pagado' && _opciones.any((x) => '${x['id']}' == uid);
     }
     if (_tipo == 'atacantes') {
+      if (destino == 'defensa') return _seleccion.contains(uid); // bajarlo
       return destino == 'ataque' && _opciones.any((x) => '${x['id']}' == uid);
     }
     if (_tipo == 'jugada' && destino != 'mano' && _talismanDe(uid) != null) {
@@ -992,7 +1030,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
       return;
     }
     if (_tipo == 'atacantes') {
-      setState(() => _seleccion.add(uid));
+      setState(() => destino == 'defensa' ? _seleccion.remove(uid) : _seleccion.add(uid));
       return;
     }
     final talisman = _tipo == 'jugada' ? _talismanDe(uid) : null;
@@ -1061,13 +1099,30 @@ class _TableroDesafioState extends State<TableroDesafio> {
     ]),
   );
 
+  /// Desafíos dJ00 T9 y BibK T12: cartas que se usan desde una pila
+  /// (Escudo Miliciano desde el Cementerio). La pila se marca y, al abrirla,
+  /// tocar la carta la juega o activa.
+  bool _usableEnPila(Map carta) =>
+      _tipo == 'jugada' &&
+      _opciones.any((o) => '${o['cartaUid']}' == '${carta['id']}');
+
+  String _etiquetaPila(Map carta) {
+    final o = _opciones.firstWhere((o) => '${o['cartaUid']}' == '${carta['id']}');
+    return '${o['tipoJugada']}' == 'activar' ? 'ACTIVAR' : 'JUGAR';
+  }
+
   Widget _pila(String titulo, List<Map> cartas, int cantidad,
       {bool castillo = false}) {
     final tope = cartas.isEmpty ? null : cartas.last;
+    final usable = !castillo && cartas.any(_usableEnPila);
     return InkWell(
       onTap: castillo ? null : () => _verPila(titulo, cartas),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Stack(alignment: Alignment.center, children: [
+          if (usable)
+            Container(width: 70, height: 94, decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(color: _boardGold, width: 3))),
           SizedBox(width: 64, height: 88, child: ClipRRect(
             borderRadius: BorderRadius.circular(5),
             child: castillo
@@ -1092,8 +1147,9 @@ class _TableroDesafioState extends State<TableroDesafio> {
           ),
         ]),
         const SizedBox(height: 3),
-        Text(titulo, maxLines: 1, overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.white,
+        Text(usable ? '$titulo · USAR' : titulo, maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: usable ? _boardGold : Colors.white,
             fontSize: 10, fontWeight: FontWeight.bold)),
       ]),
     );
@@ -1126,10 +1182,30 @@ class _TableroDesafioState extends State<TableroDesafio> {
                       mainAxisSpacing: 8, crossAxisSpacing: 8),
                     itemBuilder: (context, i) {
                       final carta = cartas[cartas.length - 1 - i];
+                      final usable = _usableEnPila(carta);
                       return GestureDetector(
-                        onTap: () => _ampliar(carta),
-                        child: _CaraCarta(cartaId: '${carta['cartaId']}',
-                          nombre: '${carta['nombre']}', width: 100, height: 140),
+                        onTap: () {
+                          if (!usable) {
+                            _ampliar(carta);
+                            return;
+                          }
+                          Navigator.pop(dialogContext);
+                          _tocarCarta(carta, 'pila');
+                        },
+                        child: Stack(children: [
+                          Positioned.fill(child: _CaraCarta(
+                            cartaId: '${carta['cartaId']}',
+                            nombre: '${carta['nombre']}', width: 100, height: 140)),
+                          if (usable)
+                            Positioned(left: 0, right: 0, bottom: 0, child: Container(
+                              color: _boardGold,
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Text(_etiquetaPila(carta),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.black,
+                                  fontSize: 12, fontWeight: FontWeight.w900)),
+                            )),
+                        ]),
                       );
                     },
                   )),
@@ -1211,7 +1287,8 @@ class _TableroDesafioState extends State<TableroDesafio> {
                               : _carta(cartas[i],
                                   zona: destino,
                                   width: cartaAncho, height: cartaAlto,
-                                  draggable: destino == 'mano' || destino == 'defensa' || destino == 'reserva'),
+                                  draggable: destino == 'mano' || destino == 'defensa' || destino == 'reserva' ||
+                                      (destino == 'ataque' && _tipo == 'atacantes')),
                           ),
                         ),
                     ]);
@@ -1650,7 +1727,9 @@ class _TableroDesafioState extends State<TableroDesafio> {
                   '${c['nombre']}',
                   if (c['fuerza'] != null) 'fuerza ${c['fuerza']}',
                   if (armas.isNotEmpty) 'porta ${armas.map((a) => a['nombre']).join(', ')}',
-                ].join(' · ') + (motivo == null ? '' : '\n$motivo'),
+                ].join(' · ') +
+                    (desgloseFuerza(c) == null ? '' : '\n${desgloseFuerza(c)}') +
+                    (motivo == null ? '' : '\n$motivo'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
               ),

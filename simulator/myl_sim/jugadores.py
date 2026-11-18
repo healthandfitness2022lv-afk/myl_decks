@@ -5772,6 +5772,13 @@ class Heuristico:
                 cands = [c for c in hab.candidatos_validos(p, yo, fuente, x) if c is not fuente] or                     hab.candidatos_validos(p, yo, fuente, x)
                 return min((_valor_vivo(p, c) for c in cands), default=99)
             return 5.0
+        if opciones and all(x.get("accion") == "modificarFuerza" for x in opciones):
+            # Ascenso Draco: "los rivales pierden 1 por cada Draco" o "tus
+            # Dragones ganan 1": la que mueve más fuerza en la mesa.
+            def impacto(x):
+                return abs(int(x.get("valor", 0) or 0) * hab.por_cada(p, fuente, x)) \
+                    * len(hab.candidatos_validos(p, yo, fuente, x))
+            return max(range(len(opciones)), key=lambda k: impacto(opciones[k]))
         return min(range(len(opciones)), key=lambda k: costo(opciones[k]))
 
     def cancelar_habilidad(self, p, yo, fuente, h, opciones):

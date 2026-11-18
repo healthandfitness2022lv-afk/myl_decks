@@ -252,6 +252,7 @@ const kCuando = [
   // vale para cartas que no entran en juego.
   Opcion('propia_juega', 'Cuando juegas una carta (aunque no entre en juego)'),
   Opcion('al_ser_destruido', 'Al ser destruido (no desterrado ni barajado)'),
+  Opcion('al_descartarse', 'Al ser descartada de tu mano'),
   Opcion(
     'al_botar_por_oponente',
     'Cuando botas cartas por una habilidad oponente',

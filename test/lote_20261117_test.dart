@@ -155,11 +155,36 @@ void main() {
       copyLimitsByKey: ban,
     ).issues.any((i) => i.code == 'COPIES_LIMIT');
 
-    test('la carta que lo dice no tiene el tope de 3', () {
-      expect(cartaSinLimiteDeCopias(aguila), isTrue);
-      expect(cartaSinLimiteDeCopias(comun), isFalse);
+    test('una carta Mercenario admite hasta 6 copias', () {
+      expect(cartaEsMercenario(aguila), isTrue);
+      expect(cartaEsMercenario(comun), isFalse);
       expect(excede(mazo('draco_aguila', 'Draco Águila')), isFalse);
       expect(excede(mazo('draco', 'Draco Común')), isTrue);
+      final siete = Deck(
+        id: 'm',
+        ownerId: 'u',
+        name: 'Águilas',
+        cards: const [
+          DeckCardEntry(cardId: 'draco_aguila', name: 'Draco Águila', count: 7),
+        ],
+      );
+      expect(excede(siete), isTrue);
+    });
+
+    test('se reconoce sin catálogo si la carta ya se leyó', () {
+      bool sinCatalogo(Deck d) => validateDeck(
+        deck: d,
+        catalogById: const {},
+        catalogByName: const {},
+      ).issues.any((i) => i.code == 'COPIES_LIMIT');
+      registrarMercenario(id: 'otro_mercenario', nombre: 'Otro Mercenario');
+      expect(sinCatalogo(mazo('otro_mercenario', 'Otro Mercenario')), isFalse);
+      expect(sinCatalogo(mazo('desconocida', 'Desconocida')), isTrue);
+      expect(textoEsMercenario('Puedes tener más de 3 X en tu Mazo.'), isTrue);
+      expect(limiteDeCopias(enBanList: null, unica: false, mercenario: true), 6);
+      expect(limiteDeCopias(enBanList: 2, unica: false, mercenario: true), 2);
+      expect(limiteDeCopias(enBanList: null, unica: true, mercenario: true), 1);
+      expect(limiteDeCopias(enBanList: null, unica: false, mercenario: false), 3);
     });
 
     test('la Ban List manda si le fija un límite', () {

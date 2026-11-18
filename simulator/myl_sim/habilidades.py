@@ -1149,6 +1149,8 @@ def disparar(
     for h in habs:
         if h.get("cuando") != cuando or h.get("accion") in ("anular", "prevenir") or es_permiso_jugar(h):
             continue
+        if h.get("soloPorHabilidad") and not getattr(p, "ctx_descarte_por_habilidad", True):
+            continue  # Fear Sidhe: "descartado por una habilidad" (no por exceso de mano)
         if not fase_ok(p, h) and inst.tipo != Tipo.TALISMAN:
             continue
         if declaracion is not None and (h.get("fase") == "declaracion_ataque") != declaracion:
@@ -2144,6 +2146,9 @@ def _resolver_efecto(
         tope = len([x for x in p.j(i).cementerio if x is not fuente])
         cands = [x for x in cands if x.tipo != Tipo.ORO and x.carta.coste <= tope]
     if not cands:
+        motivo = _motivo_sin_objetivos(p, i, h)
+        if motivo:
+            p.anotar(f"✗ {fuente.nombre}: {motivo}")
         return False, []
     objetivos = _seleccionar(p, i, fuente, h, cands)
     if h.get("cantidadExacta") and len(objetivos) != n:
@@ -2477,6 +2482,11 @@ def prohibido(p: "Partida", modo: str, jugador: int, carta: Instancia | None = N
                 return True
         if carta.tipo == Tipo.ALIADO and getattr(p.j(jugador), "veto_aliados_turno", None) == p.e.turno:
             return True  # Meleagro: este turno no puede poner Aliados en juego
+    return quien_prohibe(p, modo, jugador, carta) is not None
+
+
+def quien_prohibe(p: "Partida", modo: str, jugador: int, carta: Instancia | None = None) -> Instancia | None:
+    """La carta en juego cuya Restricción impide esta acción a `jugador`."""
     for s in p.e.instancias_en_juego():
         for h in s.habilidades:
             if h.get("accion") != "restriccion" or h.get("modo") != modo:
@@ -2496,8 +2506,27 @@ def prohibido(p: "Partida", modo: str, jugador: int, carta: Instancia | None = N
                 continue  # Carmix: "los Oros en juego no pueden ser desterrados"
             if obj.get("cementerioPropio"):
                 continue  # Cerbero: se filtra por dueño en _protegidas_cerbero
-            return True
-    return False
+            return s
+    return None
+
+
+def _motivo_sin_objetivos(p: "Partida", i: int, h: dict) -> str:
+    """Desafío SkkvVn (18-11): el Milano Negro hizo daño y no desterró nada,
+    sin decir por qué (había un Cinturón de Lady Ann en la Reserva). Si el
+    efecto se queda sin objetivos por una Restricción en juego, se dice cuál."""
+    accion = h.get("accion")
+    zonas = zonas_de(h.get("objetivo") or {})
+    modos = {
+        "desterrar": ["desterrar_cementerio"] if "cementerio" in zonas else [],
+        "barajar": ["barajar"] + (["barajar_cementerio"] if "cementerio" in zonas else []),
+        "destruir": ["destruir"],
+    }.get(accion, [])
+    verbo = {"desterrar": "desterrar del Cementerio", "barajar": "barajar", "destruir": "destruir"}.get(accion, "")
+    for modo in modos:
+        s = quien_prohibe(p, modo, i)
+        if s is not None:
+            return f"no se puede {verbo}: lo impide {s.nombre} (J{s.controlador})"
+    return ""
 
 
 def no_puede_salir(p: "Partida", x: Instancia) -> bool:

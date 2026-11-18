@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:myl_decks/models/card_variant.dart';
 
+import '../domain/validation/mercenarios.dart';
 import 'card_habilidad.dart';
 
 // card_myl.dart
@@ -104,6 +105,14 @@ class CardMyL {
       if (v is int) return v;
       if (v is num) return v.toInt();
       return int.tryParse('$v') ?? 0;
+    }
+
+    // Mercenario («Puedes tener más de 3…»): se recuerda para que las
+    // pantallas que validan un mazo sin el catálogo la reconozcan.
+    if (textoEsMercenario(
+      '${map['habilidadTextoIA'] ?? ''} ${map['habilidad'] ?? ''}',
+    )) {
+      registrarMercenario(id: id, nombre: '${map['nombre'] ?? ''}');
     }
 
     return CardMyL(

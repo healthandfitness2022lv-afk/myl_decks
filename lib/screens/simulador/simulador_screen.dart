@@ -182,7 +182,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.fitness_center_rounded, color: _gold),
                   title: const Text(
-                    'Entrenamiento',
+                    'ELO',
                     style: TextStyle(color: _gold, fontWeight: FontWeight.bold),
                   ),
                   subtitle: const Text(

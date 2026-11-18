@@ -19,8 +19,6 @@ import '../services/inventory_service.dart';
 import '../services/wishlist_service.dart';
 import '../widgets/card_image.dart';
 import 'create_deck_screen.dart';
-import 'simulador/simulador_screen.dart';
-import '../utils/app_constants.dart';
 
 class MyDecksScreen extends StatefulWidget {
   // Se conserva para no romper rutas antiguas. En v2 siempre hay una lista.
@@ -301,16 +299,6 @@ class _MyDecksScreenState extends State<MyDecksScreen> {
             onPressed: () => context.push('/inventario'),
             icon: const Icon(Icons.folder_copy_outlined),
           ),
-          if ((FirebaseAuth.instance.currentUser?.email ?? '').toLowerCase() ==
-              AppConstants.ownerEmail)
-            IconButton(
-              tooltip: 'Simulador de partidas',
-              onPressed:
-                  () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SimuladorScreen()),
-                  ),
-              icon: const Icon(Icons.sports_esports_outlined),
-            ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(

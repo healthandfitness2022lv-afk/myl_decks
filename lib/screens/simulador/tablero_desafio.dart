@@ -266,9 +266,17 @@ class _TableroDesafioState extends State<TableroDesafio> {
   Widget _campoTelefono(Map<String, dynamic> rival, Map<String, dynamic> yo) {
     Widget zona(String titulo, Map<String, dynamic> lado, String clave, String destino) =>
         _zona(titulo, _cartas(lado, clave), destino, horizontal: false);
+    // Reportes ANtc / HjND: con la letra del sistema agrandada (lo habitual en
+    // un celular) las fichas y las líneas vacías, de alto fijo, se desbordaban.
+    // Crecen con la letra.
+    // En pantallas bajas la letra agrandada no cabe: se limita (las cartas
+    // son imágenes; lo que crece es solo el texto de la mesa).
+    final altoPantalla = MediaQuery.sizeOf(context).height;
+    final tope = altoPantalla < 620 ? 1.0 : altoPantalla < 720 ? 1.15 : 1.3;
+    final letra = (MediaQuery.textScalerOf(context).scale(100) / 100).clamp(1.0, tope);
     // Una línea sin cartas queda angosta (solo su título); las demás se reparten el alto.
     Widget linea(Widget hijo, {required bool vacia, double angosta = 34}) =>
-        vacia ? SizedBox(height: angosta, child: hijo) : Expanded(flex: 3, child: hijo);
+        vacia ? SizedBox(height: angosta * letra, child: hijo) : Expanded(flex: 3, child: hijo);
     Widget fila(String titulo, Map<String, dynamic> lado, String clave, String destino,
         String destinoTotems, {double angosta = 34}) {
       final totems = _cartas(lado, 'apoyo');
@@ -280,11 +288,27 @@ class _TableroDesafioState extends State<TableroDesafio> {
       ]), vacia: _cartas(lado, clave).isEmpty && totems.isEmpty, angosta: angosta);
     }
     final hayFranja = _franjaCartas().isNotEmpty || _franjaTextos().isNotEmpty;
+    final altoFicha = 44.0 * letra;
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(letra)),
+      child: _mesaTelefono(rival, yo, altoFicha, linea, fila, zona, hayFranja),
+    );
+  }
+
+  Widget _mesaTelefono(
+    Map<String, dynamic> rival,
+    Map<String, dynamic> yo,
+    double altoFicha,
+    Widget Function(Widget, {required bool vacia, double angosta}) linea,
+    Widget Function(String, Map<String, dynamic>, String, String, String, {double angosta}) fila,
+    Widget Function(String, Map<String, dynamic>, String, String) zona,
+    bool hayFranja,
+  ) {
     return Stack(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
         child: Column(children: [
-          SizedBox(height: 44, child: _ficha(rival, activo: widget.estado['activo'] == 1)),
+          SizedBox(height: altoFicha, child: _ficha(rival, activo: widget.estado['activo'] == 1)),
           const SizedBox(height: 2),
           fila('Defensa rival', rival, 'defensa', 'defensa_rival', 'apoyo_rival'),
           linea(zona('Ataque rival', rival, 'ataque', 'ataque_rival'),
@@ -307,7 +331,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
             Expanded(flex: 2, child: zona('PAGADO · ${_cartas(yo, 'pagado').length}', yo, 'pagado', 'pagado')),
           ])),
           const SizedBox(height: 2),
-          SizedBox(height: 44, child: _ficha(yo, activo: widget.estado['activo'] == 0, tuyo: true)),
+          SizedBox(height: altoFicha, child: _ficha(yo, activo: widget.estado['activo'] == 0, tuyo: true)),
         ]),
       ),
       Positioned.fill(child: IgnorePointer(child: _flechas())),
@@ -1137,19 +1161,27 @@ class _TableroDesafioState extends State<TableroDesafio> {
                     : null,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Column(
+              child: LayoutBuilder(builder: (context, caja) {
+                final tituloZona = Text(
+                  titulo,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: destino.contains('reserva') || destino.contains('pagado')
+                        ? _boardGold : Colors.white70,
+                    fontSize: 13, fontWeight: FontWeight.w700, height: 1.1,
+                  ),
+                );
+                // Celular con la letra agrandada: si la línea quedó más baja
+                // que su título, se achica el título en vez de desbordar.
+                if (caja.maxHeight < MediaQuery.textScalerOf(context).scale(13) * 1.1 + 3) {
+                  return FittedBox(fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft, child: tituloZona);
+                }
+                return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    titulo,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: destino.contains('reserva') || destino.contains('pagado')
-                          ? _boardGold : Colors.white70,
-                      fontSize: 13, fontWeight: FontWeight.w700, height: 1.1,
-                    ),
-                  ),
+                  tituloZona,
                   const SizedBox(height: 2),
                   Expanded(child: LayoutBuilder(builder: (context, box) {
                     final total = destino == 'mano_rival' ? ocultas : cartas.length;
@@ -1185,7 +1217,8 @@ class _TableroDesafioState extends State<TableroDesafio> {
                     ]);
                   })),
                 ],
-              ),
+              );
+              }),
             ),
       );
 
@@ -1891,10 +1924,25 @@ class _CaraCarta extends StatelessWidget {
 /// Antes de mostrar la mesa: deja las URLs listas y descarga todas las
 /// imágenes de los dos mazos (con la dirección de respaldo si la primera
 /// falla). `progreso(hechas, total)` para la barra de carga.
+///
+/// Reporte 8px7 (18-11): «las cartas ya cargadas no se deben volver a cargar
+/// para otras simulaciones». Las que ya se descargaron en esta sesión no se
+/// piden de nuevo; `imagenesPorCargar` dice si hace falta mostrar la carga.
+final _imagenesYaCargadas = <String>{};
+
+/// Cuántas imágenes de `urls` faltan por descargar en esta sesión.
+int imagenesPorCargar(Map<String, String> urls) => urls.values
+    .where((u) => u.trim().isNotEmpty && !_imagenesYaCargadas.contains(u))
+    .toSet()
+    .length;
+
 Future<void> precargarImagenesDesafio(BuildContext context, Map<String, String> urls,
     void Function(int hechas, int total) progreso) async {
   _CaraCarta.sembrar(urls);
-  final lista = urls.values.where((u) => u.trim().isNotEmpty).toSet().toList();
+  final lista = urls.values
+      .where((u) => u.trim().isNotEmpty && !_imagenesYaCargadas.contains(u))
+      .toSet()
+      .toList();
   var hechas = 0;
   Future<void> una(String raw) async {
     for (final url in _CaraCarta.direcciones(raw, 320)) {
@@ -1903,7 +1951,10 @@ Future<void> precargarImagenesDesafio(BuildContext context, Map<String, String> 
       // del navegador sin compartir la imagen decodificada con el tablero
       // (compartirla en la web dejaba las cartas en negro).
       await precacheImage(NetworkImage(url), context, onError: (_, __) => ok = false);
-      if (ok) break;
+      if (ok) {
+        _imagenesYaCargadas.add(raw);
+        break;
+      }
     }
     hechas++;
     progreso(hechas, lista.length);

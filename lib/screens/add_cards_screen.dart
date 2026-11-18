@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../domain/validation/mercenarios.dart';
 import '../../models/deck.dart';
 import '../../services/card_service.dart';
 import '../../utils/text_normalize.dart';
@@ -127,6 +128,7 @@ class _AddCardsScreenState extends State<AddCardsScreen> {
         await FirebaseFirestore.instance.collection('cards').doc(cardId).get();
     if (!d.exists) return;
     final data = d.data() as Map<String, dynamic>;
+    _anotarMercenario(d.id, data);
     _selected[cardId] = _CardRow(
       id: d.id,
       nombre: (data['nombre'] ?? '').toString(),
@@ -167,6 +169,7 @@ class _AddCardsScreenState extends State<AddCardsScreen> {
         final list = <_CardRow>[];
         for (final d in snap.docs) {
           final data = d.data() as Map<String, dynamic>;
+          _anotarMercenario(d.id, data);
           list.add(
             _CardRow(
               id: d.id,
@@ -296,9 +299,10 @@ class _AddCardsScreenState extends State<AddCardsScreen> {
   }
 
   int _maxCopiesForCardId(String cardId) {
-    return (widget.copyLimitsByCardId[cardId.trim().toLowerCase()] ?? 3).clamp(
-      0,
-      3,
+    return limiteDeCopias(
+      enBanList: widget.copyLimitsByCardId[cardId.trim().toLowerCase()],
+      unica: false,
+      mercenario: esMercenario(id: cardId),
     );
   }
 
@@ -675,6 +679,13 @@ class _AddCardsScreenState extends State<AddCardsScreen> {
       radius: 22,
       child: Text(init, style: const TextStyle(fontWeight: FontWeight.bold)),
     );
+  }
+
+  /// Carta Mercenario («Puedes tener más de 3…»): admite hasta 6 copias.
+  void _anotarMercenario(String id, Map<String, dynamic> data) {
+    if (textoEsMercenario('${data['habilidadTextoIA'] ?? ''} ${data['habilidad'] ?? ''}')) {
+      registrarMercenario(id: id, nombre: '${data['nombre'] ?? ''}');
+    }
   }
 
   String? _extractThumb(Map<String, dynamic> data) {

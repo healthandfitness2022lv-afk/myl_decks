@@ -13,6 +13,99 @@ Cómo se mide lo de la IA:
 
 ---
 
+## 2026-11-18
+
+### 38 cartas nuevas programadas (Helénica y Espada Sagrada)
+
+Héctor cargó 38 cartas con su texto pero sin programar. Quedaron programadas y
+guardadas en `cards/{id}` (con respaldo en `habilidadesAntesIA`); el catálogo
+queda en 921 cartas, 0 sin programar. La programación de cada una, con sus
+notas, está en `simulator/myl_sim/lote_20261117.py`.
+
+**Funciones nuevas del motor** (hacían falta para 14 de las 38):
+
+| Función | Para qué carta |
+|---|---|
+| Disparador «cuando juegas una carta» (`propia_juega`), también para Talismanes | Fruto Fiodhain, Jared el Mago |
+| Coste comparado con la carta que disparó (`coste_disparadora`) | Jared el Mago |
+| Buscar 2 de distinto nombre y que el rival elija cuál va a la mano | Caminar las Estrellas |
+| Copiar habilidades «por el resto del juego» (antes solo hasta la Fase Final) | Fiodhain |
+| Entrar al juego ya atacando (`entra_atacando`) | Nathair-Teine |
+| Condición y comparación «Armas que controlas» (`armas_propias`) | Atalanta, Sir Bleoberis |
+| «Por cada carta afectada» y «por cada … en tu destierro» | Goblin Berserker, Martillo de Galehaut |
+| Recargo de Talismanes que cubre a otras cartas (`encarecer` + `protege`) | Las Musas |
+| Disparo por arquetipo (`disparoArquetipo`) | Musa Calíope |
+| Costo «destruye un Arma que controles» y «este u otro Aliado» | Lady Rachel, Oberón |
+| Mirar el tope en privado al jugar una carta de ahí | Anfiarao |
+| Sin tope de 3 copias si la carta lo dice | Draco Águila |
+
+**Errores del motor que aparecieron al hacerlo (corregidos):**
+
+- El Oro jugado en la Vigilia no disparaba «cuando un Oro entra en juego bajo
+  tu control»: Rey Midas nunca ganaba fuerza por el Oro del turno.
+- Brian Boru y Asaltar la Caravana no movían nada (guardaban el destino como
+  `ataque` y el motor solo entendía `linea_ataque`).
+- «Aliados Sir» incluía a Osiris y Siroco (se buscaba «sir» dentro del nombre).
+- La IA, con «dejar en fuerza 0» (Tea, Jueces del Maat), elegía a sus propios Aliados.
+
+**App:** el editor de habilidades conserva al guardar los campos de las
+condiciones que no conoce (antes los borraba: afectaba a 8 cartas con
+`controla_nombre`), y conoce los disparadores `propia_juega` y `al_ser_destruido`.
+
+**Datos corregidos en el catálogo (pedido de Héctor):** Enialio fuerza 22 → 2;
+Sir Owen marcada como única.
+
+**11 cartas antiguas reprogramadas** (`simulator/myl_sim/lote_20261118.py`).
+Figuraban como programadas pero usaban acciones que el motor no tiene y en la
+mesa no hacían nada: Adonis, Ascenso Draco, Ataque de Vampiros, Pianjy,
+Traición de Seth, Dragón Nube y Eneas (`grupoElegir` con `opciones`), Danza
+Sidhe (`fondoMazo`), Cadena Espiritual (`subirCementerio`), Fear Sidhe
+(`al_descartar_por_habilidad`) y Absalon (apuntaba a un Talismán «en juego»).
+De paso se corrigió lo que además estaba distinto del texto: Ascenso Draco
+resta 1 por cada Aliado Draco (era 1 fijo), Ataque de Vampiros no puede ser
+anulado con una carta Drácula, Traición de Seth se juega desde el Cementerio,
+Fear Sidhe paga el coste del Sidhe que trae (lo jugaba gratis) y Eneas se
+dispara al ser destruido él. Fear Sidhe baraja 2 solo si la descarta una habilidad: el
+descarte por exceso de mano es regla y no la dispara (Héctor). Lo anterior quedó respaldado en
+`habilidadesAntesCorreccion` de cada carta.
+
+**Cartas Mercenario** («Puedes tener más de 3 … en tu Mazo Castillo»: Draco
+Águila): hasta 6 copias por mazo, salvo que la Ban List fije otro límite. Rige
+en el simulador (`copias_maximas`) y en la app (`lib/domain/validation/mercenarios.dart`):
+validador, constructor de mazos, constructor de ligas y «agregar cartas».
+
+### Sección «Jugar» (solo con acceso) y ELO
+
+Pedido de Héctor: todo lo del simulador en un botón «Jugar» del home, solo
+para quien él decida (por ahora, él). Jugar reúne Desafío contra la IA, ELO
+(antes «Entrenamiento»), Simulador de partidas, Lo que gana y Laboratorio.
+Aparece en la barra lateral y en la barra inferior del celular solo con
+acceso; la ruta `/entrenamiento` también lo exige. «Meta y tendencias» sigue
+para todos, ahora solo con lo que se juega en la comunidad. Se quitó el botón
+del Simulador de «Mis mazos».
+
+Acceso (`lib/services/acceso_jugar.dart`): el dueño de la app siempre; para
+sumar a alguien, agregar su uid a la lista `uids` de `config/acceso_jugar`
+(Firestore; solo un administrador puede escribir `config/`).
+
+También quedaron publicadas la escalera de ELO (`config/escalera_entrenamiento`,
+160 rivales) y «Lo que gana» (`config/meta_simulador`): antes la app decía que
+no estaban listas.
+
+### Reportes del tablero (18-11)
+
+| Reporte | Qué pasaba | Arreglo |
+|---|---|---|
+| HjND, ANtc: «ese mensaje arriba no me deja ver» | El aviso de la Duda de la IA quedaba fijo arriba y en el celular tapaba la ficha del rival (castillo, cementerio) | Sale 4 s al medio y se cierra al tocarlo |
+| ANtc: «overflows en vertical» | Con la letra del sistema agrandada, las fichas y líneas de alto fijo se desbordaban (40 de 80 combinaciones probadas) | Crecen con la letra; en pantallas bajas la letra de la mesa se limita |
+| 8px7: «las cartas ya cargadas no se deben volver a cargar» | Cada simulación volvía a mostrar «Cargando cartas» | Lo ya descargado en la sesión no se pide de nuevo; si no falta nada, la mesa aparece al tiro |
+| SkkvVn #0: «no sé si voy primero» | La pregunta de la mano inicial no decía quién empieza | «Empiezas tú / Empieza el rival (dado: tú 1, rival 3). ¿Te quedas esta mano?» |
+| SkkvVn #1: «no le desterré con Milano Negro» | No era error: había un Cinturón de Lady Ann en la Reserva. La mesa no lo decía | Aviso «✗ Milano Negro: no se puede desterrar del Cementerio: lo impide Cinturón De Lady Ann» |
+
+Rige al publicar la app (los tres primeros) y ya en el worker (los dos últimos).
+
+---
+
 ## 2026-11-17
 
 ### App: fuera las características, motor de estadísticas nuevo, torneos, perfil y Entrenamiento
@@ -83,7 +176,7 @@ rival desde `cache/entrenamiento/`. Se genera y publica con
 `python -m myl_sim.escalera --app --publicar`.
 
 **Verificación.** `flutter analyze` sin errores (352 → 312 avisos) y
-`flutter test` 148 en verde (eran 110). Tests nuevos: motor (7), torneo (19),
+`flutter test` 152 en verde (eran 110). Tests nuevos: motor (7), torneo (23),
 perfil (4), Entrenamiento (8), meta (3); en el simulador, perfil (7, incluye
 el dashboard con Node), meta (2) y escalera (4).
 

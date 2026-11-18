@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import '../models/current_user.dart';
+import '../services/acceso_jugar.dart';
+import 'jugar_screen.dart';
 import '../services/drive_service.dart';
 import '../widgets/drive_image_picker.dart';
 import '../utils/wallpaper_image.dart';
@@ -15,7 +17,8 @@ import './admin_bulk_assign_screen.dart';
 import './ban_list_screen.dart';
 import './submissions_screen.dart';
 
-enum MenuSection { mazos, cartas, social }
+// «jugar» solo aparece para quien tiene acceso (services/acceso_jugar.dart).
+enum MenuSection { mazos, cartas, social, jugar }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,11 +30,34 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   MenuSection _selected = MenuSection.mazos;
   String _selectedBg = '';
+  bool _jugar = false;
+  late final _accesoJugar = AccesoJugar.delUsuario().listen((v) {
+    if (!mounted) return;
+    setState(() {
+      _jugar = v;
+      if (!v && _selected == MenuSection.jugar) _selected = MenuSection.mazos;
+    });
+  });
+
+  /// Secciones visibles: «Jugar» solo con acceso.
+  List<MenuSection> get _secciones => [
+    MenuSection.mazos,
+    MenuSection.cartas,
+    MenuSection.social,
+    if (_jugar) MenuSection.jugar,
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadBg();
+    _accesoJugar;
+  }
+
+  @override
+  void dispose() {
+    _accesoJugar.cancel();
+    super.dispose();
   }
 
   Future<void> _logout() async {
@@ -140,11 +166,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 68,
                 backgroundColor: const Color(0xFF11141B),
                 indicatorColor: const Color(0xFFF1D48B).withOpacity(0.18),
-                selectedIndex: _selected.index,
+                selectedIndex: _secciones.indexOf(_selected).clamp(0, 3),
                 onDestinationSelected:
-                    (index) =>
-                        setState(() => _selected = MenuSection.values[index]),
-                destinations: const [
+                    (index) => setState(() => _selected = _secciones[index]),
+                destinations: [
                   NavigationDestination(
                     icon: Icon(Icons.style_outlined),
                     selectedIcon: Icon(Icons.style_rounded),
@@ -160,6 +185,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     selectedIcon: Icon(Icons.groups_rounded),
                     label: 'Comunidad',
                   ),
+                  if (_jugar)
+                    const NavigationDestination(
+                      icon: Icon(Icons.sports_esports_outlined),
+                      selectedIcon: Icon(Icons.sports_esports_rounded),
+                      label: 'Jugar',
+                    ),
                 ],
               ),
       body: Stack(
@@ -191,6 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onLogout: _logout,
                   onOpenFriends: _goFriends,
                   currentUid: currentUser.uid,
+                  jugar: _jugar,
                 ),
                 Expanded(child: _buildPanel()),
               ],
@@ -241,6 +273,7 @@ class _LeftBar extends StatelessWidget {
   final VoidCallback onLogout;
   final VoidCallback onOpenFriends;
   final String? currentUid;
+  final bool jugar;
 
   const _LeftBar({
     required this.displayName,
@@ -251,6 +284,7 @@ class _LeftBar extends StatelessWidget {
     required this.onLogout,
     required this.onOpenFriends,
     required this.currentUid,
+    this.jugar = false,
   });
 
   @override
@@ -314,6 +348,13 @@ class _LeftBar extends StatelessWidget {
                   selected: selected == MenuSection.social,
                   onTap: () => onSelect(MenuSection.social),
                 ),
+                if (jugar)
+                  _SideItem(
+                    icon: Icons.sports_esports_outlined,
+                    label: 'Jugar',
+                    selected: selected == MenuSection.jugar,
+                    onTap: () => onSelect(MenuSection.jugar),
+                  ),
                 const Spacer(),
                 Wrap(
                   spacing: 10,
@@ -514,21 +555,25 @@ class _SubmenuPanel extends StatelessWidget {
       MenuSection.mazos => 'Tus mazos',
       MenuSection.cartas => 'Tu colección',
       MenuSection.social => 'Comunidad',
+      MenuSection.jugar => 'Jugar',
     };
     final subtitle = switch (section) {
       MenuSection.mazos => 'Construye, organiza y revisa tus mazos.',
       MenuSection.cartas => 'Controla tus copias, faltantes y deseos.',
       MenuSection.social => 'Conecta, compite y comparte con otros jugadores.',
+      MenuSection.jugar => 'Partidas contra la IA, entrenamiento y simulador.',
     };
     final icon = switch (section) {
       MenuSection.mazos => Icons.style_rounded,
       MenuSection.cartas => Icons.inventory_2_rounded,
       MenuSection.social => Icons.groups_rounded,
+      MenuSection.jugar => Icons.sports_esports_rounded,
     };
     final accent = switch (section) {
       MenuSection.mazos => const Color(0xFF78A9FF),
       MenuSection.cartas => const Color(0xFF5DD69E),
       MenuSection.social => const Color(0xFFC79BF2),
+      MenuSection.jugar => const Color(0xFFF1D48B),
     };
 
     return LayoutBuilder(
@@ -627,15 +672,9 @@ class _SubmenuPanel extends StatelessWidget {
             onCreateDeck,
           ),
           _RowItem(
-            Icons.fitness_center_rounded,
-            'Entrenamiento',
-            'Sube de rating contra mazos del meta',
-            () => context.push('/entrenamiento'),
-          ),
-          _RowItem(
             Icons.insights_rounded,
             'Meta y tendencias',
-            'Qué se juega y qué gana: agro o control',
+            'Qué se juega en la comunidad: razas, cartas y estilos',
             () => context.push('/meta'),
           ),
         ];
@@ -702,6 +741,17 @@ class _SubmenuPanel extends StatelessWidget {
               () => Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (_) => const BanListScreen())),
+            ),
+        ];
+      case MenuSection.jugar:
+        return [
+          for (var i = 0; i < opcionesJugar.length; i++)
+            _RowItem(
+              opcionesJugar[i].icono,
+              opcionesJugar[i].titulo,
+              opcionesJugar[i].detalle,
+              () => opcionesJugar[i].abrir(context),
+              featured: i == 0,
             ),
         ];
     }

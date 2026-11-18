@@ -166,7 +166,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
         builder:
             (_) => DesafioIaScreen(
               desafio: ref,
-              titulo: rival.isEmpty ? 'Entrenamiento' : 'Entrenamiento · $rival',
+              titulo: rival.isEmpty ? 'ELO' : 'ELO · $rival',
             ),
       ),
     );
@@ -237,7 +237,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Entrenamiento')),
+      appBar: AppBar(title: const Text('ELO')),
       body: FutureBuilder<Escalera>(
         future: _escalera,
         builder: (context, se) {

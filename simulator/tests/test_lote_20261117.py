@@ -406,11 +406,14 @@ def test_draco_aguila_bota_por_cada_copia_y_no_tiene_limite_de_copias():
     d = jugar(p, 0, L.carta("draco_aguila"))
     assert len(p.j(1).mazo) == 46 and hab.tiene_prop(p, d, "imbloqueable")
     aguila, comun = L.carta("draco_aguila"), aliado("Soldado", 1, 1)
-    assert copias_maximas(aguila) == 49 and copias_maximas(comun) == 3
-    assert problemas_mazo(Mazo("m", "Águilas", "racial", "Dragón", [aguila] * 10 + [ORO] * 39, []), ban={}) \
-        == ["Oro ×39 (máximo 3)"]
-    assert problemas_mazo(Mazo("m", "Águilas", "racial", "Dragón", [aguila] * 10 + [ORO] * 39, []),
-                          ban={"oro": 49, "draco_aguila": 3}) == ["Draco Águila ×10 (máximo 3)"]
+    # Mercenario: hasta 6 copias (Héctor 18-11), salvo que la Ban List diga otra cosa.
+    assert copias_maximas(aguila) == 6 and copias_maximas(comun) == 3
+    libre = {"oro": 49}
+    assert problemas_mazo(Mazo("m", "Águilas", "racial", "Dragón", [aguila] * 6 + [ORO] * 43, []), ban=libre) == []
+    assert problemas_mazo(Mazo("m", "Águilas", "racial", "Dragón", [aguila] * 7 + [ORO] * 42, []), ban=libre) \
+        == ["Draco Águila ×7 (máximo 6)"]
+    assert problemas_mazo(Mazo("m", "Águilas", "racial", "Dragón", [aguila] * 6 + [ORO] * 43, []),
+                          ban={"oro": 49, "draco_aguila": 3}) == ["Draco Águila ×6 (máximo 3)"]
 
 
 def test_draco_de_inverness():

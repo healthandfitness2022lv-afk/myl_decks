@@ -17,7 +17,12 @@ import 'tournaments/tournament_widgets.dart' show colorPerfil;
 const _estilos = ['Agro', 'Medio', 'Control', 'Combo'];
 
 class MetaStatsScreen extends StatefulWidget {
-  const MetaStatsScreen({super.key});
+  /// `soloSimulador`: «Lo que gana» (sección Jugar, con acceso). Si no, lo
+  /// que se juega en la comunidad (para todos). Héctor 18-11: lo del
+  /// simulador va solo en Jugar.
+  const MetaStatsScreen({super.key, this.soloSimulador = false});
+
+  final bool soloSimulador;
 
   @override
   State<MetaStatsScreen> createState() => _MetaStatsScreenState();
@@ -50,31 +55,33 @@ class _MetaStatsScreenState extends State<MetaStatsScreen> {
     return doc.data();
   }
 
+  // Los `late` se cargan recién al usarse: cada vista pide solo lo suyo.
   void _recargar() => setState(() {
-    _comunidad = _cargarComunidad();
-    _simulador = _cargarSimulador();
+    if (widget.soloSimulador) {
+      _simulador = _cargarSimulador();
+    } else {
+      _comunidad = _cargarComunidad();
+    }
   });
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Meta y tendencias'),
-          actions: [
-            IconButton(
-              tooltip: 'Actualizar',
-              icon: const Icon(Icons.refresh),
-              onPressed: _recargar,
-            ),
-          ],
-          bottom: const TabBar(
-            tabs: [Tab(text: 'Lo que se juega'), Tab(text: 'Lo que gana')],
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          widget.soloSimulador
+              ? 'Lo que gana según el simulador'
+              : 'Meta y tendencias',
         ),
-        body: TabBarView(children: [_tabComunidad(), _tabSimulador()]),
+        actions: [
+          IconButton(
+            tooltip: 'Actualizar',
+            icon: const Icon(Icons.refresh),
+            onPressed: _recargar,
+          ),
+        ],
       ),
+      body: widget.soloSimulador ? _tabSimulador() : _tabComunidad(),
     );
   }
 

@@ -23,6 +23,7 @@ import 'screens/teams_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/leagues/team_screen.dart';
 import 'screens/simulador/entrenamiento_screen.dart';
+import 'services/acceso_jugar.dart';
 import 'screens/tournaments/tournament_detail_screen.dart';
 import 'screens/tournaments/tournaments_screen.dart';
 
@@ -119,7 +120,10 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/entrenamiento',
-      builder: (_, __) => const _AuthGuard(child: EntrenamientoScreen()),
+      builder:
+          (_, __) => const _AuthGuard(
+            child: JugarGuard(child: EntrenamientoScreen()),
+          ),
     ),
     GoRoute(
       path: '/torneos',

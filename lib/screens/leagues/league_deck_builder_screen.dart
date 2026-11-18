@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/card_myl.dart';
 import '../../models/deck.dart';
+import '../../domain/validation/deck_validator.dart';
 import '../../models/ban_list_entry.dart';
 import '../../services/ban_list_service.dart';
 import '../../services/drive_service.dart';
@@ -137,17 +138,18 @@ class _LeagueDeckBuilderScreenState extends State<LeagueDeckBuilderScreen> {
   int _copyLimitForCard(CardMyL card) {
     final fromBan =
         _copyLimitsByKey[normalizeBanListKey(card.id)] ??
-        _copyLimitsByKey[normalizeBanListKey(card.nombre)] ??
-        3;
-    if (card.unica) return fromBan.clamp(0, 1);
-    return fromBan.clamp(0, 3);
+        _copyLimitsByKey[normalizeBanListKey(card.nombre)];
+    return limiteDeCopias(
+      enBanList: fromBan,
+      unica: card.unica,
+      mercenario: cartaEsMercenario(card, id: card.id, nombre: card.nombre),
+    );
   }
 
   int _copyLimitForEntry(DeckCardEntry entry) {
     final fromBan =
         _copyLimitsByKey[normalizeBanListKey(entry.cardId ?? '')] ??
-        _copyLimitsByKey[normalizeBanListKey(entry.name)] ??
-        3;
+        _copyLimitsByKey[normalizeBanListKey(entry.name)];
     final isUnique =
         entry.unica ||
         _availableCards.any((card) {
@@ -158,8 +160,15 @@ class _LeagueDeckBuilderScreenState extends State<LeagueDeckBuilderScreen> {
               card.nombre.trim().toLowerCase();
           return (sameId || sameName) && card.unica;
         });
-    if (isUnique) return fromBan.clamp(0, 1);
-    return fromBan.clamp(0, 3);
+    return limiteDeCopias(
+      enBanList: fromBan,
+      unica: isUnique,
+      mercenario: cartaEsMercenario(
+        null,
+        id: entry.cardId,
+        nombre: entry.name,
+      ),
+    );
   }
 
   // ── Cartas disponibles ─────────────────────────────────────────────────────

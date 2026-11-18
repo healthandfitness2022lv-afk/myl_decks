@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import '../../models/deck.dart';
 import '../../models/ban_list_entry.dart';
 import '../../models/card_myl.dart';
+import 'mercenarios.dart';
+
+export 'mercenarios.dart';
 
 @immutable
 class CardData {
@@ -64,17 +67,13 @@ String _keyFor(DeckCardEntry e) {
   return normalizeBanListKey(name.isNotEmpty ? name : (e.cardId ?? ''));
 }
 
-/// "Puedes tener más de 3 Draco Águila en tu Mazo Castillo": la carta no tiene
-/// el tope de 3 copias, salvo que la Ban List le fije uno. Mismo criterio que
-/// `copias_maximas` del simulador (`simulator/myl_sim/datos.py`).
-final _sinLimiteDeCopias = RegExp(
-  r'puedes\s+tener\s+m[áa]s\s+de\s+(?:3|tres)\b',
-  caseSensitive: false,
-);
-
-bool cartaSinLimiteDeCopias(dynamic card) =>
-    card is CardMyL &&
-    _sinLimiteDeCopias.hasMatch('${card.habilidadTextoIA}\n${card.habilidad}');
+/// Carta Mercenario («Puedes tener más de 3 Draco Águila en tu Mazo
+/// Castillo»): por el texto de la carta del catálogo o, si la pantalla no
+/// trae el catálogo, por haberla visto antes (ver `mercenarios.dart`).
+bool cartaEsMercenario(dynamic card, {String? id, String nombre = ''}) =>
+    (card is CardMyL &&
+        textoEsMercenario('${card.habilidadTextoIA} ${card.habilidad}')) ||
+    esMercenario(id: id, nombre: nombre);
 
 int _copyLimitForEntry(
   DeckCardEntry entry,
@@ -98,7 +97,7 @@ int _copyLimitForEntry(
   }
 
   if (entry.unica) return 1;
-  return sinLimite ? 99 : 3;
+  return sinLimite ? copiasMercenario : copiasNormales;
 }
 
 ValidationResult validateDeck({
@@ -131,7 +130,11 @@ ValidationResult validateDeck({
     limitByKey[key] = _copyLimitForEntry(
       entry,
       copyLimitsByKey,
-      sinLimite: cartaSinLimiteDeCopias(enCatalogo),
+      sinLimite: cartaEsMercenario(
+        enCatalogo,
+        id: entry.cardId,
+        nombre: entry.name,
+      ),
     );
   }
   for (final entry in deck.sideboardCards) {

@@ -181,7 +181,13 @@ class HumanoRemoto:
         return r
 
     def quedarse_mano(self, p, yo):
-        return self._pedir("mano_inicial", [], {"titulo": "¿Te quedas esta mano?"}) == "quedarse"
+        # Desafío SkkvVn (18-11): «no sé si voy primero o no»: la mano se decide
+        # sabiendo quién empieza (el que empieza juega su Oro antes y ataca antes).
+        dado = p.dados[-1] if getattr(p, "dados", None) else None
+        tirada = f" (dado: tú {dado[yo]}, rival {dado[1 - yo]})" if dado else ""
+        quien = "Empiezas tú" if p.inicial == yo else "Empieza el rival"
+        return self._pedir("mano_inicial", [], {
+            "titulo": f"{quien}{tirada}. ¿Te quedas esta mano?"}) == "quedarse"
 
     def confirmar_fase(self, p, yo, titulo):
         """Sin jugadas posibles el turno sigue solo (antes abría una ventana

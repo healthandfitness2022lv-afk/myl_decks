@@ -11,6 +11,35 @@ Cómo se mide:
 
 ---
 
+## 2026-11-18 · Lote de 38 cartas (Helénica y Espada Sagrada) y reportes del tablero
+
+- 38 cartas programadas y guardadas con `python -m myl_sim.lote_20261117 --aplicar`
+  (el módulo guarda la programación y las notas de cada una; sin `--aplicar`
+  solo valida contra el vocabulario del editor).
+- Motor: disparador `propia_juega`, `coste_disparadora`, `armas_propias`,
+  `incluyeFuente` en `aliados_arquetipo`, `distintoNombre` + `oponenteEligeMano`
+  en buscar, copia `permanente`, `entra_atacando`, `valorPorCada`
+  `carta_afectada` / `destierro_propio`, `encarecer` con `protege`,
+  `disparoArquetipo`, filtro en `destruirPropias`, `incluyeEstaCarta` en
+  `destruirAliados`, `privado` en mirarTope y `copias_maximas` (Draco Águila).
+- Correcciones: el Oro del turno dispara `propia_entra` (interruptor
+  `ORO_JUGADO_DISPARA_ENTRADA`), destinos `ataque`/`defensa` sin prefijo,
+  arquetipos de 3 letras o menos como palabra completa («Sir»), y la IA ya no
+  deja en fuerza 0 a sus propios Aliados.
+- Reportes SkkvVn: el motor dice qué Restricción dejó un efecto sin objetivos
+  (`quien_prohibe`), y la mano inicial dice quién empieza.
+- **Resultado:** 55 tests nuevos (`test_lote_20261117.py`, `test_reportes_1118.py`).
+  600 partidas completas con las cartas nuevas (6 mazos de prueba, IA
+  heurística): 0 errores, las 38 se jugaron; 4 terminaron por autodaño.
+- Sin medir: los ajustes de IA de este lote no pasaron por `myl_sim.filtro`.
+- Segundo lote (`lote_20261118.py`, 11 tests): 11 cartas antiguas que no hacían
+  nada (acción `grupoElegir` con `opciones`, `fondoMazo`, `subirCementerio`,
+  `al_descartar_por_habilidad`, Absalon) reescritas con el vocabulario del
+  motor. Motor: un Talismán que una habilidad ya colocó en una zona (Absalon lo
+  baraja) no se manda después al Cementerio. IA: entre dos cambios de fuerza
+  (Ascenso Draco) elige el que mueve más fuerza.
+- Mercenario: `copias_maximas` = 6 para las cartas «Puedes tener más de 3…».
+
 ## 2026-11-15 · Ampliación del motor para cartas pendientes
 
 - Nuevas formas de pagar y resolver efectos: desterrar Oro de la Reserva,

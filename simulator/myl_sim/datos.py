@@ -467,10 +467,14 @@ _ban_cache: dict[str, dict[str, int]] = {}
 SIN_LIMITE_DE_COPIAS = re.compile(r"puedes\s+tener\s+m[áa]s\s+de\s+(?:3|tres)\b", re.IGNORECASE)
 
 
+COPIAS_MERCENARIO = 6  # Héctor 18-11: hasta 6 copias de una carta Mercenario
+
+
 def copias_maximas(carta: Carta) -> int:
-    """Copias permitidas si la Ban List no dice otra cosa: 3, salvo que la
-    carta diga "Puedes tener más de 3 … en tu Mazo Castillo" (Draco Águila)."""
-    return TAMANO_MAZO if SIN_LIMITE_DE_COPIAS.search(carta.texto or "") else 3
+    """Copias permitidas si la Ban List no dice otra cosa: 3, o 6 si es una
+    carta Mercenario ("Puedes tener más de 3 … en tu Mazo Castillo": Draco
+    Águila). Mismo criterio que `lib/domain/validation/mercenarios.dart`."""
+    return COPIAS_MERCENARIO if SIN_LIMITE_DE_COPIAS.search(carta.texto or "") else 3
 
 
 def problemas_mazo(mazo: "Mazo", ban: dict[str, int] | None = None) -> list[str]:

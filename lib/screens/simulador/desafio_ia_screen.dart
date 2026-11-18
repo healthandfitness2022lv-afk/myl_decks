@@ -47,8 +47,11 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
 
   void _precargar(String id, Map<String, String> urls) {
     _precargaDe = id;
-    _precargando = true;
-    _total = urls.length;
+    // Reporte 8px7: lo ya descargado en esta sesión no se vuelve a cargar; si
+    // no falta ninguna, la mesa aparece al tiro.
+    _total = imagenesPorCargar(urls);
+    _hechas = 0;
+    _precargando = _total > 0;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final fin = precargarImagenesDesafio(context, urls, (h, t) {
         if (mounted) {
@@ -455,7 +458,6 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
         final tipo = decision?['tipo'] as String? ?? '';
         final accionIaMap = (d['accionIa'] as Map?)?.cast<String, dynamic>();
         final accionIa = accionIaMap?['texto'] as String?;
-        final hayJugadasIa = accionesIa(d).isNotEmpty;
         final tableroBase = TableroDesafio(
           estado: estado,
           decision: decision,
@@ -464,85 +466,68 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
                 'respuesta': {'decisionId': decision?['id'], 'valor': valor},
               }),
         );
-        // Mientras la IA juega, su última acción se muestra sobre la mesa.
-        // Siempre se puede abrir la lista de jugadas de la IA para marcarlas ✓/✗.
+        // Mientras la IA juega, su última acción se muestra a un costado.
         final tablero = Stack(
           children: [
             Positioned.fill(child: tableroBase),
             // Duda de la IA: una sola decisión, desde el asiento del que dudaba.
+            // Reportes HjND / ANtc (18-11): este aviso quedaba fijo arriba y
+            // en el celular tapaba la ficha del rival (castillo, cementerio).
+            // Ahora se muestra 4 s al medio de la mesa y se cierra al tocarlo;
+            // vuelve a salir solo si cambia lo que dice.
             if (d['modo'] == 'duda')
-              Positioned(
-                top: 8,
-                left: 0,
-                right: 0,
-                child: IgnorePointer(
-                  child: Center(
-                    child: Container(
-                      constraints: const BoxConstraints(maxWidth: 620),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xEE1F2A3A),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: _gold),
-                      ),
-                      child: Text(
-                        status == 'esperando'
-                            ? 'La IA dudó en esta posición (${d['mazoDuda']} contra ${d['rivalDuda']}). Juega tu turno completo como lo harías tú.'
-                            : '${d['avisoDuda'] ?? 'Comparando tu turno con el de la IA…'}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
+              Positioned.fill(
+                key: ValueKey(
+                  'duda-${snap.data!.id}-$status-${d['avisoDuda'] ?? ''}',
+                ),
+                child: Align(
+                  alignment: const Alignment(0, -0.1),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: _AvisoTemporal(
+                      segundos: 4,
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 620),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xEE1F2A3A),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _gold),
+                        ),
+                        child: Text(
+                          status == 'esperando'
+                              ? 'La IA dudó en esta posición (${d['mazoDuda']} contra ${d['rivalDuda']}). Juega tu turno completo como lo harías tú.'
+                              : '${d['avisoDuda'] ?? 'Comparando tu turno con el de la IA…'}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            if (status == 'jugando' && accionIa != null)
-              Positioned(
-                key: ValueKey('ia-jugando-${accionIaMap?['id']}'),
-                top: 8,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: _AvisoTemporal(
-                    segundos: 3,
-                    child: _AvisoIa(
-                      texto: accionIa,
-                      voto: VotoJugadaIa(
-                        ref: ref,
-                        accionId: '${accionIaMap?['id']}',
-                        voto: votosIa(d)['${accionIaMap?['id']}'],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            // Reporte qx6H: si la IA anula o responde en tu turno, la
-            // decisión llega al instante y el aviso se perdía. Queda
-            // unos segundos aunque ya te toque elegir.
-            if (status == 'esperando' && accionIa != null)
+            // Héctor 18-11: sin calificar las jugadas de la IA durante la
+            // partida (eso queda para la revisión al final). Lo que hizo sale
+            // unos segundos a un costado, sin tapar la ficha del rival
+            // (castillo, mano, cementerio) ni recibir toques.
+            if (accionIa != null && (status == 'jugando' || status == 'esperando'))
               Positioned(
                 key: ValueKey('ia-${accionIaMap?['id']}'),
-                top: 8,
-                left: 0,
-                right: 0,
-                child: Center(
-                  // Héctor: 6 s tapaba la mesa rival y entorpecía; ahora
-                  // 3 s y se cierra al tocarlo (la jugada sigue al medio).
-                  child: _AvisoTemporal(
-                    segundos: 3,
-                    child: _AvisoIa(
-                      texto: accionIa,
-                      voto: VotoJugadaIa(
-                        ref: ref,
-                        accionId: '${accionIaMap?['id']}',
-                        voto: votosIa(d)['${accionIaMap?['id']}'],
-                      ),
+                top: 0,
+                bottom: 0,
+                right: 6,
+                child: IgnorePointer(
+                  child: Align(
+                    alignment: const Alignment(1, 0.15),
+                    child: _AvisoTemporal(
+                      segundos: 3,
+                      child: _AvisoIa(texto: accionIa),
                     ),
                   ),
                 ),
@@ -602,7 +587,7 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
             // Reportar algo irregular en el momento exacto en que se ve.
             Positioned(
               right: 8,
-              bottom: hayJugadasIa ? 56 : 8,
+              bottom: 8,
               child: FloatingActionButton.small(
                 heroTag: 'reportarVivo',
                 tooltip: 'Reportar este momento',
@@ -612,19 +597,6 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
                 child: const Icon(Icons.bug_report_outlined),
               ),
             ),
-            if (hayJugadasIa)
-              Positioned(
-                right: 8,
-                bottom: 8,
-                child: FloatingActionButton.small(
-                  heroTag: 'jugadasIa',
-                  tooltip: 'Jugadas de la IA (marcar ✓/✗)',
-                  backgroundColor: _gold,
-                  foregroundColor: Colors.black,
-                  onPressed: () => mostrarJugadasIa(context, ref),
-                  child: const Icon(Icons.fact_check_outlined),
-                ),
-              ),
           ],
         );
         // Todo se decide en la mesa (la barra de fase dice qué hacer y se
@@ -1429,37 +1401,36 @@ class _AvisoTurno extends StatelessWidget {
 }
 
 class _AvisoIa extends StatelessWidget {
-  const _AvisoIa({required this.texto, required this.voto});
+  const _AvisoIa({required this.texto});
 
   final String texto;
-  final Widget voto;
 
   @override
   Widget build(BuildContext context) => AnimatedSwitcher(
     duration: const Duration(milliseconds: 250),
     child: Container(
       key: ValueKey(texto),
-      constraints: const BoxConstraints(maxWidth: 620),
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      constraints: const BoxConstraints(maxWidth: 240),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xEE1A120C),
+        color: const Color(0xE61A120C),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _gold),
+        border: Border.all(color: _gold.withValues(alpha: .6)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.smart_toy_outlined, color: _gold, size: 20),
-          const SizedBox(width: 8),
+          const Icon(Icons.smart_toy_outlined, color: _gold, size: 18),
+          const SizedBox(width: 6),
           Flexible(
             child: Text(
               texto,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
             ),
           ),
-          const SizedBox(width: 4),
-          voto,
         ],
       ),
     ),

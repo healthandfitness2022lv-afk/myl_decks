@@ -281,8 +281,7 @@ _carta(
     [IMBLOQUEABLE,
      hab("botar", "El oponente bota 1 por cada Draco Águila que controles", cuando="al_jugar",
          cantidadSegun="aliados_arquetipo", porCadaArquetipo="Draco Águila", cantidad=1, objetivo=RIVAL)],
-    "El límite de 3 copias no rige para esta carta (validador de la app y del simulador), salvo que la Ban "
-    "List le fije uno.",
+    "Carta Mercenario: hasta 6 copias por mazo (app y simulador), salvo que la Ban List le fije otro límite.",
 )
 _carta(
     "draco_de_inverness", "Draco De Inverness", "Aliado", 1, 1, "Dragón",

@@ -435,7 +435,7 @@ class Partida:
         if exceso > 0:
             sobran = self.decide(a).elegir_descartes(self, a, list(jug.mano), exceso)
             for inst in sobran:
-                self.descartar(inst)
+                self.descartar(inst, por_habilidad=False)  # regla de mano máxima
             self.anotar(f"J{a} descarta por exceso de mano: {', '.join(x.nombre for x in sobran)}")
 
     def _vigilia(self, a: int) -> None:
@@ -624,7 +624,13 @@ class Partida:
                 if h.get("cuando") == "al_inicio_fase" and h.get("fase") == "vigilia" \
                         and h.get("accion") == "generarOro":
                     hab._intentar(self, inst.controlador, inst, h)
-        if inst.tipo == Tipo.TALISMAN and inst.zona in (Zona.MANO, Zona.CEMENTERIO, Zona.MAZO, Zona.DESTIERRO):
+        # Absalon: "en respuesta a que juegues un Talismán… barájalo en tu Mazo":
+        # si una habilidad ya lo puso en una zona (está en esa lista), se queda ahí.
+        ya_colocado = inst.tipo == Tipo.TALISMAN and any(
+            x is inst for x in self.j(inst.dueno).lista(inst.zona)) if inst.zona in (
+                Zona.MANO, Zona.CEMENTERIO, Zona.MAZO, Zona.DESTIERRO) else False
+        if inst.tipo == Tipo.TALISMAN and not ya_colocado \
+                and inst.zona in (Zona.MANO, Zona.CEMENTERIO, Zona.MAZO, Zona.DESTIERRO):
             # Jugado desde otra zona puede terminar desterrado (Jinetes de Fuego).
             self._mover(
                 inst, Zona.DESTIERRO if jugada.destino == "destierro" else hab.zona_final_talisman(inst)
@@ -1050,18 +1056,23 @@ class Partida:
             for arma in [a for a in self.e.portadas if a.portador == inst.uid]:
                 self._mover(arma, zona if zona != Zona.MAZO else Zona.CEMENTERIO)
 
-    def descartar(self, inst: Instancia) -> None:
-        """Descarta desde la mano y dispara habilidades de descarte."""
+    def descartar(self, inst: Instancia, *, por_habilidad: bool = True) -> None:
+        """Descarta desde la mano y dispara habilidades de descarte.
+        `por_habilidad=False`: descarte por regla (exceso de mano al final del
+        turno); no dispara lo que pide "descartado por una habilidad" (Fear Sidhe)."""
         era_mano = inst.zona == Zona.MANO
         dueno = inst.dueno
         self._mover(inst, Zona.CEMENTERIO)
         if era_mano:
             self.descartadas_turno[dueno] += 1
             costo_anterior = getattr(self, "ctx_costo", None)
+            anterior = getattr(self, "ctx_descarte_por_habilidad", True)
+            self.ctx_descarte_por_habilidad = por_habilidad
             try:
                 hab.disparar(self, inst, "al_descartarse", forzar=True)
             finally:
                 self.ctx_costo = costo_anterior
+                self.ctx_descarte_por_habilidad = anterior
 
     def sale_del_juego(self, inst: Instancia, zona: Zona) -> None:
         """Saca una carta del juego y dispara 'al salir del juego'."""

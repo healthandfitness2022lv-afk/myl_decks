@@ -478,7 +478,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             inicial: 0,
                           );
                           return Text(
-                            'Entrenamiento: rating ${p.rating} · '
+                            'ELO: ${p.rating} · '
                             '${p.ganadas} de ${p.partidas} ganadas · '
                             'mejor ${p.mejorRating}',
                             style: const TextStyle(

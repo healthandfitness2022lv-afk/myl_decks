@@ -1223,8 +1223,14 @@ def _elegir_del_grupo(p: "Partida", i: int, inst: Instancia, opciones: list[dict
     """Opciones excluyentes y opcionales ("puedes X o Y"): quien puede decir
     "ninguna" (la persona) elige una por su nombre. La elegida ya no vuelve a
     preguntar "¿usar?". None = no usa ninguna."""
-    posibles = [x for x in opciones if condicion_ok(p, i, x) and puede_pagar_costo(p, i, inst, x)
-                and _objetivos_suficientes(p, i, inst, x)]
+    # Dario III (Héctor 18-11: «cuando ataca, en la Fase Final no me pregunta»):
+    # «si este Aliado atacó» se mide sobre esta carta; sin fuente nunca se cumplía.
+    anterior, p.ctx_fuente_habilidad = getattr(p, "ctx_fuente_habilidad", None), inst
+    try:
+        posibles = [x for x in opciones if condicion_ok(p, i, x) and puede_pagar_costo(p, i, inst, x)
+                    and _objetivos_suficientes(p, i, inst, x)]
+    finally:
+        p.ctx_fuente_habilidad = anterior
     if not posibles:
         return None
     k = p.decide(i).elegir_opcion(p, i, inst, posibles)

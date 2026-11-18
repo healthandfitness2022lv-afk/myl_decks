@@ -1123,6 +1123,12 @@ class _TableroDesafioState extends State<TableroDesafio> {
             Container(width: 70, height: 94, decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(7),
               border: Border.all(color: _boardGold, width: 3))),
+          if (usable)
+            Positioned(top: 2, child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              color: _boardGold,
+              child: const Text('USAR', style: TextStyle(color: Colors.black,
+                fontSize: 10, fontWeight: FontWeight.w900)))),
           SizedBox(width: 64, height: 88, child: ClipRRect(
             borderRadius: BorderRadius.circular(5),
             child: castillo
@@ -1147,8 +1153,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
           ),
         ]),
         const SizedBox(height: 3),
-        Text(usable ? '$titulo · USAR' : titulo, maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        Text(titulo, maxLines: 1, overflow: TextOverflow.ellipsis,
           style: TextStyle(color: usable ? _boardGold : Colors.white,
             fontSize: 10, fontWeight: FontWeight.bold)),
       ]),

@@ -474,7 +474,14 @@ class HumanoRemoto:
     def elegir_opcion(self, p, yo, fuente, opciones):
         """Anand ("robas o barajas", reporte 4n5oe), Nuada, Loch Lein: el
         jugador elige cuál usar (antes el motor tomaba la primera)."""
-        datos = [{"id": str(k), "titulo": _texto_habilidad(h)} for k, h in enumerate(opciones)]
+        def titulo(h):
+            texto = _texto_habilidad(h)
+            if any(e.get("accion") == "subirMano" and (e.get("objetivo") or {}).get("quien") == "esta_carta"
+                   for e in h.get("luego") or [] if isinstance(e, dict)):
+                # Dario III: «puedes subirlo a tu Mano para desterrar… o robar».
+                texto = f"Subir {fuente.nombre} a la mano: {texto[:1].lower()}{texto[1:]}"
+            return texto
+        datos = [{"id": str(k), "titulo": titulo(h)} for k, h in enumerate(opciones)]
         if all(h.get("opcional") for h in opciones):
             datos.append({"id": "ninguna", "titulo": "No usar"})
         r = self._pedir("opcion", datos, {"titulo": f"{fuente.nombre}: elige una"})

@@ -104,6 +104,26 @@ no estaban listas.
 
 Rige al publicar la app (los tres primeros) y ya en el worker (los dos últimos).
 
+### Reportes pendientes (BibK, dJ00, w3a6, vUsU) y Dario III
+
+| Reporte | Qué pasaba | Arreglo |
+|---|---|---|
+| Dario III (Héctor 18-11 e IVHC) | Tras atacar, en la Fase Final no preguntaba nada: la condición «si atacó» se revisaba sin saber de qué carta | Pregunta «Subir Dario III a la mano: desterrar 1 de Cementerio / robar 1 / No usar» |
+| vUsU T5 Orfeo | No se podía activar si nunca había nombrado (buscaba copias de un nombre vacío) | Se activa si el Mazo rival tiene cartas; nombras al activarlo |
+| BibK T12 Corona Faraónica | Tras «¿Usar?» pedía elegir al Aliado que entra (único posible); el título decía «restringirCombate 1 en juego» | No pide objetivo; «¿Usar Corona Faraónica (que Djoser pueda atacar este turno · botar 1)?» |
+| BibK T6 Djoser | Destruir al entrar un Arma era obligatorio | Opcional («puedes destruir») |
+| BibK T12 / AkOg T13 Escudo Miliciano | Desde el Cementerio solo en el ataque rival | También en tu ataque («en respuesta a un Ataque») |
+| dJ00 T9 «no hay interfaz para jugar desde el Cementerio» | La pila solo ampliaba las cartas | La pila se marca «USAR»; al abrirla, tocar la carta la juega o activa |
+| dJ00 T7 costo alternativo | «¿Pagar el costo alternativo?» | Dos botones explícitos: «Botar 3» / «Pagar 1 Oro» |
+| w3a6 T5 dos Bereber | «Otro Guerrero» excluía a las copias del mismo nombre | Cada Bereber puede dar +2 al otro |
+| w3a6 T5 Látigo y Bastón / quién bloquea a quién | — | Ya resueltos antes (Oros pagados disparan; flechas de bloqueo) |
+| vUsU T3 Eros (IA) | Buscaba Olímpicos + Corona | 2 Coronas del Día; si no, Corona + Ofrenda a los Dioses |
+| vUsU T9 ataque | Sin contador ni forma visible de bajar atacantes | Contador animado ⚔ con la fuerza del ataque, «Toca un atacante para bajarlo» (o arrástralo a la Defensa); al ampliar un Aliado: «base 2 · +2 Guerrero Bereber · -1 Toro Apis» |
+
+Queda pendiente: elegir el orden cuando se activan varias habilidades a la vez (4NtK).
+Tests: `simulator/tests/test_reportes_pendientes_1118.py`, `test/tablero_fuerza_test.dart`.
+Rige en el worker al reiniciarlo y en la app al publicarla.
+
 ---
 
 ## 2026-11-17

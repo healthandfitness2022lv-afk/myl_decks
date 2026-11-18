@@ -5283,12 +5283,16 @@ class Heuristico:
             # #49: primero a quien el cambio le da vuelta su pelea (Jentakus
             # bloqueado por Djedefhor), después el resto de los combatientes.
             cambio = int(h.get("valor", 0))
-            enemigo = cambio < 0
+            # Tea / Jueces del Maat: "tiene fuerza 0" es un castigo (valor 0 no
+            # es un bono): va al rival, y cuenta como perder toda su fuerza.
+            a_cero = h.get("modoFuerza") == "fijar" and cambio == 0
+            enemigo = cambio < 0 or a_cero
             pelean = _combatientes(p)
             return sorted(
                 candidatos,
                 key=lambda c: (
-                    (c.controlador == yo) == enemigo, not _decisivo(p, c, cambio), c.uid not in pelean,
+                    (c.controlador == yo) == enemigo,
+                    not _decisivo(p, c, -hab.fuerza(p, c) if a_cero else cambio), c.uid not in pelean,
                     -_valor_carta(p, c),
                 ),
             )[:n]
@@ -5411,7 +5415,9 @@ class Heuristico:
                 return sum(2 if int(x.get("limitePorTurno", 0) or 0) >= 1 else 1
                            for x in c.habilidades if _habilidad_repetible(x))
             return sorted(candidatos, key=lambda c: (c.nombre in en_juego, -repetible(c)))[:n]
-        if accion in _BENEFICIO_PROPIO or (accion == "modificarFuerza" and int(h.get("valor", 0)) >= 0):
+        if accion in _BENEFICIO_PROPIO or (accion == "modificarFuerza" and int(h.get("valor", 0)) >= 0
+                                           and not (h.get("modoFuerza") == "fijar"
+                                                    and int(h.get("valor", 0)) == 0)):
             peligro = accion == "buscar" and _en_peligro(p, yo)
 
             def bota(c):  # #87: Jinetes de Fuego o Mercado Egipcio, que hacen daño

@@ -373,6 +373,11 @@ def _mazo_desde_doc(deck_id: str, d: dict, docs: dict | None = None) -> Mazo:
 
 
 def cargar_mazo(owner_uid: str, deck_id: str, *, usar_cache: bool = False) -> Mazo:
+    # Rival del modo Entrenamiento: su lista está en el caché local del worker.
+    if deck_id.startswith("escalera:"):
+        from .escalera import cargar_mazo_rival
+
+        return cargar_mazo_rival(deck_id)
     # Las listas notables son snapshots globales: se pueden enfrentar contra
     # cualquier mazo propio sin pertenecer a users/{uid}/decks.
     if deck_id.startswith("notable:"):

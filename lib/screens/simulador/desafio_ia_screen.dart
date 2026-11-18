@@ -16,7 +16,12 @@ const _surface = Color(0xFF132126);
 const _gold = Color(0xFFF2D487);
 
 class DesafioIaScreen extends StatefulWidget {
-  const DesafioIaScreen({super.key});
+  /// Con [desafio] abre directo esa partida (modo Entrenamiento): no ofrece
+  /// crear otra ni ver el historial de desafíos.
+  const DesafioIaScreen({super.key, this.desafio, this.titulo});
+
+  final DocumentReference<Map<String, dynamic>>? desafio;
+  final String? titulo;
 
   @override
   State<DesafioIaScreen> createState() => _DesafioIaScreenState();
@@ -27,7 +32,8 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
   late final Stream<List<Deck>> _decks = soloMazosValidos(
     DeckService(_uid).watchMyDecks(),
   );
-  DocumentReference<Map<String, dynamic>>? _desafio;
+  late DocumentReference<Map<String, dynamic>>? _desafio = widget.desafio;
+  bool get _fijo => widget.desafio != null;
   String? _humano;
   String? _ia;
   bool _creando = false;
@@ -152,9 +158,9 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
                       MediaQuery.sizeOf(context).height
               ? 36
               : null,
-      title: const Text(
-        'Desafío IA',
-        style: TextStyle(color: _gold, fontWeight: FontWeight.bold),
+      title: Text(
+        widget.titulo ?? 'Desafío IA',
+        style: const TextStyle(color: _gold, fontWeight: FontWeight.bold),
       ),
       actions: [
         if (_desafio == null)
@@ -163,7 +169,7 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
             icon: const Icon(Icons.psychology_alt_outlined, color: _gold),
             label: const Text('Dudas de la IA', style: TextStyle(color: _gold)),
           ),
-        if (_desafio != null)
+        if (_desafio != null && !_fijo)
           IconButton(
             tooltip: 'Ver mis desafíos',
             onPressed: () => setState(() => _desafio = null),
@@ -669,7 +675,7 @@ class _DesafioIaScreenState extends State<DesafioIaScreen> {
             const SizedBox(height: 12),
             _Decision(ref: ref, decision: decision),
           ],
-          if (status == 'error' || status == 'abandonado')
+          if ((status == 'error' || status == 'abandonado') && !_fijo)
             FilledButton.icon(
               onPressed: _creando ? null : () => _reintentar(d),
               icon: const Icon(Icons.replay),

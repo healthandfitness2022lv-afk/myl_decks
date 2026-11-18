@@ -627,9 +627,15 @@ class _SubmenuPanel extends StatelessWidget {
             onCreateDeck,
           ),
           _RowItem(
+            Icons.fitness_center_rounded,
+            'Entrenamiento',
+            'Sube de rating contra mazos del meta',
+            () => context.push('/entrenamiento'),
+          ),
+          _RowItem(
             Icons.insights_rounded,
             'Meta y tendencias',
-            'Razas y cartas más jugadas',
+            'Qué se juega y qué gana: agro o control',
             () => context.push('/meta'),
           ),
         ];
@@ -669,6 +675,12 @@ class _SubmenuPanel extends StatelessWidget {
             'Amigos',
             'Solicitudes y jugadores conectados',
             () => context.push('/amigos'),
+          ),
+          _RowItem(
+            Icons.emoji_events_outlined,
+            'Torneos',
+            'Suizo con top: inscríbete u organiza uno',
+            () => context.push('/torneos'),
           ),
           _RowItem(
             Icons.groups_2_outlined,

@@ -67,3 +67,48 @@ def test_sin_programar_solo_cuenta_cartas_con_texto():
         ({"nombre": "Oro", "tipo": "Oro"}, 6),
     ])
     assert r["sinProgramar"] == 1 and r["oros"] == 6 and r["noOros"] == 4
+
+
+_NODE_PERFIL = r"""
+const fs = require('fs');
+const html = fs.readFileSync(process.argv[2], 'utf8');
+const a = html.indexOf('// <perfil-habilidades>'), b = html.indexOf('// </perfil-habilidades>');
+if (a < 0 || b < 0) throw new Error('no se encontró el bloque perfil-habilidades');
+const PERFIL = new Function(html.slice(a, b) + '\nreturn PERFIL;')();
+const casos = JSON.parse(fs.readFileSync(process.argv[3], 'utf8')).casos;
+const out = casos.map(caso => {
+  const r = PERFIL.analizar(caso.cartas.map(c => ({
+    tipo: c.tipo, coste: c.coste, copias: c.copias, roles: PERFIL.rolesDeHabilidades(c.habilidades),
+  })));
+  return { indice: r.indice, perfil: r.perfil, puntos: r.puntos, copiasPorRol: r.copiasPorRol,
+           total: r.total, oros: r.oros };
+});
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+def test_dashboard_calcula_lo_mismo_que_el_simulador(tmp_path):
+    """El dashboard de ligas (JavaScript) usa las mismas reglas: se ejecuta su
+    bloque `perfil-habilidades` con Node sobre los casos compartidos."""
+    import shutil
+    import subprocess
+
+    import pytest
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node no está instalado")
+    dashboard = perfil.ARCHIVO_CASOS.parents[2] / "dashboard" / "index.html"
+    guion = tmp_path / "perfil.js"
+    guion.write_text(_NODE_PERFIL, encoding="utf-8")
+    r = subprocess.run([node, str(guion), str(dashboard), str(perfil.ARCHIVO_CASOS)],
+                       capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stderr
+    casos = json.loads(perfil.ARCHIVO_CASOS.read_text(encoding="utf-8"))["casos"]
+    for caso, js in zip(casos, json.loads(r.stdout), strict=True):
+        e = caso["esperado"]
+        assert (js["indice"], js["perfil"], js["total"], js["oros"]) == (
+            e["indice"], e["perfil"], e["total"], e["oros"]), caso["nombre"]
+        assert js["copiasPorRol"] == e["copiasPorRol"], caso["nombre"]
+        for rol in perfil.ROLES:
+            assert abs(js["puntos"][rol] - e["roles"][rol]) < 0.02, (caso["nombre"], rol)

@@ -65,6 +65,52 @@ def _jugar(args) -> dict:
     return out
 
 
+def _match(args) -> dict:
+    """Al mejor de 3: dado para la primera, el que pierde parte la siguiente,
+    gana el primero en llegar a 2 (empate o error: parte el otro; máximo 5)."""
+    import random
+
+    a_id, b_id, seed, rollouts, salida = args
+    rng = random.Random(seed)
+    while True:
+        da, db = rng.randint(1, 6), rng.randint(1, 6)
+        if da != db:
+            break
+    parte = 0 if da > db else 1
+    partidas, victorias = [], [0, 0]
+    for n in range(5):
+        f = _jugar((a_id, b_id, parte, seed * 10 + n, rollouts, salida))
+        f["partida"] = n + 1
+        partidas.append(f)
+        g = f["ganador"]
+        if g in (0, 1):
+            victorias[g] += 1
+            parte = 1 - g
+        else:
+            parte = 1 - parte
+        if max(victorias) == 2:
+            break
+    return {"rival": partidas[0]["rival"], "rival_id": b_id, "seed": seed, "dado": [da, db],
+            "marcador": victorias, "gano_match": victorias[0] == 2, "partidas": partidas}
+
+
+def resumen_bo3_md(a: Mazo, matches: list[dict], rollouts: int, total: int) -> str:
+    ms = sorted(matches, key=lambda m: (m["marcador"][0] - m["marcador"][1], m["rival"]))
+    g = sum(m["gano_match"] for m in ms)
+    ps = [p for m in ms for p in m["partidas"] if "error" not in p]
+    gp = sum(p["gano"] for p in ps)
+    out = [f"# {a.nombre} contra el meta · al mejor de 3 · IA por utilidad ({rollouts} rollouts por candidata)", "",
+           f"{len(ms)} de {total} matches · ganó {g} ({g / max(1, len(ms)):.0%}) · "
+           f"partidas: {gp} de {len(ps)} ({gp / max(1, len(ps)):.0%})", "",
+           "| Rival | Marcador | Match | Partidas (quién parte → ganador) |", "|---|---|---|---|"]
+    for m in ms:
+        det = ", ".join(f"{'S' if p['empieza'] == 'A' else 'R'}→{'S' if p['gano'] else 'R'}" for p in m["partidas"])
+        out.append(f"| {m['rival']} | {m['marcador'][0]}-{m['marcador'][1]} | "
+                   f"{'gana' if m['gano_match'] else 'pierde'} | {det} |")
+    out += ["", "S = Sacerdote/mazo propio, R = rival. Ej.: «S→R» = partió el propio y ganó el rival."]
+    return "\n".join(out)
+
+
 def resumen_md(a: Mazo, filas: list[dict], rollouts: int) -> str:
     por: dict[str, list[dict]] = {}
     for f in filas:
@@ -92,12 +138,27 @@ def main(argv=None) -> int:
     ap.add_argument("--procesos", type=int, default=10)
     ap.add_argument("--seed", type=int, default=100)
     ap.add_argument("--salida", default=str(CACHE / "utilidad_meta"))
+    ap.add_argument("--bo3", action="store_true", help="matches al mejor de 3 (dado; el que pierde parte)")
     args = ap.parse_args(argv)
     cargar(args.a)  # valida Ban List y Únicas
     a = _cargar(args.a)
     rivales = [m for m in raciales_del_cache() if m.id != a.id and _unicas_ok(m)]
     salida = Path(args.salida)
     salida.mkdir(parents=True, exist_ok=True)
+    if args.bo3:
+        tareas = [(a.id, m.id, args.seed + 1000 * i, args.rollouts, str(salida)) for i, m in enumerate(rivales)]
+        print(f"{a.nombre}: {len(rivales)} matches al mejor de 3", flush=True)
+        hechos, inicio = [], time.monotonic()
+        with Pool(args.procesos) as pool:
+            for m in pool.imap_unordered(_match, tareas):
+                hechos.append(m)
+                print(json.dumps({"hechos": len(hechos), "total": len(tareas), "rival": m["rival"],
+                                  "marcador": m["marcador"], "min": round((time.monotonic() - inicio) / 60, 1)},
+                                 ensure_ascii=False), flush=True)
+                (salida / "matches.json").write_text(json.dumps(hechos, ensure_ascii=False, indent=1), encoding="utf-8")
+                (salida / "resumen.md").write_text(resumen_bo3_md(a, hechos, args.rollouts, len(tareas)),
+                                                   encoding="utf-8")
+        return 0
     tareas = [(a.id, m.id, k, args.seed + 1000 * i + k, args.rollouts, str(salida))
               for i, m in enumerate(rivales) for k in range(args.partidas)]
     print(f"{a.nombre}: {len(rivales)} rivales, {len(tareas)} partidas", flush=True)

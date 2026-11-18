@@ -569,7 +569,7 @@
       </div>
     </div>
 
-    <!-- Cartas asociadas a una característica dentro del comparador -->
+    <!-- Cartas asociadas a un rol dentro del comparador -->
     <div id="feature-cards-modal" style="display:none;position:fixed;inset:0;z-index:220;background:rgba(0,0,0,.72);backdrop-filter:blur(3px)">
       <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(1040px,96vw);max-height:90vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surf2)">
@@ -727,9 +727,9 @@
         <div class="subhead">Enfrentamientos entre razas registradas</div>
         <div class="tw"><table><thead><tr><th>#</th><th>Matchup</th><th>Duelos</th><th>Resultado</th><th>Ventaja observada</th></tr></thead><tbody id="tbody-matchups"></tbody></table></div>
         <div class="subhead">Rendimiento por perfil de juego</div>
-        <div style="font-size:11px;color:var(--text3);margin:-4px 0 10px">Cada lista se asigna al perfil dominante de sus características. Si dos grupos tienen un peso similar, se presenta como un perfil híbrido.</div>
+        <div style="font-size:11px;color:var(--text3);margin:-4px 0 10px">El estilo de cada lista (Agro, Medio, Control o Combo) se calcula con las habilidades programadas de sus cartas y su curva de coste.</div>
         <div class="tw"><table><thead><tr><th>#</th><th>Estilo</th><th>Duelos</th><th>G</th><th>P</th><th>E</th><th>Winrate</th></tr></thead><tbody id="tbody-grps"></tbody></table></div>
-        <details style="margin-top:16px"><summary style="cursor:pointer;font-size:12px;color:var(--text2);font-weight:600;padding:6px 0">Ver detalle por característica individual</summary><div class="tw" style="margin-top:8px"><table><thead><tr><th>#</th><th>Característica</th><th>Duelos</th><th>G</th><th>P</th><th>E</th><th>Winrate</th></tr></thead><tbody id="tbody-feats"></tbody></table></div></details>
+        <details style="margin-top:16px"><summary style="cursor:pointer;font-size:12px;color:var(--text2);font-weight:600;padding:6px 0">Ver detalle por rol de las cartas</summary><div class="tw" style="margin-top:8px"><table><thead><tr><th>#</th><th>Rol</th><th>Duelos</th><th>G</th><th>P</th><th>E</th><th>Winrate</th></tr></thead><tbody id="tbody-feats"></tbody></table></div></details>
       </div>
 
       <div class="tab-panel" id="round-tab-cartas">
@@ -922,34 +922,26 @@
     restoringUrlState = false;
   }
 
-  // Catálogo de cartas (para cruzar características por cardId). Se carga 1 vez.
+  // Catálogo de cartas (para cruzar los roles de cada carta por cardId). Se carga 1 vez.
   let cardCatalog = null;        // { byId:{}, byName:{} }
   let cardCatalogPromise = null;
   function loadCardCatalog() {
     if (cardCatalogPromise) return cardCatalogPromise;
     cardCatalogPromise = Promise.all([
       db.collection('cards').get(),
-      db.collection('card_custom_features').get().catch(() => ({ forEach(){} })),
-    ]).then(([cardsSnap, featSnap]) => {
-      // característica normalizada → grupo (Removal, Control, Agro…)
-      const featGroup = {};
-      featSnap.forEach(d => {
-        const m = d.data();
-        const g = (m.group || '').trim();
-        if (!g) return;
-        if (m.name)       featGroup[normFeat(m.name)] = g;
-        if (m.normalized) featGroup[normFeat(m.normalized)] = g;
-      });
+    ]).then(([cardsSnap]) => {
       const byId = {}, byName = {}, byNormalizedName = {};
       cardsSnap.forEach(d => {
         const c = d.data();
-        const feats = readFeatures(c.caracteristicasRaw);
+        // Roles de la carta según sus habilidades programadas.
+        const roles = PERFIL.rolesDeHabilidades(c.habilidades);
+        const feats = PERFIL.ROLES.filter(r => roles[r] > 0).map(r => PERFIL.NOMBRES[r]);
         const entry = {
           id:d.id, name:c.nombre || '', tipo:c.tipo || '',
           coste:c.coste ?? null, fuerza:c.fuerza ?? null,
           edition:c.edicion || '', race:c.raza || '',
           unique:c.unica === true, soloLibre:c.soloLibre === true,
-          isStub:c.status === 'stub', feats, img:null,
+          isStub:c.status === 'stub', feats, roles, img:null,
           legacyImg:pickImg(c), imageResolved:false,
           officialVariantId:String(c.officialVariantId || '').trim(),
         };
@@ -959,10 +951,10 @@
           byNormalizedName[normFeat(c.nombre)] = entry;
         }
       });
-      cardCatalog = { byId, byName, byNormalizedName, featGroup };
+      cardCatalog = { byId, byName, byNormalizedName };
       return cardCatalog;
     }).catch(() => {
-      cardCatalog = { byId:{},byName:{},byNormalizedName:{},featGroup:{} };
+      cardCatalog = { byId:{},byName:{},byNormalizedName:{} };
       return cardCatalog;
     });
     return cardCatalogPromise;
@@ -1115,26 +1107,178 @@
     if (m) return 'https://lh3.googleusercontent.com/d/' + m[1] + '=w480';
     return url;
   }
-  // caracteristicasRaw admite lista, mapa {k:true} o CSV — igual que en la app.
-  function readFeatures(any) {
-    const out = [];
-    if (!any) return out;
-    if (Array.isArray(any)) any.forEach(x => out.push(String(x)));
-    else if (typeof any === 'object') Object.entries(any).forEach(([k,v]) => { if (v === true) out.push(k); });
-    else if (typeof any === 'string') any.split(',').forEach(p => out.push(p.trim()));
-    return out.map(s => s.trim()).filter(Boolean);
-  }
-  // Normalización de característica igual a la app (tildes, guiones, espacios).
+  // <perfil-habilidades>
+  // Qué hace un mazo según las habilidades programadas de sus cartas. Es el
+  // mismo cálculo que lib/domain/analisis_mazo (app) y simulator/myl_sim/perfil.py
+  // (simulador); los tres se prueban contra test/fixtures/perfil_casos.json.
+  // Si cambias una regla o un peso aquí, cámbialo también allá.
+  const PERFIL = (() => {
+    const ROLES = ['presion','dano_directo','remocion','control','respuesta','proteccion','ventaja','economia','recursion','disrupcion'];
+    const NOMBRES = {
+      presion:'Presión', dano_directo:'Daño directo', remocion:'Remoción', control:'Control',
+      respuesta:'Respuesta', proteccion:'Protección', ventaja:'Ventaja de cartas',
+      economia:'Economía de Oros', recursion:'Recursión', disrupcion:'Disrupción de mano',
+    };
+    const FAMILIAS = {
+      'Presión':['presion','dano_directo'], 'Manejo de mesa':['remocion','control','respuesta'],
+      'Recursos':['ventaja','economia','recursion'], 'Apoyo':['proteccion','disrupcion'],
+    };
+    const FAMILIA_POR_NOMBRE = {};
+    Object.entries(FAMILIAS).forEach(([f, rs]) => rs.forEach(r => { FAMILIA_POR_NOMBRE[NOMBRES[r]] = f; }));
+    const TOPE_CARTA = 2.0;
+    const RIVAL = ['oponente','cualquiera','disparadora','ambos'];
+    const PROPIO = ['propio','esta_carta','proximo'];
+    const EN_JUEGO = ['en_juego','linea_defensa','linea_ataque','linea_apoyo'];
+    const PROPIEDADES = ['imbloqueable','indestructible','indesterrable','noAnulable','furia','guardian','errante','retador','sinLimiteArmas'];
+    const DISPARO_REPETIDO = ['al_atacar','al_hacer_dano','al_inicio_fase','al_bloquear','propia_entra','propia_sale','propio_ataca','propia_juega'];
+    const RESPUESTA = ['oponente_juega','habilidad_oponente'];
+    const PROTEGE = ['indestructible','indesterrable','inmunidad','noAnulable'];
+    const AGRESIVO = ['furia','imbloqueable','retador'];
+    const PESO_PRESION = 1.0, PESO_MANEJO = 1.0, PESO_CURVA = 0.4;
+    const ESCALA_PRESION = 0.8, ESCALA_MANEJO = 1.3;
+    const CURVA_BAJA = 1.6, CURVA_ALTA = 3.2, CORTE_AGRO = 62, CORTE_CONTROL = 38;
+
+    const entero = (v, d = 0) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
+    const mapa = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+    const cantidadDe = e => (e.cantidad == null ? 1 : entero(e.cantidad, 1));
+    const alcance = e => {
+      if (mapa(e.objetivo).seleccion === 'todos') return 1.6;
+      const n = cantidadDe(e);
+      return n <= 1 ? 1.0 : Math.min(1.0 + 0.3 * (n - 1), 1.6);
+    };
+    const factor = (e, cuando) => {
+      let f = 1.0, costo = mapa(e.costo);
+      if (PROPIEDADES.includes(String(e.accion || ''))) { cuando = 'continua'; costo = {}; }
+      const seGasta = ['destruirEstaCarta','desterrarEstaCarta','barajarEstaCarta','fondoMazoEstaCarta'].some(k => costo[k]);
+      if (cuando === 'activada' && !seGasta && !e.unaVez) f *= 1.3;
+      else if (cuando === 'continua') f *= 1.2;
+      else if (DISPARO_REPETIDO.includes(cuando)) f *= 1.1;
+      f *= Math.max(0.6, 1.0 - 0.1 * entero(costo.oros));
+      if (['descartar','destruirAliados','desterrarAliados','barajarMano'].reduce((s, k) => s + entero(costo[k]), 0)) f *= 0.85;
+      if (String(mapa(e.condicion).tipo || 'ninguna') !== 'ninguna') f *= 0.85;
+      return f;
+    };
+    function rolesDeEfecto(e, cuando) {
+      const accion = String(e.accion || '');
+      const obj = mapa(e.objetivo);
+      const quien = String(obj.quien || 'oponente');
+      const zona = String(obj.zona || 'en_juego');
+      const zonas = new Set([zona, ...(Array.isArray(obj.zonas) ? obj.zonas.map(String) : [])]);
+      const tipos = Array.isArray(obj.tipos) ? obj.tipos.map(String) : [];
+      const modo = String(e.modo || '');
+      const valor = entero(e.valor);
+      const destino = String(e.zonaDestino || '');
+      const cantidad = Math.max(1, cantidadDe(e));
+      const rival = RIVAL.includes(quien), propio = PROPIO.includes(quien), enJuego = EN_JUEGO.includes(zona);
+      const out = {};
+      const suma = (rol, p) => { out[rol] = (out[rol] || 0) + p; };
+      if ((accion === 'destruir' || accion === 'desterrar') && rival && enJuego) suma('remocion', 1.0 * alcance(e));
+      if (accion === 'barajar' && rival && enJuego) suma('remocion', 0.9 * alcance(e));
+      if (accion === 'subirMano' && rival && enJuego) suma('remocion', 0.6 * alcance(e));
+      if (accion === 'ganarControl') { suma('remocion', 0.8); suma('presion', 0.4); }
+      if (['perderHabilidad','restriccion','encarecer','noAgrupar'].includes(accion) && !propio) suma('control', 0.8 * alcance(e));
+      if (accion === 'restringirCombate') {
+        if (modo === 'puede_atacar_este_turno') suma('presion', 0.6);
+        else if (!propio) suma('control', 0.7 * alcance(e));
+      }
+      if (accion === 'modificarFuerza') {
+        if (valor > 0 && !rival) suma('presion', Math.min(0.3 + 0.15 * valor, 0.9) * (quien === 'propio' ? alcance(e) : 1.0));
+        else if (valor < 0 && !propio) suma('control', Math.min(0.3 + 0.15 * -valor, 0.9) * alcance(e));
+      }
+      if (accion === 'robar' && quien !== 'oponente') suma('ventaja', Math.min(0.5 * cantidad, 1.5));
+      if (accion === 'mirarTope' || accion === 'mostrar') suma('ventaja', 0.5);
+      if (accion === 'mirar') suma(rival ? 'disrupcion' : 'ventaja', 0.3);
+      if (accion === 'botar' && ['oponente','ambos','cualquiera'].includes(quien)) suma('dano_directo', Math.min(0.4 * cantidad, 2.0));
+      const esOro = tipos.length === 1 && tipos[0] === 'Oro';
+      const trae = ['buscar','jugarDesde','ponerEnJuego'].includes(accion);
+      if (accion === 'generarOro' || (trae && (destino === 'reserva_oro' || esOro))) suma('economia', 1.0);
+      else if (trae && zonas.has('mazo')) suma('ventaja', 0.9);
+      if (accion === 'modificarCoste' && valor < 0) suma('economia', 0.6);
+      if (accion === 'agrupar' && !rival) suma('economia', 0.5);
+      if (['barajar','subirMano','jugarDesde','buscar','ponerEnJuego','mover'].includes(accion) && propio && zonas.has('cementerio')) {
+        suma('recursion', 0.9 * (accion !== 'barajar' ? 1.0 : 0.6));
+      }
+      if (['anular','cancelarAtaque','cancelarHabilidad','redirigir'].includes(accion) || RESPUESTA.includes(cuando)) suma('respuesta', 1.0);
+      if (['prevenir','reducirDano','protegerHabilidad'].includes(accion) || PROTEGE.includes(accion)
+          || (accion === 'otorgarPropiedad' && PROTEGE.includes(modo))) suma('proteccion', 0.7);
+      if (AGRESIVO.includes(accion) || (accion === 'otorgarPropiedad' && AGRESIVO.includes(modo))) suma('presion', 0.8);
+      if (accion === 'descartar' && (quien === 'oponente' || quien === 'ambos')) suma('disrupcion', Math.min(0.7 * cantidad, 1.6));
+      const f = factor(e, cuando);
+      Object.keys(out).forEach(k => { out[k] *= f; });
+      return out;
+    }
+    // Puntos por rol de una carta (sus habilidades y sus "luego"), con tope.
+    function rolesDeHabilidades(habilidades) {
+      const out = {};
+      (Array.isArray(habilidades) ? habilidades : []).forEach(h => {
+        if (!h || typeof h !== 'object') return;
+        const cuando = String(h.cuando || '');
+        [h, ...(Array.isArray(h.luego) ? h.luego.filter(x => x && typeof x === 'object') : [])].forEach(e => {
+          Object.entries(rolesDeEfecto(e, cuando)).forEach(([rol, p]) => { out[rol] = (out[rol] || 0) + p; });
+        });
+      });
+      Object.keys(out).forEach(k => { if (out[k] <= 0) delete out[k]; else out[k] = Math.min(out[k], TOPE_CARTA); });
+      return out;
+    }
+    function indiceVelocidad(presion, manejo, noOros, costeMedio) {
+      if (noOros <= 0) return 50;
+      const dp = Math.min(presion / noOros / ESCALA_PRESION, 1.0);
+      const dm = Math.min(manejo / noOros / ESCALA_MANEJO, 1.0);
+      const curva = Math.max(0, Math.min(1, (CURVA_ALTA - costeMedio) / (CURVA_ALTA - CURVA_BAJA))) * 2 - 1;
+      const bruto = (PESO_PRESION * dp - PESO_MANEJO * dm + PESO_CURVA * curva) / (Math.max(PESO_PRESION, PESO_MANEJO) + PESO_CURVA);
+      return Math.floor(Math.max(0, Math.min(100, 50 + 50 * bruto)) + 0.5);
+    }
+    // cartas: [{ tipo, coste, roles, copias }]. Devuelve puntos por rol,
+    // índice de velocidad (0 = control, 100 = agro) y perfil.
+    function analizar(cartas) {
+      const puntos = {}; ROLES.forEach(r => { puntos[r] = 0; });
+      const copiasPorRol = {}; ROLES.forEach(r => { copiasPorRol[r] = 0; });
+      let total = 0, oros = 0, noOros = 0, conCoste = 0, sumaCoste = 0;
+      (cartas || []).forEach(c => {
+        const n = Number(c.copias || 0);
+        if (n <= 0) return;
+        total += n;
+        const tipo = String(c.tipo || '').toLowerCase().replace(/á/g,'a').replace(/ó/g,'o').trim();
+        if (tipo.startsWith('oro')) oros += n;
+        else {
+          noOros += n;
+          const coste = c.coste == null ? -1 : entero(c.coste, -1);
+          if (coste >= 0) { sumaCoste += coste * n; conCoste += n; }
+        }
+        Object.entries(c.roles || {}).forEach(([rol, p]) => {
+          if (p <= 0 || !(rol in puntos)) return;
+          puntos[rol] += p * n; copiasPorRol[rol] += n;
+        });
+      });
+      const costeMedio = conCoste ? sumaCoste / conCoste : 0;
+      const presion = puntos.presion + puntos.dano_directo;
+      const manejo = puntos.remocion + puntos.control + puntos.respuesta + 0.5 * puntos.ventaja + 0.5 * puntos.recursion;
+      const indice = indiceVelocidad(presion, manejo, noOros, costeMedio);
+      const motor = puntos.ventaja + puntos.economia + puntos.recursion;
+      const suma = ROLES.reduce((s, r) => s + puntos[r], 0);
+      const perfil = (noOros && motor / noOros >= 0.75 && motor > (suma - motor) * 1.25) ? 'Combo'
+        : indice >= CORTE_AGRO ? 'Agro' : indice <= CORTE_CONTROL ? 'Control' : 'Medio';
+      const familias = {};
+      Object.entries(FAMILIAS).forEach(([f, rs]) => {
+        const p = rs.reduce((s, r) => s + puntos[r], 0);
+        if (p > 0) familias[f] = p;
+      });
+      return { total, oros, noOros, costeMedio, puntos, copiasPorRol, presion, manejo, indice, perfil, familias, sinRoles: suma <= 0 };
+    }
+    return { ROLES, NOMBRES, FAMILIAS, FAMILIA_POR_NOMBRE, rolesDeHabilidades, indiceVelocidad, analizar };
+  })();
+  // </perfil-habilidades>
+
+  // Normalización de nombres (tildes, guiones, espacios).
   function normFeat(s) {
     return String(s).trim().toLowerCase()
       .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
       .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n')
       .replace(/[_-]/g,' ').replace(/\s+/g,' ');
   }
-  // Grupo de una característica (o 'Otros' si no está mapeada).
+  // Familia de un rol (Presión, Manejo de mesa, Recursos, Apoyo).
   function groupOfFeat(f) {
-    const cat = cardCatalog || {};
-    return (cat.featGroup || {})[normFeat(f)] || 'Otros';
+    return PERFIL.FAMILIA_POR_NOMBRE[f] || 'Otros';
   }
 
   // ── Sidebar ────────────────────────────────────────────────────────────────
@@ -1773,26 +1917,16 @@
     }).filter(Boolean).sort().join('|');
   }
 
-  // El arquetipo se deriva de las características dominantes de las cartas.
-  // La raza se conserva como contexto, pero no define por sí sola el arquetipo.
+  // El estilo del mazo (Agro, Medio, Control o Combo) sale de las habilidades
+  // programadas de sus cartas y de su curva de coste. La raza se conserva
+  // como contexto, pero no define por sí sola el arquetipo.
   function deckStyleProfile(deck, cat) {
-    const weights = {};
-    let total = 0;
-    (deck || []).forEach(c => {
-      const n = Number(c.count || 1);
-      total += n;
-      const groups = new Set((catalogEntryFor(c, cat).feats || []).map(groupOfFeat));
-      groups.delete('Otros');
-      groups.forEach(g => { weights[g] = (weights[g] || 0) + n; });
-    });
-    const ranked = Object.entries(weights).sort((a,b) => b[1]-a[1]);
-    if (!ranked.length || !total) return { label:'Sin clasificar', weights };
-    const primary = ranked[0];
-    const secondary = ranked[1];
-    const label = secondary && secondary[1] / total >= .15 && secondary[1] >= primary[1] * .6
-      ? `${primary[0]} / ${secondary[0]}`
-      : primary[0];
-    return { label, weights };
+    const a = PERFIL.analizar((deck || []).map(c => {
+      const e = catalogEntryFor(c, cat);
+      return { tipo:c.tipo || e.tipo, coste:c.coste ?? e.coste, roles:e.roles || {}, copias:Number(c.count || 1) };
+    }));
+    if (a.sinRoles) return { label:'Sin clasificar', weights:{} };
+    return { label:a.perfil, weights:a.familias, indice:a.indice };
   }
 
   function sampleLevel(lists, duels) {
@@ -1812,7 +1946,7 @@
     const races = {};      // raza → resultados
     const pdeck = {};      // instancia de lista por jugador y fecha
     const cards = {};      // carta → inclusión + resultados asociados
-    const feat = {};       // característica individual → resultados
+    const feat = {};       // rol de carta → resultados
     const styles = {};     // perfil dominante → resultados
     const matchups = {};   // pareja de razas registradas, sin exponer identidades bloqueadas
     const archetypeNames = new Set();
@@ -2864,8 +2998,8 @@
     ].join('');
     document.getElementById('fcm-title').textContent = `Grupo “${state.activeGroup}”`;
     document.getElementById('fcm-sub').textContent = selected
-      ? `Cartas con la característica “${selected.label}”`
-      : 'Selecciona una característica para filtrar las cartas';
+      ? `Cartas con el rol “${selected.label}”`
+      : 'Selecciona un rol para filtrar las cartas';
     document.getElementById('fcm-body').innerHTML =
       `<div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:7px">Características del grupo</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${chips}</div>
@@ -5745,8 +5879,8 @@
     { key: 'draw', label: 'E' },
     { key: 'winPct', label: 'Winrate' },
   ];
-  sortableTable('tbody-grps', _featLikeCols, rows => { const tbody = document.getElementById('tbody-grps'); tbody.innerHTML = rows.length ? featRowsHtml(rows, false, true) : `<tr class="empty-row"><td colspan="7">Sin estilos (¿mazos sin cartas con características?)</td></tr>`; }, 'winPct');
-  sortableTable('tbody-feats', _featDetailCols, rows => { const tbody = document.getElementById('tbody-feats'); tbody.innerHTML = rows.length ? featRowsHtml(rows, true, true) : `<tr class="empty-row"><td colspan="7">Sin características</td></tr>`; }, 'winPct');
+  sortableTable('tbody-grps', _featLikeCols, rows => { const tbody = document.getElementById('tbody-grps'); tbody.innerHTML = rows.length ? featRowsHtml(rows, false, true) : `<tr class="empty-row"><td colspan="7">Sin estilos (¿mazos sin cartas con habilidades programadas?)</td></tr>`; }, 'winPct');
+  sortableTable('tbody-feats', _featDetailCols, rows => { const tbody = document.getElementById('tbody-feats'); tbody.innerHTML = rows.length ? featRowsHtml(rows, true, true) : `<tr class="empty-row"><td colspan="7">Sin roles</td></tr>`; }, 'winPct');
 
   loadSidebar();
 </script>

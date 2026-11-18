@@ -12,6 +12,16 @@ class CardService {
 
   CollectionReference<Map<String, dynamic>> get _col => _db.collection('cards');
 
+  /// Catálogo completo, leído una sola vez por sesión. Sirve para análisis
+  /// (validar listas, estadísticas); las pantallas que editan cartas leen
+  /// directo de Firestore.
+  static Future<List<CardMyL>>? _catalogo;
+  static Future<List<CardMyL>> catalogo() =>
+      _catalogo ??= CardService().getAllCards().catchError((Object e) {
+        _catalogo = null; // un error no debe quedar guardado
+        throw e;
+      });
+
   // -------------------------
   // Upsert: crea o actualiza
   // -------------------------

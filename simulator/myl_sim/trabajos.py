@@ -65,10 +65,14 @@ def resumen(tipo: str, r: dict) -> dict:
     """Lo justo para mostrar en la app (Firestore limita el tamaño del doc)."""
     if tipo == "meta_matriz":
         return {"meta": r["meta"], "mazos": len(r["ranking"]), "partidasPorCruce": r["partidasPorCruce"],
-                "ranking": [{"id": f["id"], "nombre": f["nombre"], "score": round(f["score"], 4),
+                "creado": r.get("creado"), "metaPerfil": r.get("metaPerfil"),
+                "ranking": [{"id": f["id"], "nombre": f["nombre"], "raza": f.get("raza", ""),
+                             "score": round(f["score"], 4),
                              "ic95": [round(x, 4) for x in f["ic95"]],
                              "scoreEvolutivo": round(f["scoreEvolutivo"], 4),
-                             "equilibrio": round(f["equilibrio"], 4)} for f in r["ranking"][:30]]}
+                             "equilibrio": round(f["equilibrio"], 4),
+                             "perfil": f.get("perfil"), "indice": f.get("indice"),
+                             "turnoVictoria": f.get("turnoVictoria")} for f in r["ranking"][:30]]}
     if tipo == "optimizar":
         ro = r["rondas"]
         return {"base": r["base"]["nombre"], "rivales": len(r["rivales"]), "origenPool": r["origenPool"],

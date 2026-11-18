@@ -20,8 +20,11 @@ import 'screens/wishlist_screen.dart';
 import 'screens/friends_screen.dart';
 import 'screens/communities_screen.dart';
 import 'screens/teams_screen.dart';
-import 'screens/profile_screen.dart';
+import 'screens/profile/profile_screen.dart';
 import 'screens/leagues/team_screen.dart';
+import 'screens/simulador/entrenamiento_screen.dart';
+import 'screens/tournaments/tournament_detail_screen.dart';
+import 'screens/tournaments/tournaments_screen.dart';
 
 /// Muestra login si no hay sesión; el destino pedido cuando la hay.
 class _AuthGuard extends StatelessWidget {
@@ -112,6 +115,23 @@ final GoRouter appRouter = GoRouter(
       builder:
           (_, state) => _AuthGuard(
             child: _TeamByIdScreen(teamId: state.pathParameters['id'] ?? ''),
+          ),
+    ),
+    GoRoute(
+      path: '/entrenamiento',
+      builder: (_, __) => const _AuthGuard(child: EntrenamientoScreen()),
+    ),
+    GoRoute(
+      path: '/torneos',
+      builder: (_, __) => const _AuthGuard(child: TournamentsScreen()),
+    ),
+    GoRoute(
+      path: '/torneos/:id',
+      builder:
+          (_, state) => _AuthGuard(
+            child: TournamentDetailScreen(
+              torneoId: state.pathParameters['id'] ?? '',
+            ),
           ),
     ),
     GoRoute(

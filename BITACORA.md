@@ -13,6 +13,85 @@ Cómo se mide lo de la IA:
 
 ---
 
+## 2026-11-17
+
+### App: fuera las características, motor de estadísticas nuevo, torneos, perfil y Entrenamiento
+
+Pedido de Héctor: las cartas ya están programadas, así que las características
+cargadas a mano sobran; las estadísticas deben salir solo de las habilidades,
+vincularse con el simulador para saber qué tan agro o control está el meta;
+rehacer el perfil; arreglar torneos (se organiza uno pronto); y un modo
+Entrenamiento con dificultad creciente tipo Elo.
+
+**1. Características y legacy, fuera.** El código ya no lee ni escribe
+`caracteristicasRaw`, `tags` ni la colección `card_custom_features` (los datos
+quedan en Firestore sin uso; borrarlos es decisión de Héctor, ADR-003).
+Se fueron: «Agrupar características», el selector de características al crear
+cartas, el bloque «Características Legacy» del detalle de carta y las
+estadísticas antiguas. El editor de habilidades elige la acción directo del
+enum `Accion`; el glosario es de solo lectura. El filtro del catálogo ahora es
+«Qué hace la carta» (y funciona: el anterior no filtraba).
+
+**2. Motor de estadísticas** (`lib/domain/analisis_mazo/`, espejo en
+`simulator/myl_sim/perfil.py` y en el dashboard). Diez roles con peso según
+alcance, repetición, costo y condición; índice de velocidad 0–100 (0 control,
+100 agro) con perfil Agro / Medio / Control / Combo; consistencia
+(probabilidad de Oros por turno y de remoción, respuesta o robo en la mano
+inicial). Los tres lenguajes se prueban contra los mismos 8 mazos
+(`test/fixtures/perfil_casos.json`).
+
+Calibración contra el simulador (49 mazos, 1.200 partidas de la heurística):
+correlación −0,77 entre el índice y el turno medio de victoria; cada 10 puntos
+son unos 0,6 turnos menos. Con la matriz nueva (32 mazos válidos, 12 partidas
+por cruce): −0,86.
+
+**3. Qué tan agro o control está el meta** (`python -m myl_sim.meta matriz`,
+ahora guarda la duración de cada partida y agrega la sección al informe).
+Con los 32 mazos válidos del caché y la heurística:
+
+| | Agro | Medio | Control | Velocidad media |
+|---|---|---|---|---|
+| Lo que hay (pesos iguales) | 25% | 31% | 44% | 46 |
+| Si todos se pasan a lo que gana | 50% | 22% | 28% | 58 |
+| Equilibrio | 53% | 6% | 41% | 57 |
+
+Winrate contra el meta por estilo: Agro 58,5% · Medio 49,9% · Control 45,2%.
+Agro le gana a Control 63% y a Medio 59%. Ojo: lo juega la heurística, que
+pilotea mejor los mazos directos; con la IA buena el control debería subir.
+La app lo muestra en «Meta y tendencias» (pestañas «Lo que se juega» y «Lo que
+gana») cuando se publique con `--publicar`.
+
+**4. Torneos** (nuevo, `/torneos`). Suizo + top cut: inscripción con cuenta y
+mazo validado contra el formato y la Ban List congelada del torneo, listas
+ocultas hasta el final, emparejamiento sin repetir rival, byes, retiros,
+desempates (% de duelos de rivales, % de partidas propias y de rivales),
+llave por siembra, cada jugador carga su resultado y el rival lo confirma, el
+organizador puede corregir. Al terminar, pestaña «Meta» con razas y estilos.
+Usa la colección `tournaments`, que ya tenía regla e índices.
+
+**5. Perfil** (`lib/screens/profile/`). Historial competitivo (torneos y
+ligas), mazos y estilo de juego, colección y Desafío IA. La foto ahora se sube
+en web. En ligas cada uno indica cuál jugador del team es (campo `uid` nuevo
+en `teams/{id}/players/{pid}`).
+
+**6. Entrenamiento** (`/entrenamiento`). Escalera de 160 rivales (32 mazos ×
+5 niveles de IA), rating 834 a 1782: Elo del nivel en la arena + fuerza del
+mazo contra el meta. El jugador parte en 934 y su rating se mueve con la
+fórmula Elo (K 48 las primeras 10 partidas, después 24). Las partidas son
+Desafíos IA normales marcados `modo: entrenamiento`; el worker carga el mazo
+rival desde `cache/entrenamiento/`. Se genera y publica con
+`python -m myl_sim.escalera --app --publicar`.
+
+**Verificación.** `flutter analyze` sin errores (352 → 312 avisos) y
+`flutter test` 148 en verde (eran 110). Tests nuevos: motor (7), torneo (19),
+perfil (4), Entrenamiento (8), meta (3); en el simulador, perfil (7, incluye
+el dashboard con Node), meta (2) y escalera (4).
+
+**Sin probar en la app real**: ninguna pantalla nueva se abrió contra
+Firebase; falta publicar y recorrerlas. Pendiente de Héctor: publicar la app,
+reiniciar el worker (rivales `escalera:`), correr la matriz y la escalera con
+`--publicar`, y revisar ADR-002 (regla de `tournaments`).
+
 ## 2026-11-16
 
 ### Partidas de la noche (Defensor vs Dragón)

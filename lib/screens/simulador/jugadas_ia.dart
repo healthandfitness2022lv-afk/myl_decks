@@ -197,8 +197,18 @@ class AutopsiaIa extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      r['error'] == true ? Icons.error_outline : Icons.check_circle_outline,
-                      color: r['error'] == true ? Colors.orangeAccent : Colors.greenAccent,
+                      // Indiferente: todas las opciones daban el mismo final
+                      // (0% o 100%): no es acierto ni error.
+                      r['error'] == true
+                          ? Icons.error_outline
+                          : r['indiferente'] == true
+                          ? Icons.remove_circle_outline
+                          : Icons.check_circle_outline,
+                      color: r['error'] == true
+                          ? Colors.orangeAccent
+                          : r['indiferente'] == true
+                          ? Colors.white38
+                          : Colors.greenAccent,
                       size: 18,
                     ),
                     const SizedBox(width: 6),

@@ -44,7 +44,9 @@ def test_la_grabacion_reproduce_la_misma_partida():
     assert not inf["reproduccionOk"] and inf["diferencias"] == []
 
 
-def test_detecta_donde_la_ia_jugaria_distinto_y_lo_simula():
+def test_detecta_donde_la_ia_jugaria_distinto_y_lo_simula(monkeypatch):
+    # Con 3 muestras nada es significativo: aquí solo se prueba la detección.
+    monkeypatch.setattr("myl_sim.autopsia.Z", 0.0)
     for seed in range(1, 15):
         cartas, nombres, registro, metodos, ganador, turnos = _jugar(seed)
         inf = ah.informe(cartas, nombres, seed, registro, metodos, ganador, turnos, maximo=2, muestras=3,
@@ -86,3 +88,18 @@ def test_con_el_final_decidido_compara_a_dos_turnos():
     x = {"turno": 5, "fase": "batalla", "humano": "atacar con A", "ia": "no atacar", "ganaHumano": 0.0,
          "ganaIa": 0.0, **hz, "mejor": "humano"}
     assert "a 2 turnos" in ah.explicar(x) and "tu jugada fue mejor" in ah.explicar(x)
+
+
+def test_sin_diferencia_firme_no_hay_veredicto():
+    """Héctor: 0% contra 0% no es acierto, y una diferencia de suerte no es mejor."""
+    from myl_sim.autopsia import diferencia_clara, indiferente
+
+    assert not diferencia_clara([0.0] * 12, [0.0] * 12, 0.2)          # las dos pierden siempre
+    assert indiferente([0.0, 0.0, 0.05]) and indiferente([1.0, 0.95])
+    assert not indiferente([0.0, 0.5])
+    # 6 de 12 contra 3 de 12, con muestras que se cruzan: puede ser suerte.
+    a = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
+    b = [1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
+    assert not diferencia_clara(b, a, 0.2)
+    # Siempre gana una y nunca la otra en las mismas muestras: firme.
+    assert diferencia_clara([0.0] * 12, [1.0] * 12, 0.2)

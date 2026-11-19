@@ -26,6 +26,33 @@ REVISABLES = ("elegir_jugada", "elegir_atacantes", "elegir_bloqueos", "elegir_ob
 MUESTRAS = 10
 MAX_ALTERNATIVAS = 5
 MARGEN = 0.25  # la alternativa debe ganar al menos 25 puntos más
+Z = 2.0  # y la diferencia pareada debe superar 2 errores estándar (no suerte)
+EXTRA = 2  # si parece mejor pero no es firme: hasta EXTRA×muestras más, pareadas
+EXTREMO = 0.1  # ≤10% o ≥90%: el final ya está decidido
+
+
+def diferencia_clara(base: list[float], otra: list[float], margen: float, z: float | None = None) -> bool:
+    """`otra` rinde más que `base` de verdad: muestras pareadas (misma
+    semilla = mismos robos y barajados para las dos), ventaja media ≥ `margen`
+    y mayor que `z` errores estándar. Con 2 opciones que dan lo mismo en cada
+    muestra (0% y 0%) no hay diferencia, por definición."""
+    z = Z if z is None else z
+    d = [b - a for a, b in zip(base, otra)]
+    n = len(d)
+    if n < 2:
+        return False
+    media = sum(d) / n
+    if media < margen:
+        return False
+    var = sum((x - media) ** 2 for x in d) / (n - 1)
+    ee = (var / n) ** 0.5
+    return media > z * ee if ee > 0 else media > 0
+
+
+def indiferente(tasas: list[float]) -> bool:
+    """Todas las opciones ganan siempre (o pierden siempre): el resultado no
+    dice cuál era mejor, así que tampoco es un acierto."""
+    return len(tasas) >= 2 and (max(tasas) <= EXTREMO or min(tasas) >= 1 - EXTREMO)
 
 
 # ── Grabar y reproducir decisiones ───────────────────────────────────────────
@@ -343,23 +370,40 @@ def revisar_decision(cartas, nombres, seed: int, registro: list, k: int,
             return opciones[min(indice, len(opciones) - 1)][1]
         return opcion
 
+    def puntos(indice, m):
+        g = reproducir(cartas, nombres, seed, registro, rama=k, opcion=elegir(indice), muestra=m,
+                       metodos=metodos)
+        if g is None:
+            return None
+        return 1.0 if g == lado else 0.5 if g == -1 else 0.0
+
     # Primero la elegida (índice 0) para conocer cuántas alternativas hay.
-    tasas = []
+    # Muestra m = mismos robos y barajados para todas las opciones (pareadas).
+    res: list[list[float]] = []
     for indice in range(MAX_ALTERNATIVAS):
         if descripciones and indice >= len(descripciones):
             break
-        victorias, jugadas = 0, 0
+        fila = []
         for m in range(muestras):
-            g = reproducir(cartas, nombres, seed, registro, rama=k, opcion=elegir(indice), muestra=m,
-                           metodos=metodos)
-            if g is None:
+            v = puntos(indice, m)
+            if v is None:
                 return None
-            jugadas += 1
-            victorias += 1 if g == lado else 0.5 if g == -1 else 0
-        tasas.append(victorias / jugadas)
+            fila.append(v)
+        res.append(fila)
     if not descripciones:
         return None
+    tasas = [sum(r) / len(r) for r in res]
     mejor = max(range(len(tasas)), key=lambda i: tasas[i])
+    # Parece mejor pero puede ser suerte: más muestras pareadas para las dos.
+    if mejor != 0 and tasas[mejor] - tasas[0] >= MARGEN and not diferencia_clara(res[0], res[mejor], MARGEN):
+        for m in range(muestras, muestras * (1 + EXTRA)):
+            a, b = puntos(0, m), puntos(mejor, m)
+            if a is None or b is None:
+                return None
+            res[0].append(a)
+            res[mejor].append(b)
+        tasas[0], tasas[mejor] = (sum(res[0]) / len(res[0]), sum(res[mejor]) / len(res[mejor]))
+    error = mejor != 0 and diferencia_clara(res[0], res[mejor], MARGEN)
     return {
         "paso": k,
         "lado": lado,
@@ -371,7 +415,9 @@ def revisar_decision(cartas, nombres, seed: int, registro: list, k: int,
         "mejor": descripciones[mejor],
         "ganaMejor": round(tasas[mejor], 2),
         "opciones": [{"texto": d, "gana": round(t, 2)} for d, t in zip(descripciones, tasas)],
-        "error": mejor != 0 and tasas[mejor] - tasas[0] >= MARGEN,
+        "muestras": len(res[0]),
+        "error": error,
+        "indiferente": indiferente(tasas),
         "_elegir": elegir,
     }
 
@@ -406,7 +452,7 @@ CANDIDATAS_IA = 18  # cuántas se prueban como máximo para hallar esas 6
 
 
 def _a_horizonte(cartas, nombres, seed: int, registro: list, k: int, opcion, metodos,
-                 muestras: int = MUESTRAS_SUTIL, turnos: int = TURNOS_SUTIL) -> float | None:
+                 muestras: int = MUESTRAS_SUTIL, turnos: int = TURNOS_SUTIL) -> list[float] | None:
     from .busqueda_ataques import valor_estado
 
     lado = registro[k]["lado"]
@@ -415,24 +461,25 @@ def _a_horizonte(cartas, nombres, seed: int, registro: list, k: int, opcion, met
         p.horizonte = p.e.turno + turnos
         return opcion(p, metodo, args)
 
-    total = 0.0
+    vals = []
     for m in range(muestras):
         try:
             g = reproducir(cartas, nombres, seed, registro, rama=k, opcion=con_horizonte, muestra=m,
                            metodos=metodos)
         except Horizonte as h:
-            total += valor_estado(h.partida, lado)
+            vals.append(valor_estado(h.partida, lado))
             continue
         if g is None:
             return None
-        total += 1 if g == lado else 0.5 if g == -1 else 0
-    return total / muestras
+        vals.append(1 if g == lado else 0.5 if g == -1 else 0)
+    return vals  # una por muestra (pareadas entre opciones)
 
 
 def revisar_sutil(cartas, nombres, seed: int, registro: list, r: dict, metodos=None) -> dict:
     """Si no hubo un error claro, mira a 2 turnos la elegida contra las demás."""
     elegir = r.pop("_elegir", None)
-    if r["error"] or elegir is None or len(r["opciones"]) < 2:
+    # Si todas ganan (o pierden) siempre, mirar a 2 turnos tampoco dice nada.
+    if r["error"] or r.get("indiferente") or elegir is None or len(r["opciones"]) < 2:
         return r
     estimas = []
     for indice in range(len(r["opciones"])):
@@ -440,13 +487,15 @@ def revisar_sutil(cartas, nombres, seed: int, registro: list, r: dict, metodos=N
         if v is None:
             return r
         estimas.append(v)
+    porm = estimas
+    estimas = [sum(v) / len(v) for v in porm]
     mejor = max(range(len(estimas)), key=lambda i: estimas[i])
     for o, v in zip(r["opciones"], estimas):
         o["estima"] = round(v, 3)
     # Revisión 7 desafíos: Clochafarmore rendía menos a 2 turnos pero ganaba
     # más al final (90% contra 50%): no es error si el final lo contradice.
     no_contradice = r["opciones"][mejor]["gana"] >= r["opciones"][0]["gana"]
-    if mejor != 0 and estimas[mejor] - estimas[0] >= MARGEN_SUTIL and no_contradice:
+    if mejor != 0 and diferencia_clara(porm[0], porm[mejor], MARGEN_SUTIL) and no_contradice:
         r.update({"sutil": True, "mejor": r["opciones"][mejor]["texto"],
                   "estimaElegida": round(estimas[0], 3), "estimaMejor": round(estimas[mejor], 3),
                   "turnosHorizonte": TURNOS_SUTIL})
@@ -463,6 +512,14 @@ def explicar(revision: dict) -> str:
     if revision["error"]:
         return (f"{t}: eligió «{revision['elegida']}» (gana {revision['ganaElegida']:.0%}); "
                 f"con «{revision['mejor']}» ganaba {revision['ganaMejor']:.0%}.")
+    if revision.get("indiferente"):
+        todas = "perdían" if revision["ganaElegida"] <= EXTREMO else "ganaban"
+        return (f"{t}: «{revision['elegida']}»: todas las opciones {todas} ({revision['ganaElegida']:.0%}); "
+                "la simulación no dice cuál era mejor, así que no cuenta como acierto ni como error.")
+    if revision.get("ganaMejor", 0) > revision["ganaElegida"]:
+        return (f"{t}: «{revision['elegida']}» ({revision['ganaElegida']:.0%}) contra «{revision['mejor']}» "
+                f"({revision['ganaMejor']:.0%}): la diferencia es chica o de suerte; no se puede decir que fuera "
+                "un error.")
     return f"{t}: «{revision['elegida']}» fue de las mejores opciones (gana {revision['ganaElegida']:.0%})."
 
 
@@ -503,5 +560,10 @@ def informe(cartas, nombres, seed: int, grabacion: list, metodos, acciones: list
         resumen = (f"Sin errores graves, pero {len(sutiles)} de {len(revisiones)} decisiones revisadas eran "
                    f"mejorables (quedan como lecciones pendientes).")
     else:
-        resumen = f"La IA eligió bien en las {len(revisiones)} decisiones revisadas (con alternativas reales)."
+        indif = sum(1 for r in revisiones if r.get("indiferente"))
+        utiles = len(revisiones) - indif
+        resumen = (f"Sin errores claros de la IA en {utiles} decisiones revisadas" if utiles else
+                   "No hubo decisiones que la simulación pudiera juzgar")
+        resumen += (f"; en otras {indif} todas las opciones daban el mismo final (ganar o perder siempre), "
+                    "así que no dicen nada." if indif else ".")
     return {"resumen": resumen, "revisiones": revisiones}

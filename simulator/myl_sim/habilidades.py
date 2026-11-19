@@ -205,9 +205,14 @@ def condicion_ok(p: "Partida", i: int, h: dict) -> bool:
         "cartas_cementerio": len(yo.cementerio),
         # "Si controlas un Aliado Faraón" se mira sin contar al que está
         # entrando y dispara la habilidad (Corona Faraónica con Jentakus I).
+        # Al entrar en juego tampoco cuenta la propia fuente (reporte IQVB:
+        # Sir Agravain "si controlas otro Aliado Caballero" robaba estando
+        # solo). Las continuas sí se cuentan (Pelope: "2 o más Héroe").
         "aliados_raza": sum(
             1 for a in yo.aliados
             if _raza_ok(a, c.get("raza", "")) and a is not getattr(p, "ctx_disparadora", None)
+            and not (h.get("cuando") == "al_jugar" and fuente is not None and a is fuente
+                     and not c.get("incluyeFuente"))
         ),
         "oros_en_juego": oros_en_juego(p, i),
         "oros_vs_oponente": oros_en_juego(p, i) - oros_en_juego(p, 1 - i),
@@ -1767,6 +1772,8 @@ def resolver(p: "Partida", i: int, fuente: Instancia, h: dict) -> None:
 def aplicar_luego(p: "Partida", i: int, fuente: Instancia, h: dict, cumplido: bool, afectadas: list[Instancia]) -> None:
     elegidos: set[str] = set()
     decididos: dict[str, dict | None] = {}
+    # "Si lo haces" del paso anterior (Magia Amatista: robar solo si destruyó).
+    hecho_anterior = cumplido
     for e in h.get("luego") or []:
         if not isinstance(e, dict):
             continue
@@ -1775,6 +1782,9 @@ def aplicar_luego(p: "Partida", i: int, fuente: Instancia, h: dict, cumplido: bo
         relacion = e.get("relacion", "si_se_cumplio")
         if relacion == "si_se_cumplio" and not cumplido:
             break
+        if relacion == "si_anterior" and not hecho_anterior:
+            continue
+        hecho_anterior = False  # si este paso no se resuelve, el siguiente "si_anterior" no va
         if relacion == "si_no_se_cumplio" and cumplido:
             continue  # Idmon: "si no es un Héroe, envíala al Cementerio"
         if e.get("momento") == "fase_final":
@@ -1826,6 +1836,7 @@ def aplicar_luego(p: "Partida", i: int, fuente: Instancia, h: dict, cumplido: bo
             continue
         p.ctx_previas = afectadas
         cumplido, nuevas = _resolver_efecto(p, i, fuente, e, previas=afectadas)
+        hecho_anterior = cumplido
         if cumplido and e.get("grupoElegir"):
             elegidos.add(e["grupoElegir"])
         if nuevas:
@@ -3012,8 +3023,14 @@ def _mirar_tope(p: "Partida", i: int, fuente: Instancia, h: dict, n: int) -> tup
             p.ejecutar_jugada(i, Jugada("jugar_gratis", t))  # Idmon: jugarlo sin pagar
         else:
             p._mover(t, destinos.get(destino, Zona.MANO))
-        # Reporte 4NtK: lo que toma el rival con Renpet solo lo sabe él.
-        p.anotar(f"{fuente.nombre}: toma {t.nombre if destino == 'en_juego' or publica else privado(i, t.nombre)}")
+        # Reporte 4NtK: lo que toma el rival con Renpet (cualquier carta) solo
+        # lo sabe él. Reporte dmwP T3: si solo puede tomar ciertas cartas (Tadg:
+        # "un Oro o un Aliado Druida"), la muestra para probar que cumple.
+        con_filtro = bool(obj.get("tipos") or obj.get("arquetipo") or obj.get("raza") or nombrado)
+        if con_filtro and destino != "en_juego" and not publica:
+            t.revelada = True
+        p.anotar(f"{fuente.nombre}: toma "
+                 f"{t.nombre if destino == 'en_juego' or publica or con_filtro else privado(i, t.nombre)}")
     resto = [x for x in vistas if x not in elegidas and x.zona == Zona.MAZO]
     resto_a = h.get("restoA") or "mazo_tope"
     if resto_a == "elegir_tope_fondo":

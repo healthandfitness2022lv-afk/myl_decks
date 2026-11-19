@@ -165,6 +165,25 @@ def _corregir(nombre: str, habs: list[dict]) -> list[dict]:
         # El texto no lo limita a tu Vigilia.
         return [{**h, "fase": "cualquiera", "turno": "cualquiera", "zonaActivacion": R}
                 if h.get("cuando") == "activada" else h for h in habs]
+    if n == "marmita druida":
+        # "Puedes mostrar una carta Druida de tu Mano para robar una carta"
+        # (reporte dmwP T1: robaba sin mostrar nada): mostrar y luego robar.
+        out = []
+        for h in habs:
+            if h.get("cuando") == "al_jugar" and h.get("accion") == "robar":
+                h = {**{k: v for k, v in h.items() if k != "condicion"}, "accion": "mostrar", "opcional": True,
+                     "cantidad": 1, "objetivo": {"seleccion": "elige", "zona": "mano", "arquetipo": "Druida",
+                                                 "quien": "propio"},
+                     "luego": [{"relacion": "si_se_cumplio", "accion": "robar", "cantidad": 1,
+                                "duracion": "instantaneo", "objetivo": {"quien": "propio"}}]}
+            out.append(h)
+        return out
+    if n == "magia amatista":
+        # "Luego, puedes destruir un Aliado en juego con el mismo nombre. Si
+        # lo haces, puedes robar": el robo depende de destruir, no del
+        # destierro (reportes dmwP T11 y P3Cy T18: robaba sin copia en juego).
+        return [{**h, "luego": [{**e, "relacion": "si_anterior"} if isinstance(e, dict) and e.get("accion") == "robar"
+                                else e for e in h.get("luego") or []]} if h.get("luego") else h for h in habs]
     if n == "nacer de la muerte":
         return [{**h, "fase": "vigilia", "turno": "propio"} if h.get("cuando") == "al_jugar" else h for h in habs]
     # Sin programar en Firestore: se programan acá desde el texto impreso.

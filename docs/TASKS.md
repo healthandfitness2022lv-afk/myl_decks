@@ -8,6 +8,8 @@ Prioridad: P0 (urgente) · P1 · P2. Solo el humano mueve tareas a `HECHA` (al h
 | T-001 | P1 | HECHO | Completar ARCHITECTURE.md inspeccionando el código real | claude/T-001-architecture | QA APROBADO; docs + valoración inicial | — | $67.250.000 |
 | T-002 | P2 | PENDIENTE | Diagnóstico de calidad: análisis estático y tests, registrar fallos como tareas | — | — | — | por estimar |
 | T-003 | P2 | PENDIENTE | Análisis comercial (sales): cliente objetivo, propuesta de valor, precios y 3 mejoras prioritarias | — | — | — | por estimar |
+| T-007 | P1 | EN_REVISION | Rediseñar proporciones y zonas del tablero del simulador (tablero_desafio, horizontal y vertical) | claude/T-007-tablero-proporciones | Hecho a ciegas (sin Flutter SDK en la nube): falta flutter analyze/test y revisión visual | — | por estimar |
+
 ## Detalle de tareas
 
 ### T-001 — Completar ARCHITECTURE.md

@@ -39,11 +39,15 @@ def crear(motor: str, seed: int):
         j = crear_arena("busqueda_vigilia", seed)
         j.modelar_rival = True
         return j
+    if motor == "vigilia_valor3":  # la IA buena con la valoración reentrenada (valor_estado_v3.json)
+        from .busqueda_vigilia import BuscadorVigilia
+
+        return BuscadorVigilia(seed, aprendido=3)
     return crear_arena(motor, seed)
 
 
 def _nombre(motor: str) -> str:
-    return motor if motor.startswith("utilidad") or motor == "vigilia_estilo" else identidad(motor)
+    return motor if motor.startswith("utilidad") or motor in ("vigilia_estilo", "vigilia_valor3") else identidad(motor)
 
 
 def jugar_match(x: str, y: str, mazo_x, mazo_y, seed: int) -> dict:

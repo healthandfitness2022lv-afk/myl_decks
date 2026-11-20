@@ -91,9 +91,10 @@ def valor_estado(p: Partida, yo: int, aprendido: bool = True) -> float:
         g = p.e.ganador
         return 1.0 if g == yo else 0.5 if g == -1 else 0.0
     if aprendido:
-        from .valor import prob_ganar, prob_ganar_v2
+        from .valor import prob_ganar, prob_ganar_v2, prob_ganar_v3
 
-        q = prob_ganar_v2(p, yo) if aprendido == 2 else prob_ganar(p, yo)
+        q = (prob_ganar_v3(p, yo) if aprendido == 3 else prob_ganar_v2(p, yo) if aprendido == 2
+             else prob_ganar(p, yo))
         if q is not None:
             return q
     mio, suyo = p.j(yo), p.j(1 - yo)

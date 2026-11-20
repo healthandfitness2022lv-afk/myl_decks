@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 
 import 'meta_stats_screen.dart';
 import 'simulador/desafio_ia_screen.dart';
-import 'simulador/laboratorio_ml_screen.dart';
 import 'simulador/simulador_screen.dart';
 
 class JugarOpcion {
@@ -47,11 +46,5 @@ final opcionesJugar = <JugarOpcion>[
     'Lo que gana',
     'El meta según el simulador: agro o control',
     (c) => _push(c, const MetaStatsScreen(soloSimulador: true)),
-  ),
-  JugarOpcion(
-    Icons.science_outlined,
-    'Laboratorio',
-    'Entrenamiento de la IA y mediciones',
-    (c) => _push(c, const LaboratorioMlScreen()),
   ),
 ];

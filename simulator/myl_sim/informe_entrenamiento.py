@@ -37,7 +37,7 @@ def huella_motor() -> str:
     raiz = Path(__file__).resolve().parent
     resumen = hashlib.sha256()
     for nombre in ("modelo.py", "motor.py", "habilidades.py", "jugadores.py", "simulacion.py",
-                   "exploracion.py", "busqueda_bloqueos.py"):
+                   "busqueda_bloqueos.py"):
         resumen.update(nombre.encode("utf-8") + b"\0")
         resumen.update((raiz / nombre).read_bytes())
     return resumen.hexdigest()[:16]

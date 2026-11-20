@@ -21,7 +21,6 @@ from . import habilidades as hab
 from .busqueda_bloqueos import PoliticaConBusqueda
 from .datos import CACHE
 from .jugadores import Heuristico
-from .politica_meta import jugador_para
 from .modelo import Instancia, Zona
 from .motor import Jugada, Partida
 from .simulacion import _sin_ids_reservados, _solo_cambios
@@ -807,16 +806,6 @@ class PoliticaDificultad:
         return attr
 
 
-def politica_ia_para(mazo_humano, mazo_ia, seed: int,
-                    registro_path: Path | None = None):
-    """Usa aprendizaje solo si las dos barajas coinciden con un cruce aprobado."""
-    ruta = registro_path or CACHE / "entrenamiento" / "modelos" / "djoser_registro_v2.json"
-    if not ruta.exists():
-        return Heuristico(seed)
-    registro = json.loads(ruta.read_text(encoding="utf-8"))
-    return jugador_para(registro, ruta.parent, mazo_ia, mazo_humano, seed)
-
-
 class _AnotarEnVivo:
     """Anota en el estado real y publica las acciones de la IA al momento.
 
@@ -857,7 +846,7 @@ class SesionDesafio:
         self.humano = HumanoRemoto(self.pedir)
         self.nivel = nivel if nivel in NIVELES else 4
         self.pausa = pausa
-        self.politica_base_ia = politica_ia_para(mazo_humano, mazo_ia, seed * 2 + 1)
+        self.politica_base_ia = Heuristico(seed * 2 + 1)
         self.politica_ia = self.politica_base_ia
         if self.nivel == 5:
             # La IA más fuerte medida en la arena (+100 Elo sobre la heurística;

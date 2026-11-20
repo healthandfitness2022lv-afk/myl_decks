@@ -29,12 +29,6 @@ La credencial es `myl_decks/secrets/firebase-admin.json`, que está fuera de git
 | Atender la pantalla Simulador de la app | `.venv/Scripts/python -m myl_sim.worker` |
 | Tests | `.venv/Scripts/python -m pytest` |
 | Generar episodios locales de autojuego | `.venv/Scripts/python -m myl_sim.cli recolectar <idA> <idB> -n 1000` |
-| Entrenar primera política con los episodios | `.venv/Scripts/python -m myl_sim.aprendizaje entrenar cache/entrenamiento/djoser_vs_sacerdote_train_v1.jsonl cache/entrenamiento/modelos/djoser_v1.json` |
-| Evaluarla contra la heurística | `.venv/Scripts/python -m myl_sim.aprendizaje evaluar cache/entrenamiento/modelos/djoser_v1.json --pares 40 --salida cache/entrenamiento/modelos/djoser_v1_evaluacion.json` |
-| Probar jugadas alternativas de Djoser | `.venv/Scripts/python -m myl_sim.exploracion recolectar <idDjoser> <idRival> cache/entrenamiento/djoser_exploracion_v1.jsonl --pares 1000` |
-| Aprender preferencias de esas pruebas | `.venv/Scripts/python -m myl_sim.exploracion aprender cache/entrenamiento/djoser_exploracion_v1.jsonl cache/entrenamiento/modelos/djoser_alternativas_v1.json` |
-| Comparar con semillas nuevas | `.venv/Scripts/python -m myl_sim.exploracion evaluar cache/entrenamiento/modelos/djoser_alternativas_v1.json --pares 100 --salida cache/entrenamiento/modelos/djoser_alternativas_v1_evaluacion.json` |
-| Comprobar otro rival | `.venv/Scripts/python -m myl_sim.exploracion evaluar cache/entrenamiento/modelos/djoser_alternativas_v1.json --rival <idRival> --pares 200 --seed 380001 --salida cache/entrenamiento/modelos/djoser_otro_rival.json` |
 | Probar búsqueda de bloqueos | `.venv/Scripts/python -m myl_sim.busqueda_bloqueos <idDjoser> <idRival> --pares 100 --muestras 4 --max-candidatos 8 --sin-limite-tiempo --salida cache/entrenamiento/busqueda_bloqueos.json` |
 | Recuperar jugadas de una exploración anterior | `.venv/Scripts/python -m myl_sim.informe_entrenamiento cache/entrenamiento/djoser_sacerdote_actual_v3.jsonl` |
 | Auditar errores en lote (todos los cruces) | `.venv/Scripts/python -m myl_sim.auditoria lote <idA> <idB> <idC> -n 100 --cache` (o `--formato racial`) |

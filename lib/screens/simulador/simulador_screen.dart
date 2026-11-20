@@ -14,7 +14,6 @@ import '../../models/deck.dart';
 import 'cartas_por_completar.dart';
 import 'desafio_ia_screen.dart';
 import 'entrenamiento_screen.dart';
-import 'laboratorio_ml_screen.dart';
 import 'estado_mazos.dart';
 import 'narracion_texto.dart';
 import 'tablero_screen.dart';
@@ -194,28 +193,6 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                       () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const EntrenamientoScreen(),
-                        ),
-                      ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Card(
-                color: const Color(0xFF1A120C),
-                child: ListTile(
-                  leading: const Icon(Icons.analytics_outlined, color: _gold),
-                  title: const Text(
-                    'Laboratorio ML',
-                    style: TextStyle(color: _gold, fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text(
-                    'Matrices y entrenamiento ejecutados en este PC.',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                  trailing: const Icon(Icons.chevron_right, color: _gold),
-                  onTap:
-                      () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const LaboratorioMlScreen(),
                         ),
                       ),
                 ),

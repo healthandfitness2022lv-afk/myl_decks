@@ -487,51 +487,7 @@ def procesar_job_ml(doc) -> None:
                             "finishedAt": firestore.SERVER_TIMESTAMP})
                 print(f"  {tipo} listo ({resumen['segundos']} s)")
                 return
-            if tipo != "matriz":
-                raise ValueError(f"Tipo de trabajo ML no soportado: {tipo}")
-            owner = str(data["ownerUid"])
-            base_id = str(data["deckBase"])
-            formato = str(data.get("formato") or "racial")
-            n = max(1, min(int(data.get("n", 1000)), MAX_PARTIDAS))
-            seed = int(data.get("seed", 1))
-            print(f"ML {doc.id}: matriz {base_id}, formato {formato}, {n} partidas")
-            ultimo = [0.0]
-
-            def avance(indice, total, base_nombre, rival_nombre, fila) -> None:
-                ahora = time.time()
-                # La última actualización siempre se guarda, aunque haya sido rápida.
-                if ahora - ultimo[0] >= 1.2 or indice == total:
-                    ultimo[0] = ahora
-                    ref.update({
-                        "progreso": indice / total,
-                        "parcial": {
-                            "completados": indice, "total": total,
-                            "ultimoRival": rival_nombre,
-                            "ultimoWinrate": fila["winrate"],
-                        },
-                    })
-                    latido()
-
-            from .matriz_meta import ejecutar_matriz
-            t0 = time.time()
-            resultado = ejecutar_matriz(owner, base_id, formato=formato,
-                                        partidas=n, seed=seed, progreso=avance)
-            resultado["segundos"] = round(time.time() - t0, 1)
-            carpeta = CACHE / "entrenamiento" / "ml_jobs"
-            carpeta.mkdir(parents=True, exist_ok=True)
-            ruta = carpeta / f"{doc.id}_matriz.json"
-            ruta.write_text(json.dumps(resultado, ensure_ascii=False, indent=2), encoding="utf-8")
-            resumen = {
-                "base": resultado["base"],
-                "cruces": resultado["cruces"],
-                "partidasPorCruce": n,
-                "formatoRivales": formato,
-                "segundos": resultado["segundos"],
-            }
-            ref.update({"status": "done", "progreso": 1, "resultado": resumen,
-                        "localPath": str(ruta.resolve()),
-                        "finishedAt": firestore.SERVER_TIMESTAMP})
-            print(f"  matriz lista: {resultado['base']['nombre']} ({len(resultado['cruces'])} cruces)")
+            raise ValueError(f"Tipo de trabajo ML no soportado: {tipo}")
         except Exception as e:  # noqa: BLE001 - se ve directamente en la app
             traceback.print_exc()
             ref.update({"status": "error", "error": str(e)[:500]})

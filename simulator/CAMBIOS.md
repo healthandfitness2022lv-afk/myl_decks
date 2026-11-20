@@ -28,8 +28,9 @@ Cómo se mide:
   - IA por utilidad vs IA buena: 33,3% y 36,7% (12 matches), 163 s por partida contra 41.
   - IA buena con estilo del rival vs IA buena: 37,5% y 46,5% (16 matches): sin mejora contra otra IA.
   - Valoración v3 sobre partidas de la búsqueda: acierto 81,0% (v2: 77,2%).
-  - IA buena con valoración v3 (`vigilia_valor3`) vs IA buena: 62,5% por match (IC95 43,1–81,9),
-    55,0% por partida (IC95 42,4–67,6), 24 matches. A favor pero sin confirmar: no es el valor por defecto todavía.
+  - IA buena con valoración v3 (`vigilia_valor3`) vs IA buena: primera tanda 62,5% por match y 55,0% por partida
+    (24 matches); segunda tanda 41,7% y 46,7% (24 matches). Total: 52,1% por match (IC95 38,0–66,2) y 50,8% por
+    partida (IC95 41,9–59,8) en 48 matches: sin diferencia. La v3 queda como opción, no por defecto.
 
 ## 2026-11-18 · Lote de 38 cartas (Helénica y Espada Sagrada) y reportes del tablero
 

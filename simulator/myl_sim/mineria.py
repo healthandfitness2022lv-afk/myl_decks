@@ -35,11 +35,17 @@ LECCIONES = SALIDA / "lecciones.jsonl"
 RESUMEN = SALIDA / "resumen.json"
 
 
-def jugar_grabada(mazo_a, mazo_b, seed: int) -> tuple[int | None, list, list]:
-    """Partida heurística contra heurística con las decisiones de ambos lados grabadas."""
+def jugar_grabada(mazo_a, mazo_b, seed: int, jugador: str = "heuristico") -> tuple[int | None, list, list]:
+    """Partida `jugador` contra `jugador` (heurística o un motor de la arena, ej.
+    `busqueda_vigilia`) con las decisiones de ambos lados grabadas."""
     registro: list = []
     ref: list = [None]
-    base = (Heuristico(seed * 2), Heuristico(seed * 2 + 1))
+    if jugador == "heuristico":
+        base = (Heuristico(seed * 2), Heuristico(seed * 2 + 1))
+    else:
+        from .arena import crear
+
+        base = (crear(jugador, seed * 2), crear(jugador, seed * 2 + 1))
     metodos = [metodos_de(j) for j in base]
     p = Partida((mazo_a.cartas, mazo_b.cartas),
                 tuple(Grabadora(j, i, registro, ref, revisable=True) for i, j in enumerate(base)),
@@ -52,9 +58,10 @@ def jugar_grabada(mazo_a, mazo_b, seed: int) -> tuple[int | None, list, list]:
     return ganador, registro, metodos
 
 
-def minar_partida(mazo_a, mazo_b, seed: int, *, revisar: int = 2, muestras: int = 10) -> list[dict]:
+def minar_partida(mazo_a, mazo_b, seed: int, *, revisar: int = 2, muestras: int = 10,
+                  jugador: str = "heuristico") -> list[dict]:
     """Errores del perdedor en una partida (lista vacía si no hubo o fue empate)."""
-    ganador, registro, metodos = jugar_grabada(mazo_a, mazo_b, seed)
+    ganador, registro, metodos = jugar_grabada(mazo_a, mazo_b, seed, jugador)
     if ganador not in (0, 1):
         return []
     perdedor = 1 - ganador
@@ -71,6 +78,7 @@ def minar_partida(mazo_a, mazo_b, seed: int, *, revisar: int = 2, muestras: int 
         out.append({
             "id": f"{seed}_{k}",
             "origen": "mineria",
+            "jugador": jugador,
             "patron": patron(r),
             "categoria": categoria(r),
             "mazo": nombres[perdedor],
@@ -126,7 +134,8 @@ def categoria(r: dict) -> str:
 _MAZOS: dict = {}
 
 
-def _tarea(rutas: tuple[str, str], seed: int, revisar: int, muestras: int) -> list[dict]:
+def _tarea(rutas: tuple[str, str], seed: int, revisar: int, muestras: int,
+           jugador: str = "heuristico") -> list[dict]:
     from .datos import Mazo
 
     mazos = []
@@ -135,7 +144,7 @@ def _tarea(rutas: tuple[str, str], seed: int, revisar: int, muestras: int) -> li
             _MAZOS[ruta] = Mazo.from_json(json.loads(Path(ruta).read_text(encoding="utf-8")))
         mazos.append(_MAZOS[ruta])
     try:
-        return minar_partida(mazos[0], mazos[1], seed, revisar=revisar, muestras=muestras)
+        return minar_partida(mazos[0], mazos[1], seed, revisar=revisar, muestras=muestras, jugador=jugador)
     except Exception as e:  # noqa: BLE001 - una partida rota no detiene el lote
         return [{"id": f"{seed}_falla", "origen": "mineria", "falla": f"{type(e).__name__}: {e}"[:300],
                  "deckIds": [Path(r).stem for r in rutas], "seed": seed}]
@@ -172,6 +181,46 @@ def lote(email: str, formato: str, partidas: int, revisar: int, muestras: int) -
             if n % 20 == 0 or n == partidas:
                 print(f"{n}/{partidas} partidas, {encontrados} errores, {time.time() - t0:.0f} s", flush=True)
     imprimir_resumen()
+
+
+def lote_cache(jugador: str, partidas: int, revisar: int, muestras: int, seed: int = 1,
+               procesos: int | None = None) -> Path:
+    """Como `lote`, pero con los raciales válidos del caché local (sin Firestore) y
+    cualquier motor. Guarda aparte: cache/mineria/lecciones_<jugador>.jsonl."""
+    from .datos import CACHE
+    from .meta import raciales_del_cache
+
+    rutas = [str(CACHE / f"mazo_{m.id}.json") for m in raciales_del_cache()]
+    rutas = [r for r in rutas if Path(r).exists()]
+    rng = random.Random(seed)
+    tareas = [(tuple(rng.sample(rutas, 2)), rng.randint(1, 10**9)) for _ in range(partidas)]
+    destino = SALIDA / f"lecciones_{jugador}.jsonl"
+    SALIDA.mkdir(parents=True, exist_ok=True)
+    print(f"{len(rutas)} mazos, {partidas} partidas de {jugador}", flush=True)
+    t0, encontrados = time.time(), 0
+    with ProcessPoolExecutor(max_workers=procesos or max(2, (os.cpu_count() or 4) - 2)) as ex, \
+            destino.open("a", encoding="utf-8") as salida:
+        futs = [ex.submit(_tarea, r, s, revisar, muestras, jugador) for r, s in tareas]
+        for n, f in enumerate(as_completed(futs), 1):
+            for leccion in f.result():
+                salida.write(json.dumps(leccion, ensure_ascii=False) + "\n")
+                encontrados += "falla" not in leccion
+            salida.flush()
+            if n % 10 == 0 or n == partidas:
+                print(f"{n}/{partidas} partidas, {encontrados} errores, {time.time() - t0:.0f} s", flush=True)
+    return destino
+
+
+def imprimir_resumen_de(archivo: Path, top: int = 25) -> None:
+    lecciones = [json.loads(x) for x in archivo.read_text(encoding="utf-8").splitlines() if x.strip()]
+    r = resumen(lecciones)
+    archivo.with_suffix(".resumen.json").write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"\n{r['errores']} errores en {len(r['patrones'])} patrones ({r['fallas']} partidas con falla)")
+    for p in r["patrones"][:top]:
+        print(f"\n{p['veces']:>3}× −{p['puntosPerdidos']:.1f}  {p['patron']}  ({len(p['mazos'])} mazos)")
+        for e in p["ejemplos"][:4]:
+            print(f"      {e['id']}  T{e['turno']} {e['mazo']}: {e['detalle']} "
+                  f"({e['gana'][0]:.0%} → {e['gana'][1]:.0%})")
 
 
 # ── Lecciones guardadas ──────────────────────────────────────────────────────
@@ -235,7 +284,16 @@ def main(argv=None) -> None:
     ap.add_argument("--revisar", type=int, default=2, help="decisiones del perdedor a revisar por partida")
     ap.add_argument("--muestras", type=int, default=10)
     ap.add_argument("--resumen", action="store_true")
+    ap.add_argument("--jugador", help="motor de la arena (ej. busqueda_vigilia); usa los raciales del caché local")
+    ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--procesos", type=int)
     a = ap.parse_args(argv)
+    if a.jugador:
+        archivo = SALIDA / f"lecciones_{a.jugador}.jsonl"
+        if not a.resumen:
+            archivo = lote_cache(a.jugador, a.partidas, a.revisar, a.muestras, a.seed, a.procesos)
+        imprimir_resumen_de(archivo)
+        return
     if a.resumen:
         imprimir_resumen()
         return

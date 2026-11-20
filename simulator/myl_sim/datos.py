@@ -150,6 +150,10 @@ def _corregir(nombre: str, habs: list[dict]) -> list[dict]:
         # "Si controlas a Heka, puedes robar una carta adicional."
         out = []
         for h in habs:
+            if h.get("accion") == "perderHabilidad" and h.get("duracion", "instantaneo") == "instantaneo":
+                # Reporte NJO9 T13: "sin habilidad hasta la Fase Final", no
+                # por toda la partida (instantáneo = permanente en el motor).
+                h = {**h, "duracion": "hasta_fase_final"}
             if h.get("accion") == "perderHabilidad" and not any(
                     (e.get("condicion") or {}).get("tipo") == "controla_nombre" for e in h.get("luego") or []):
                 extra = {"relacion": "si_se_cumplio", "accion": "robar", "cantidad": 1, "opcional": True,

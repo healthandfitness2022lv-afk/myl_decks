@@ -435,21 +435,9 @@ class HumanoRemoto:
         hn = next((h for h in (fuente.habilidades if fuente else [])
                    if (h.get("objetivo") or {}).get("nombrarCarta")), None)
         objn = (hn or {}).get("objetivo") or {}
-        if objn.get("zona") == "mazo" and objn.get("quien") == "oponente":
-            # Desafío g9FE: Orfeo "busca en el Mazo Castillo oponente": ves su
-            # mazo (una carta por nombre) y eliges la que quieres desterrar.
-            unicas = {}
-            for x in p.j(1 - yo).mazo:
-                unicas.setdefault(x.nombre, x)
-            if unicas:
-                cartas = sorted(unicas.values(), key=lambda x: x.nombre)
-                ids = self._pedir("objetivos", [_carta(x, p) for x in cartas],
-                                  {"titulo": f"{fuente.nombre if fuente else 'Busca'}: elige una carta del mazo rival",
-                                   "cantidad": 1}) or []
-                por_uid = {str(x.uid): x.nombre for x in cartas}
-                elegida = next((por_uid[str(u)] for u in ids if str(u) in por_uid), None)
-                if elegida:
-                    return elegida
+        # Reporte A3SB T14: Orfeo "nombra una carta. Luego, busca en el Mazo
+        # Castillo oponente": primero se nombra a ciegas (puede fallar) y
+        # después se busca. Antes se mostraba el mazo rival para elegir.
         tipos = set(objn.get("tipos") or [])
         razas: set[str] = set()
         if ((hn or {}).get("objetivo") or {}).get("quien") == "oponente" and "Aliado" in tipos:

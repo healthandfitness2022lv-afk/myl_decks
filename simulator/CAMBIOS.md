@@ -11,6 +11,24 @@ Cómo se mide:
 
 ---
 
+## 2026-11-20 · Una sola IA: se unifican los métodos de decisión y aprendizaje
+
+- **Queda un motor**: la IA buena (`busqueda_vigilia`) sobre la heurística, con
+  `creencias` (mano probable del rival) y `valor.py` (valoración de la mesa).
+- **Borrado**: Laboratorio IA de la app (y su trabajo `matriz` en el worker; la
+  matriz del meta sigue en `myl_sim.meta`), política por perceptrón
+  (`aprendizaje`, `politica_meta`, `exploracion`) e IA por utilidad
+  (`busqueda_utilidad`, `prueba_utilidad`, `utilidad_meta`).
+- **Nuevo**: `medir_bo3` (matches al mejor de 3; winrate por match y por
+  partida), `estilo` (cuánto se aparta el rival de la heurística al atacar y
+  bloquear; apagado por defecto) y `valor entrenar --jugador busqueda_vigilia`
+  (valoración v3, entrenada con partidas jugadas por la búsqueda).
+- **Mediciones al mejor de 3** (`cache/arena/bo3.jsonl`):
+  - IA buena vs heurística: 66,7% por match, 58,8% por partida (12 matches).
+  - IA por utilidad vs IA buena: 33,3% y 36,7% (12 matches), 163 s por partida contra 41.
+  - IA buena con estilo del rival vs IA buena: 37,5% y 46,5% (16 matches): sin mejora contra otra IA.
+  - Valoración v3 sobre partidas de la búsqueda: acierto 81,0% (v2: 77,2%).
+
 ## 2026-11-18 · Lote de 38 cartas (Helénica y Espada Sagrada) y reportes del tablero
 
 - 38 cartas programadas y guardadas con `python -m myl_sim.lote_20261117 --aplicar`

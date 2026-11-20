@@ -101,6 +101,12 @@ def _compactar(grupo: list[str]) -> list[str]:
         if " pasa a control de " in t and t.split(" pasa a control de ")[0] in controlados:
             continue
         limpio.append(t)
+    # Reporte g3hq T11: una destrucción en masa sale primero en una sola
+    # lista y después lo que dispara cada carta.
+    en_combate = [t[: -len(" es destruido en combate")] for t in limpio if t.endswith(" es destruido en combate")]
+    if len(en_combate) > 1:
+        limpio = [f"Destruidos en combate: {', '.join(en_combate)}"] + [
+            t for t in limpio if not t.endswith(" es destruido en combate")]
     out, prefijo = [], None
     for t in limpio:
         pre, sep, resto = t.partition(": ")
@@ -243,7 +249,8 @@ class Partida:
                 "dl": [x.carta.id for x in j.destierro],
                 "r": [x.carta.id for x in j.reserva],
                 "p": [x.carta.id for x in j.pagado],
-                "v": j.oros_virtuales,
+                # Oros generados (libres y los que solo pagan ciertas cartas, Saladino).
+                "v": j.oros_virtuales + sum(max(0, r[0]) for r in j.oros_restringidos),
                 "def": [aliado(a) for a in j.defensa],
                 "atk": [aliado(a) for a in j.ataque],
                 "ap": [x.carta.id for x in j.apoyo],

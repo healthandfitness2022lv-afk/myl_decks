@@ -120,3 +120,22 @@ def test_ya_corregidos_teseo_killgharrah_cleopatra_demoledor():
     p.e.activo = 0
     demoledor = jugar(p, 0, C("Demoledor de Amon"))
     assert not hab.tiene_prop(p, demoledor, "furia")
+
+
+def test_destrucciones_en_masa_en_una_sola_lista():
+    """g3hq T11: primero la lista de destruidos y después las activaciones."""
+    from myl_sim.motor import _compactar
+
+    out = _compactar(["A es destruido en combate", "A: roba Carta", "B es destruido en combate",
+                      "C es destruido en combate"])
+    assert out[0] == "Destruidos en combate: A, B, C" and out[1] == "A: roba Carta"
+    assert _compactar(["A es destruido en combate"]) == ["A es destruido en combate"]
+
+
+def test_la_foto_cuenta_los_oros_generados_restringidos():
+    """g3hq T10: los Oros de Saladino (solo para ciertas cartas) también se ven."""
+    p = _p()
+    p.e.log = []
+    p.j(0).oros_virtuales = 1
+    p.j(0).oros_restringidos.append([2, ["Arma"], "", 0])
+    assert p.foto("x")["j"][0]["v"] == 3

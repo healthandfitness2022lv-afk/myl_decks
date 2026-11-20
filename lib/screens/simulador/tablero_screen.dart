@@ -20,6 +20,7 @@ import '../../models/card_myl.dart';
 import '../../services/drive_service.dart';
 import '../../widgets/card_image.dart';
 import 'narracion_texto.dart';
+import 'oro_temporal.dart';
 
 const _gold = Color(0xFFF2D487);
 const _oroInicial = 'oro_inicial';
@@ -829,12 +830,21 @@ class _Mesa {
     double ancho,
     double alto, {
     bool pagado = false,
-  }) => _Recursos(
-    titulo: '$titulo: ${ids.length}',
-    ancho: ancho,
-    alto: alto,
-    cartas: [for (final id in ids) carta('$id', 44, pagado: pagado)],
-  );
+    Object? temporales,
+  }) {
+    // Reporte g3hq: los Oros generados (Herrero, Saladino, Dragones…) se
+    // ven en la Reserva como fichas, no solo como un número en el título.
+    final n = ((temporales as num?)?.toInt() ?? 0).clamp(0, 12);
+    return _Recursos(
+      titulo: '$titulo: ${ids.length}${n > 0 ? ' + $n temporal${n == 1 ? '' : 'es'}' : ''}',
+      ancho: ancho,
+      alto: alto,
+      cartas: [
+        for (final id in ids) carta('$id', 44, pagado: pagado),
+        for (var k = 0; k < n; k++) const OroTemporal(ancho: 44, alto: 62),
+      ],
+    );
+  }
 
   Widget _fase(double ancho) => _BannerFase(
     turno: '${paso['t']}',
@@ -890,7 +900,7 @@ class _Mesa {
             width: der,
             child: Column(
               children: [
-                _oros('RESERVA (rival)${(rival['v'] as num? ?? 0) > 0 ? '  +${rival['v']} temporal' : ''}', rival['r'] as List, der, 150),
+                _oros('RESERVA (rival)', rival['r'] as List, der, 150, temporales: rival['v']),
                 const SizedBox(height: 8),
                 _oros(
                   'PAGADO (rival)',
@@ -904,7 +914,7 @@ class _Mesa {
                 const Spacer(),
                 _oros('PAGADO', tuyo['p'] as List, der, 110, pagado: true),
                 const SizedBox(height: 8),
-                _oros('RESERVA${(tuyo['v'] as num? ?? 0) > 0 ? '  +${tuyo['v']} temporal' : ''}', tuyo['r'] as List, der, 150),
+                _oros('RESERVA', tuyo['r'] as List, der, 150, temporales: tuyo['v']),
               ],
             ),
           ),
@@ -1026,10 +1036,11 @@ class _Mesa {
             child: Column(
               children: [
                 _oros(
-                  '${arriba ? 'RESERVA (rival)' : 'RESERVA'}${(j['v'] as num? ?? 0) > 0 ? '  +${j['v']} temporal' : ''}',
+                  arriba ? 'RESERVA (rival)' : 'RESERVA',
                   j['r'] as List,
                   anchoOros,
                   71,
+                  temporales: j['v'],
                 ),
                 const SizedBox(height: 8),
                 _oros(
@@ -1588,7 +1599,9 @@ class _BannerFase extends StatelessWidget {
           width: ancho,
           constraints: BoxConstraints(
             minHeight: 92,
-            maxHeight: MediaQuery.sizeOf(context).height * .3,
+            // Reporte VWmE: si el texto no cabe, el cuadro crece (hasta más
+            // de la mitad de la pantalla) y la letra se achica en jugadas largas.
+            maxHeight: MediaQuery.sizeOf(context).height * .55,
           ),
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1615,16 +1628,19 @@ class _BannerFase extends StatelessWidget {
                     child: child,
                   ),
                 ),
-            child: SingleChildScrollView(
+            child: Scrollbar(
               key: ValueKey(texto),
-              child: Text.rich(
-                TextSpan(children: tramosConCartas(texto, cartas)),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  height: 1.25,
+              thumbVisibility: texto.length > 220,
+              child: SingleChildScrollView(
+                child: Text.rich(
+                  TextSpan(children: tramosConCartas(texto, cartas)),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: tamanoTextoJugada(texto),
+                    height: 1.25,
+                  ),
                 ),
               ),
             ),
@@ -1634,6 +1650,11 @@ class _BannerFase extends StatelessWidget {
     ),
   );
 }
+
+/// Letra del cuadro de la jugada: más chica cuanto más largo el texto, para
+/// que una jugada larga se lea entera (reporte VWmE).
+double tamanoTextoJugada(String texto) =>
+    texto.length > 450 ? 11 : texto.length > 250 ? 12.5 : 14;
 
 /// Línea brillante que separa los dos lados de la mesa.
 class _Divisor extends StatelessWidget {

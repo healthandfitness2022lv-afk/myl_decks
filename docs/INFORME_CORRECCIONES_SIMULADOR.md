@@ -10,6 +10,18 @@ con un test y deja aquí una fila por reporte. Si cambió el código, hay que re
 Borrado: el worker borra de Firestore los reportes ya atendidos (menos las dudas). La copia local en
 `simulator/cache/reportes/` los conserva todos, con su estado en `atendidos.json`.
 
+## 20/11/2026 00:30 (dudas resueltas con Héctor)
+
+| Reporte | Qué pedía | Qué se hizo | Archivo y test |
+|---|---|---|---|
+| g3hq T10 | Ver los oros generados (Herrero, Saladino, Dragones, Imhotep, Jano…) | Se ven como fichas «Oro temporal» en la Reserva de ambos tableros; también cuentan los de Saladino | `oro_temporal.dart`, `tablero_screen.dart`, `tablero_desafio.dart`, `motor.py`; `oros_temporales_test.dart` |
+| g3hq T11 | Destrucciones en masa en una sola lista | «Destruidos en combate: A, B, C» y después lo que dispara cada uno | `motor.py`, `test_destrucciones_en_masa_en_una_sola_lista` |
+| g3hq T11 | Mercaderes en un solo paso | Ya se agrupaba en la Fase Final | — |
+| VWmE | El cuadro de la jugada debe crecer si el texto no cabe | Crece hasta más de la mitad de la pantalla, achica la letra en jugadas largas y muestra la barra | `tablero_screen.dart`, `oros_temporales_test.dart` |
+| qZJp T12 | Erec con fuerza 3 | No era error: la fuerza estaba mal escrita en la base de datos | — |
+
+Queda una duda: Haquika tomó el control de sí misma (oXy1); si vuelve a pasar, reportarla.
+
 ## 20/11/2026 00:30 (revisión de todos los reportes antiguos)
 
 Se revisaron los 632 reportes: 516 corregidos (2 hoy y el resto ya estaban arreglados), 106 sugerencias de juego,

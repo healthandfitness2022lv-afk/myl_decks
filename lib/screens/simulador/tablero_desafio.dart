@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/card_myl.dart';
 import '../../services/drive_service.dart';
 import '../../widgets/card_image.dart';
+import 'oro_temporal.dart';
 
 const _boardGold = Color(0xFFF2D487);
 const _boardSurface = Color(0xFF132126);
@@ -280,7 +281,8 @@ class _TableroDesafioState extends State<TableroDesafio> {
   /// los botones y las cartas para elegir.
   Widget _campoTelefono(Map<String, dynamic> rival, Map<String, dynamic> yo) {
     Widget zona(String titulo, Map<String, dynamic> lado, String clave, String destino) =>
-        _zona(titulo, _cartas(lado, clave), destino, horizontal: false);
+        _zona(titulo, _cartas(lado, clave), destino, horizontal: false,
+            temporales: clave == 'reserva' ? _numVirtuales(lado) : 0);
     // Reportes ANtc / HjND: con la letra del sistema agrandada (lo habitual en
     // un celular) las fichas y las líneas vacías, de alto fijo, se desbordaban.
     // Crecen con la letra.
@@ -518,7 +520,8 @@ class _TableroDesafioState extends State<TableroDesafio> {
     Widget zona(String titulo, Map<String, dynamic> lado, String clave,
             String destino, {int ocultas = 0}) =>
         _zona(titulo, _cartas(lado, clave), destino,
-            horizontal: horizontal, ocultas: ocultas);
+            horizontal: horizontal, ocultas: ocultas,
+            temporales: clave == 'reserva' ? _numVirtuales(lado) : 0);
     return LayoutBuilder(builder: (context, limits) => Center(
       child: FittedBox(
         fit: BoxFit.contain,
@@ -974,6 +977,9 @@ class _TableroDesafioState extends State<TableroDesafio> {
     });
   }
 
+  int _numVirtuales(Map<String, dynamic> lado) =>
+      ((lado['orosVirtuales'] as num?)?.toInt() ?? 0).clamp(0, 12);
+
   /// Oros virtuales (Dragones): « + 2 virtuales» junto a la Reserva.
   String _virtuales(Map<String, dynamic> lado) {
     final v = (lado['orosVirtuales'] as num?)?.toInt() ?? 0;
@@ -1221,7 +1227,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
   );
 
   Widget _zona(String titulo, List<Map> cartas, String destino,
-      {required bool horizontal, int ocultas = 0}) =>
+      {required bool horizontal, int ocultas = 0, int temporales = 0}) =>
       DragTarget<String>(
         onWillAcceptWithDetails: (d) => _puedeSoltar(d.data, destino),
         onAcceptWithDetails: (d) => _soltar(d.data, destino),
@@ -1265,7 +1271,9 @@ class _TableroDesafioState extends State<TableroDesafio> {
                   tituloZona,
                   const SizedBox(height: 2),
                   Expanded(child: LayoutBuilder(builder: (context, box) {
-                    final total = destino == 'mano_rival' ? ocultas : cartas.length;
+                    // Reporte g3hq: los Oros generados (Herrero, Saladino,
+                    // Dragones, Imhotep, Jano…) se ven en la Reserva.
+                    final total = destino == 'mano_rival' ? ocultas : cartas.length + temporales;
                     if (total == 0) {
                       return const Center(child: Text('—',
                           style: TextStyle(color: Colors.white30, fontSize: 20)));
@@ -1289,6 +1297,8 @@ class _TableroDesafioState extends State<TableroDesafio> {
                             alignment: Alignment.bottomCenter,
                             child: destino == 'mano_rival'
                               ? _dorso()
+                              : i >= cartas.length
+                              ? OroTemporal(ancho: cartaAncho, alto: cartaAlto)
                               : _carta(cartas[i],
                                   zona: destino,
                                   width: cartaAncho, height: cartaAlto,

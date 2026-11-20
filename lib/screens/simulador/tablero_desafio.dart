@@ -489,14 +489,14 @@ class _TableroDesafioState extends State<TableroDesafio> {
           // Proporciones (T-007): el campo propio y la mano son más altos que
           // los del rival, así tus cartas se ven y se tocan mejor; la mano
           // rival (solo dorsos) y el divisor se achican. Las columnas laterales
-          // se simetrizan: pilas/resumen en las puntas, fase y registro al medio.
+          // se simetrizan: pilas/resumen en las puntas, registro (izquierda) y fase (derecha) al medio.
           child: Stack(children: horizontal ? [
             poner(12, 12, 250, 125, _resumen(rival, activo: widget.estado['activo'] == 1)),
             poner(12, 143, 250, 125, _pilas(rival)),
-            poner(12, 280, 250, 400, _fase()),
+            poner(12, 280, 250, 400, _registro()),
             poner(12, 687, 250, 125, _pilas(yo)),
             poner(12, 823, 250, 125, _resumen(yo, activo: widget.estado['activo'] == 0)),
-            poner(274, 12, 1002, 60, zona('Mano rival · ${rival['manoCantidad']}', rival, 'mano', 'mano_rival',
+            poner(274, 12, 1002, 64, zona('Mano rival · ${rival['manoCantidad']}', rival, 'mano', 'mano_rival',
                 ocultas: (rival['manoCantidad'] as num?)?.toInt() ?? 0)),
             poner(274, 78, 750, 148, zona('Línea de Defensa rival', rival, 'defensa', 'defensa_rival')),
             poner(1034, 78, 242, 148, zona('Tótems', rival, 'apoyo', 'apoyo_rival')),
@@ -508,7 +508,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
             poner(274, 778, 1002, 170, zona('Tu mano', yo, 'mano', 'mano')),
             poner(1288, 12, 300, 170, zona('RESERVA RIVAL · ${_cartas(rival, 'reserva').length}${_virtuales(rival)}', rival, 'reserva', 'reserva_rival')),
             poner(1288, 188, 300, 120, zona('PAGADO RIVAL · ${_cartas(rival, 'pagado').length}', rival, 'pagado', 'pagado_rival')),
-            poner(1288, 314, 300, 332, _registro()),
+            poner(1288, 314, 300, 332, _fase()),
             poner(1288, 652, 300, 120, zona('PAGADO · ${_cartas(yo, 'pagado').length}', yo, 'pagado', 'pagado')),
             poner(1288, 778, 300, 170, zona('RESERVA · ${_cartas(yo, 'reserva').length}${_virtuales(yo)}', yo, 'reserva', 'reserva')),
             Positioned.fill(child: IgnorePointer(child: _flechas())),

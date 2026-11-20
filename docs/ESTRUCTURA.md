@@ -6,5 +6,5 @@
 - `tmp/` contiene respaldos y borradores versionados (parches, `.bak`, `.tgz`, resultados). Está referenciado por `simulator/REGLAS.md` (`tmp/pdfs/dar_primer_bloque.txt`), por lo que NO se movió. Propuesta para el humano: mover el texto del D.A.R. a `docs/referencias/` y archivar o borrar el resto.
 
 ## Tablero del simulador (T-007)
-Lienzo fijo escalado con `FittedBox` (1600×960 horizontal, 900×1540 vertical). Cambios: líneas propias y mano más altas que las del rival, mano rival y divisor más bajos, fase a la izquierda y registro (9 líneas) a la derecha, columnas simétricas. El teléfono (`_campoTelefono`) no cambió.
+Lienzo fijo escalado con `FittedBox` (1600×960 horizontal, 900×1540 vertical). Cambios: líneas propias y mano más altas que las del rival, mano rival y divisor más bajos, registro (9 líneas) al centro de la columna izquierda y fase al centro de la derecha, columnas simétricas. El teléfono (`_campoTelefono`) no cambió.
 Pendiente: verificar con `flutter analyze`, `flutter test` y captura con Playwright (build web) en un entorno con Flutter.

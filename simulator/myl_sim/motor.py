@@ -154,6 +154,7 @@ class Partida:
         self.sin_programar: tuple[set, set] = (set(), set())
         self.ultimo_dano: dict[int, str] = {0: "", 1: ""}
         self.pasos: list[dict] = []  # fotos de la mesa (partida narrada)
+        self.estilo = None  # estilo.Estilo: cómo ataca y bloquea cada lado (lo activa la búsqueda)
         self.mulligans = [0, 0]
         self.turnos_propios = [0, 0]
         self.oros_turno4: list[int | None] = [None, None]
@@ -773,6 +774,8 @@ class Partida:
         if not candidatos or hab.prohibido(self, "declarar_ataque", a):
             return  # Pwyll: mientras esté en juego no se puede declarar ataque
         atacantes = self.decide(a).elegir_atacantes(self, a, candidatos)
+        if self.estilo is not None:
+            self.estilo.observar_ataque(self, a, candidatos, atacantes)
         # Hathor: "este Aliado debe ser declarado atacante este turno si puede".
         atacantes += [x for x in candidatos if hab.tiene_estado(self, x, "debe_atacar") and x not in atacantes]
         if not atacantes and hab.prohibido(self, "ataque_obligatorio", a):
@@ -853,6 +856,8 @@ class Partida:
         self.bloqueos = dict(bloqueos)
         if bloqueables and libres:
             elegidos = self.decide(d).elegir_bloqueos(self, d, bloqueables, libres)
+            if self.estilo is not None:
+                self.estilo.observar_bloqueo(self, d, bloqueables, libres, elegidos)
             for atk_uid, blk in elegidos.items():
                 atk = next((x for x in bloqueables if x.uid == atk_uid), None)
                 if atk is not None and blk in libres and self.puede_bloquear(atk, blk) and blk not in bloqueos.values():

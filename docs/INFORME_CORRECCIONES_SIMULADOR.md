@@ -7,6 +7,41 @@ Cómo funciona: el worker copia cada 10 minutos los reportes de Firestore a `sim
 El agente revisa los nuevos (`python -m myl_sim.buzon_reportes pendientes`), reproduce la mesa, corrige el motor
 con un test y deja aquí una fila por reporte. Si cambió el código, hay que reiniciar el worker.
 
+Borrado: el worker borra de Firestore los reportes ya atendidos (menos las dudas). La copia local en
+`simulator/cache/reportes/` los conserva todos, con su estado en `atendidos.json`.
+
+## 20/11/2026 00:30 (revisión de todos los reportes antiguos)
+
+Se revisaron los 632 reportes: 516 corregidos (2 hoy y el resto ya estaban arreglados), 106 sugerencias de juego,
+4 que no eran error y 6 dudas.
+
+**Corregidos hoy**
+
+| Reporte | Carta | Qué pasaba | Qué se hizo | Archivo y test |
+|---|---|---|---|---|
+| NJO9 T13 | Resplandor de Heka | Dejaba al Aliado sin habilidad por toda la partida | Ahora es solo hasta la Fase Final | `datos.py`, `test_resplandor_de_heka_*` |
+| A3SB T14 | Orfeo | Te mostraba el mazo rival para elegir | Primero nombras a ciegas y después busca; puede fallar | `desafio.py` |
+
+**Ya estaban corregidos** (se comprobó con un test en `test_reportes_20261120.py`): Guerrero Escorpión no se cuenta
+a sí mismo (lLnW, ffAu), Djedefhor no se baraja a sí mismo (oXy1), Crom Dubh desterrado no dispara (5Lcf),
+Epicuro no se sube a sí mismo (qZJp), Focea deja al Aliado en el tope (g3hq), Teseo solo destruye Aliados rivales
+(g3hq), no se juega un segundo Killgharrah (lLnW), Cleopatra no nombra Faraón (9Phx), Demoledor sin habilidad no
+ataca al entrar (oHee), Melisende pone al Caballero en el tope (tJU3, RVPb) y Neferite I ofrece al Kobold (pyCo).
+Los otros 499 reportes eran de partidas ya revisadas en sesiones anteriores.
+
+**No eran error**: Oillipheist pegaba 4 por el +2 permanente de Clochafarmore (tI7B); Galatine costó 2 por el
+descuento de Yvain (tJU3); Crom Cruach sin objetivo de coste 2 (5Lcf, aclarado por Héctor).
+
+**Dudas (no se borran)**: oros generados como temporales en la reserva (g3hq); agrupar destrucciones en masa y los
+pasos de Mercaderes en la narración (g3hq); agrandar el cuadro cuando el texto no cabe (VWmE); Haquika tomó el
+control de sí misma (oXy1, no reproducible); Erec con fuerza 3 (qZJp, no reproducible). Las cuatro primeras son
+cambios de la app, no del motor.
+
+**Sugerencias de juego (106)**: son de partidas del 9 al 12/11. Desde entonces la IA cambió mucho (búsqueda y
+utilidad), así que no se tocaron una por una. Los temas que más se repiten: no descartar cartas clave (Lady Calvaur,
+Idmon, oros), no barajar cartas útiles con Cathach o Cuna de Dragones, usar el Resplandor de Heka o la Guardia
+Gozosa en el momento justo, no atacar a morir y bajar oro todos los turnos.
+
 ## 19/11/2026 22:57 (primera ejecución del agente)
 
 - Se activó el buzón: 630 reportes copiados (46 desafíos y 94 simulaciones). Ninguno nuevo desde el último arreglo.

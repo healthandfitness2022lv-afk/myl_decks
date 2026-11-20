@@ -55,14 +55,27 @@ def _leer(ruta: Path, defecto):
 
 # ---------------------------------------------------------------- worker (Firestore)
 
-def exportar(cliente=None) -> int:
-    """Copia a `cache/reportes/` los documentos cuyos reportes cambiaron.
+def _f(r: dict) -> str:
+    """Fecha del reporte como texto ISO (identifica al reporte dentro del doc)."""
+    x = r.get("fecha") or r.get("creado") or ""
+    return _json(x) if isinstance(x, datetime) else str(x)
 
-    Lo llama el worker. Devuelve cuántos documentos actualizó."""
+
+def exportar(cliente=None, purgar: bool = False) -> int:
+    """Copia a `cache/reportes/` los reportes nuevos de cada documento.
+
+    La copia local es un archivo que solo crece: un reporte borrado de
+    Firestore sigue aquí con la misma clave. Con `purgar`, borra de Firestore
+    los reportes que el agente ya atendió (salvo las dudas), como pidió
+    Héctor el 2026-11-20. Lo llama el worker. Devuelve cuántos documentos
+    cambió (copiados o purgados)."""
+    from google.cloud import firestore
+
     from .datos import cargar_mazo, db
 
     cliente = cliente or db()
     cambiados = 0
+    borrables = _borrables() if purgar else set()
     for coleccion in COLECCIONES:
         for snap in cliente.collection(coleccion).select(["reportes"]).stream(timeout=60):
             reportes = (snap.to_dict() or {}).get("reportes") or []
@@ -70,25 +83,43 @@ def exportar(cliente=None) -> int:
                 continue
             ruta = CARPETA / f"{coleccion}_{snap.id}.json"
             previo = _leer(ruta, {})
-            if len(previo.get("reportes") or []) == len(reportes):
-                continue
+            locales = previo.get("reportes") or []
+            conocidas = {_f(r) for r in locales}
+            nuevos = [r for r in reportes if _f(r) not in conocidas]
             ref = cliente.collection(coleccion).document(snap.id)
-            doc = ref.get().to_dict() or {}
-            data = {"coleccion": coleccion, "id": snap.id, "reportes": reportes,
-                    "exportado": datetime.now(timezone.utc)}
-            if coleccion == "ai_challenges":
-                g = ref.collection("grabacion").document("registro").get().to_dict()
-                data["grabacion"] = g
-                data["resumen"] = {k: doc.get(k) for k in ("status", "deckHumano", "deckIa", "nivel", "seed", "error")}
-            else:
-                data["simulacion"] = {k: doc.get(k) for k in ("deckA", "deckB", "seed", "jugador", "n", "inicial")}
-                try:
-                    data["mazos"] = [cargar_mazo(doc["ownerUid"], doc[k]).to_json() for k in ("deckA", "deckB")]
-                except Exception as e:  # noqa: BLE001 - el reporte sirve igual sin mazos
-                    data["mazos_error"] = str(e)[:300]
-            _escribir(ruta, data)
-            cambiados += 1
+            if nuevos:
+                doc = ref.get().to_dict() or {}
+                data = {**previo, "coleccion": coleccion, "id": snap.id, "reportes": locales + nuevos,
+                        "exportado": datetime.now(timezone.utc)}
+                if coleccion == "ai_challenges":
+                    data["grabacion"] = ref.collection("grabacion").document("registro").get().to_dict()
+                    data["resumen"] = {k: doc.get(k) for k in ("status", "deckHumano", "deckIa", "nivel", "seed", "error")}
+                elif not previo.get("mazos"):
+                    data["simulacion"] = {k: doc.get(k) for k in ("deckA", "deckB", "seed", "jugador", "n", "inicial")}
+                    try:
+                        data["mazos"] = [cargar_mazo(doc["ownerUid"], doc[k]).to_json() for k in ("deckA", "deckB")]
+                    except Exception as e:  # noqa: BLE001 - el reporte sirve igual sin mazos
+                        data["mazos_error"] = str(e)[:300]
+                _escribir(ruta, data)
+                cambiados += 1
+            viejos = [r for r in reportes if (coleccion, snap.id, _f(r)) in borrables]
+            if viejos:
+                ref.update({"reportes": firestore.ArrayRemove(viejos)})
+                cambiados += 1
     return cambiados
+
+
+def _borrables() -> set[tuple[str, str, str]]:
+    """(colección, doc, fecha) de los reportes atendidos que no son duda."""
+    out = set()
+    for clave, v in _atendidos()["claves"].items():
+        if v.get("estado") == "duda":
+            continue
+        coleccion, doc_id, n = clave.split("/")
+        locales = _leer(CARPETA / f"{coleccion}_{doc_id}.json", {}).get("reportes") or []
+        if int(n) < len(locales):
+            out.add((coleccion, doc_id, _f(locales[int(n)])))
+    return out
 
 
 # ---------------------------------------------------------------- agente (solo local)
@@ -101,7 +132,7 @@ def _atendidos() -> dict:
 
 
 def _fecha(r: dict) -> str:
-    return str(r.get("fecha") or r.get("creado") or "")
+    return _f(r)
 
 
 def todos() -> list[dict]:
@@ -182,7 +213,7 @@ def main(argv=None) -> None:
     t = sub.add_parser("atender")
     t.add_argument("clave")
     t.add_argument("nota")
-    t.add_argument("--estado", default="corregido", choices=["corregido", "programacion", "duda", "no_es_error"])
+    t.add_argument("--estado", default="corregido", choices=["corregido", "programacion", "duda", "no_es_error", "jugada"])
     a = ap.parse_args(argv)
     if a.cmd == "pendientes":
         xs = pendientes()

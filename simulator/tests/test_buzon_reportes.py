@@ -17,6 +17,10 @@ class _Ref:
     def __init__(self, data, grab=None):
         self._d, self._g = data, grab
 
+    def update(self, cambios):
+        quitar = cambios["reportes"].values
+        self._d["reportes"] = [r for r in self._d["reportes"] if r not in quitar]
+
     def get(self):
         return _Snap("x", self._d)
 
@@ -69,3 +73,20 @@ def test_exporta_y_lista_solo_lo_nuevo(tmp_path, monkeypatch):
     cliente.cols["ai_challenges"]["AAAA1"]["reportes"].append(_rep(21, "otro"))
     assert b.exportar(cliente) == 1
     assert [p["clave"] for p in b.pendientes()] == ["ai_challenges/AAAA1/2"]
+
+
+def test_purga_lo_atendido_y_conserva_la_copia_local(tmp_path, monkeypatch):
+    monkeypatch.setattr(b, "CARPETA", tmp_path)
+    monkeypatch.setattr(b, "ATENDIDOS", tmp_path / "atendidos.json")
+    docs = {"BBBB1": {"reportes": [_rep(20, "arreglado"), _rep(21, "duda"), _rep(22, "pendiente")]}}
+    cliente = _Db({"ai_challenges": docs})
+    b.exportar(cliente)
+    b.atender("ai_challenges/BBBB1/0", "ok")
+    b.atender("ai_challenges/BBBB1/1", "no se entiende", estado="duda")
+    b.exportar(cliente, purgar=True)
+    assert [r["comentario"] for r in docs["BBBB1"]["reportes"]] == ["duda", "pendiente"]
+    # La copia local no pierde nada y las claves no se corren.
+    assert [p["clave"] for p in b.pendientes()] == ["ai_challenges/BBBB1/2"]
+    docs["BBBB1"]["reportes"].append(_rep(23, "nuevo"))
+    b.exportar(cliente, purgar=True)
+    assert [p["clave"] for p in b.pendientes()] == ["ai_challenges/BBBB1/2", "ai_challenges/BBBB1/3"]

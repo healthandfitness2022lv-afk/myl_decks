@@ -603,7 +603,9 @@ def main(argv=None) -> int:
             if time.time() - ultima_exportacion > EXPORTAR_REPORTES:
                 ultima_exportacion = time.time()
                 try:
-                    if (n := buzon_reportes.exportar()):
+                    # Héctor (2026-11-20): una vez corregidos, los reportes
+                    # antiguos se borran de Firestore (quedan en la copia local).
+                    if (n := buzon_reportes.exportar(purgar=True)):
                         print(f"Reportes copiados a cache/reportes/: {n} documento(s)", flush=True)
                 except Exception:  # noqa: BLE001 - el buzón nunca bota al worker
                     traceback.print_exc()

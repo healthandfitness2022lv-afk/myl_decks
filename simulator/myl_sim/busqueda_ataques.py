@@ -82,11 +82,7 @@ class _Forzado(Heuristico):
 def valor_estado(p: Partida, yo: int, aprendido: bool = True) -> float:
     """0–1: estimación de victoria para `yo` cuando la simulación se corta.
     Usa la valoración entrenada (`valor.py`) si existe.
-    `aprendido="utilidad"`: la utilidad de `busqueda_utilidad` (rapidez y castillo)."""
-    if aprendido == "utilidad":
-        from .busqueda_utilidad import utilidad
-
-        return utilidad(p, yo)
+    `aprendido`: 1, 2 o 3 según el modelo de `valor.py`."""
     if p.e.terminada:
         g = p.e.ganador
         return 1.0 if g == yo else 0.5 if g == -1 else 0.0

@@ -10,8 +10,8 @@ Se reporta el winrate de X por **match** y por **partida**, con IC95.
 
     python -m myl_sim.medir_bo3 X Y [--pares 6] [--mazos id...] [--seed 1] [--procesos 10]
 
-Motores: los de `arena` (heuristico, busqueda_vigilia, experto, nivelN...) y
-`utilidad` / `utilidadN` (IA por utilidad con N rollouts, 6 por defecto).
+Motores: los de `arena` (heuristico, busqueda_vigilia, experto, nivelN...),
+`vigilia_estilo` (con estilo del rival) y `vigilia_valor3` (valoración v3).
 Solo lee el caché local; guarda en cache/arena/bo3.jsonl.
 """
 from __future__ import annotations
@@ -30,11 +30,6 @@ BO3 = CARPETA / "bo3.jsonl"
 
 
 def crear(motor: str, seed: int):
-    if motor.startswith("utilidad"):
-        from .busqueda_utilidad import BuscadorUtilidad
-
-        n = int(motor[len("utilidad"):] or 6)
-        return BuscadorUtilidad(seed, rollouts=n)
     if motor == "vigilia_estilo":  # la IA buena + estilo del rival (estilo.py)
         j = crear_arena("busqueda_vigilia", seed)
         j.modelar_rival = True
@@ -47,7 +42,7 @@ def crear(motor: str, seed: int):
 
 
 def _nombre(motor: str) -> str:
-    return motor if motor.startswith("utilidad") or motor in ("vigilia_estilo", "vigilia_valor3") else identidad(motor)
+    return motor if motor in ("vigilia_estilo", "vigilia_valor3") else identidad(motor)
 
 
 def jugar_match(x: str, y: str, mazo_x, mazo_y, seed: int) -> dict:

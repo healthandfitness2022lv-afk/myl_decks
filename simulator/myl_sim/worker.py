@@ -33,6 +33,7 @@ _desafios_activos: set[str] = set()
 _jobs_ia_activos: set[str] = set()
 _jobs_ml_activos: set[str] = set()
 _RED_RETRY = Retry(initial=1, maximum=4, timeout=12)
+EXPORTAR_REPORTES = 600  # cada cuánto copia los reportes a cache/reportes/ (agente horario)
 
 
 def latido(forzar: bool = False) -> None:
@@ -578,6 +579,9 @@ def main(argv=None) -> int:
             flujo.reconfigure(encoding="utf-8", errors="replace")
     print("Worker del simulador escuchando simulations/ (Ctrl+C para salir)")
     inicio_pendiente = not args.conservar_activos
+    from . import buzon_reportes
+
+    ultima_exportacion = 0.0
     while True:
         try:
             latido(forzar=inicio_pendiente)
@@ -596,6 +600,13 @@ def main(argv=None) -> int:
                 procesar_job_ml(doc)
             if args.una:
                 return 0
+            if time.time() - ultima_exportacion > EXPORTAR_REPORTES:
+                ultima_exportacion = time.time()
+                try:
+                    if (n := buzon_reportes.exportar()):
+                        print(f"Reportes copiados a cache/reportes/: {n} documento(s)", flush=True)
+                except Exception:  # noqa: BLE001 - el buzón nunca bota al worker
+                    traceback.print_exc()
             time.sleep(ESPERA)
         except Exception:  # noqa: BLE001 - una caída de Firestore no mata al worker
             traceback.print_exc()

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../data/pb_data.dart';
+import '../domain/analisis_mazo/analisis_mazo.dart';
 import '../models/card_myl.dart';
 import '../services/drive_service.dart';
 import '../models/current_user.dart';
@@ -41,7 +42,7 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
   bool get _lecturaMasivaActiva =>
       _lecturaMasivaRunId != null && _lecturaMasivaHechas < _lecturaMasivaTotal;
 
-  // ── caché de características por carta ───────────────────────
+  // ── roles por carta (según sus habilidades programadas) ──────
   final Map<String, List<String>> _caracCache = {};
 
   // ── resultados filtrados (computados fuera del build) ────────
@@ -57,44 +58,14 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
   bool _soloStubs = false; // filtro "solo incompletas"
   bool _soloSinHabilidad = false;
   final Set<String> _caracFilter = {};
-  List<String> _features = [];
-
-  String _normalize(String s) {
-    var t = s.trim().toLowerCase();
-    t = t
-        .replaceAll(RegExp(r'[áàä]'), 'a')
-        .replaceAll(RegExp(r'[éèë]'), 'e')
-        .replaceAll(RegExp(r'[íìï]'), 'i')
-        .replaceAll(RegExp(r'[óòö]'), 'o')
-        .replaceAll(RegExp(r'[úùü]'), 'u')
-        .replaceAll('ñ', 'n')
-        .replaceAll('_', ' ')
-        .replaceAll('-', ' ')
-        .replaceAll(RegExp(r'\s+'), ' ');
-    switch (t) {
-      case 'dano directo':
-      case 'daño directo':
-        return 'dano directo';
-      case 'generador de oro':
-      case 'generador de oros':
-        return 'generador de oros';
-      case 'control de aliado':
-      case 'control de aliados':
-        return 'control de aliados';
-      default:
-        return t;
-    }
-  }
-
-  Map<String, String> get _canon {
-    return {for (final k in _features) _normalize(k): k};
-  }
+  static final List<String> _features = [
+    for (final r in roles) nombresRol[r]!,
+  ];
 
   @override
   void initState() {
     super.initState();
     _searchCtrl.addListener(_onSearchChanged);
-    _loadFeaturesFromFirestore();
     _loadAllCards();
   }
 
@@ -175,27 +146,6 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
           _refreshing = false;
         });
     }
-  }
-
-  Future<void> _loadFeaturesFromFirestore() async {
-    final snap =
-        await FirebaseFirestore.instance
-            .collection('card_custom_features') // o 'features' si usas esa
-            .orderBy('name')
-            .get();
-
-    final list = <String>[];
-    for (final d in snap.docs) {
-      // Las unificadas en una genérica ya no se ofrecen.
-      if (d.data()['unificadaEn'] != null) continue;
-      final name = (d.data()['name'] ?? '').toString().trim();
-      if (name.isNotEmpty) list.add(name);
-    }
-    if (!mounted) return;
-    setState(() {
-      _features = list;
-      _recompute();
-    });
   }
 
   bool _tieneTextoHabilidad(Map<String, dynamic> data) {
@@ -463,7 +413,12 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
 
     _caracCounts = counts;
     _visibleCaracs = _features.where((c) => (counts[c] ?? 0) > 0).toList();
-    _filteredItems = preChar;
+    _filteredItems =
+        _caracFilter.isEmpty
+            ? preChar
+            : preChar
+                .where((c) => _caracteristicasDe(c).toSet().containsAll(_caracFilter))
+                .toList();
   }
 
   bool get _esAliado => (_tipo ?? '').toLowerCase() == 'aliado';
@@ -588,7 +543,6 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
         'rareza': '',
         'habilidad': '',
         'unica': false,
-        'caracteristicasRaw': [],
         'status': 'stub',
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -795,62 +749,11 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
     );
   }
 
-  List<String> _caracteristicasDe(CardMyL c) {
-    // Memoizado: si ya fue calculado para esta carta, devolver el cache
-    final cached = _caracCache[c.id];
-    if (cached != null) return cached;
-
-    final dynamic raw = c.caracteristicasRaw;
-    final Set<String> out = {};
-    if (raw == null) {
-      _caracCache[c.id] = const [];
-      return const [];
-    }
-
-    if (raw is List) {
-      for (final e in raw) {
-        final base = _normalize(e);
-        final canon = _canon[base];
-        if (canon != null)
-          out.add(canon);
-        else {
-          // si no es canonical, quizá sea custom
-          final s = e?.toString() ?? '';
-          if (s.isNotEmpty) out.add(s);
-        }
-      }
-    } else if (raw is Map<String, dynamic>) {
-      raw.forEach((k, v) {
-        if (v == true) {
-          final base = _normalize(k);
-          final canon = _canon[base];
-          if (canon != null)
-            out.add(canon);
-          else {
-            final s = k.toString();
-            if (s.isNotEmpty) out.add(s);
-          }
-        }
-      });
-    } else if (raw is String) {
-      for (final part in raw.split(',')) {
-        final base = _normalize(part);
-        final canon = _canon[base];
-        if (canon != null)
-          out.add(canon);
-        else {
-          final s = part.toString().trim();
-          if (s.isNotEmpty) out.add(s);
-        }
-      }
-    }
-
-    final list =
-        out.toList()
-          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    _caracCache[c.id] = list;
-    return list;
-  }
+  /// Qué hace la carta: sus roles, del más fuerte al más débil.
+  List<String> _caracteristicasDe(CardMyL c) =>
+      _caracCache[c.id] ??= [
+        for (final r in rolesOrdenados(c)) nombresRol[r]!,
+      ];
 
   // ===== función para eliminar carta (solo administrador) =====
   Future<void> _confirmAndDeleteCard(String cardId) async {
@@ -975,9 +878,9 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
             icon: const Icon(Icons.info_outline),
             onPressed: () => _showCountsDialog(context),
           ),
-          if (!wide && _caracFilter.isNotEmpty)
+          if (!wide)
             IconButton(
-              tooltip: 'Filtrar por características',
+              tooltip: 'Filtrar por lo que hace la carta',
               icon: const Icon(Icons.tune),
               onPressed: () => _openCaracFilterSheet(context),
             ),
@@ -1231,7 +1134,6 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
     }
 
     final items = _filteredItems;
-    final showLegacyFeatures = _caracFilter.isNotEmpty;
     final puedeSeleccionarIa =
         (context.read<CurrentUser>().email ?? '').toLowerCase() ==
         AppConstants.ownerEmail;
@@ -1372,7 +1274,7 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
     );
 
     if (items.isEmpty) {
-      return wide && showLegacyFeatures
+      return wide
           ? Row(
             children: [
               Expanded(
@@ -1397,7 +1299,7 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
           );
     }
 
-    if (!wide || !showLegacyFeatures) {
+    if (!wide) {
       return Column(children: [statusBar, Expanded(child: grid)]);
     }
 
@@ -1437,7 +1339,7 @@ class _CardsCatalogScreenState extends State<CardsCatalogScreen> {
                         const Icon(Icons.tune),
                         const SizedBox(width: 8),
                         const Text(
-                          'Filtrar por características',
+                          'Qué hace la carta',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -1842,7 +1744,7 @@ class _RightPanel extends StatelessWidget {
                 const Icon(Icons.bolt_outlined, color: Color(0xFFF1D48B)),
                 const SizedBox(width: 8),
                 const Text(
-                  'Características',
+                  'Qué hace la carta',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,

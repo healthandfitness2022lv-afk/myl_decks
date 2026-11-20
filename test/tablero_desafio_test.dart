@@ -306,7 +306,8 @@ void main() {
       'opciones': aliados,
     }));
     await tester.pumpAndSettle();
-    expect(find.text('Toca o arrastra los Aliados que atacan'), findsOneWidget);
+    // vUsU T9: con uno ya elegido, la barra dice cómo bajarlo.
+    expect(find.text('Toca un atacante para bajarlo'), findsOneWidget);
     expect(find.text('Atacar con 1'), findsOneWidget);
     await tester.tap(find.text('Segundo atacante'));
     await tester.pumpAndSettle();

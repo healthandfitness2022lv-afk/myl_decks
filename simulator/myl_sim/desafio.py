@@ -21,7 +21,6 @@ from . import habilidades as hab
 from .busqueda_bloqueos import PoliticaConBusqueda
 from .datos import CACHE
 from .jugadores import Heuristico
-from .politica_meta import jugador_para
 from .modelo import Instancia, Zona
 from .motor import Jugada, Partida
 from .simulacion import _sin_ids_reservados, _solo_cambios
@@ -46,6 +45,12 @@ def _carta(inst: Instancia, partida: Partida) -> dict[str, Any]:
     }
     if inst.en_juego:
         out.update(_estado_habilidad(inst, partida))
+        desglose = hab.desglose_fuerza(partida, inst)
+        if desglose:
+            # Desafío vUsU T9: al tocar un Aliado se ve quién lo sube o lo baja.
+            base = inst.fuerza_temporal if inst.fuerza_temporal is not None else inst.carta.fuerza
+            out["fuerzaBase"] = base
+            out["fuerzaDesglose"] = [{"de": de, "valor": v} for de, v in desglose]
     return out
 
 
@@ -181,7 +186,13 @@ class HumanoRemoto:
         return r
 
     def quedarse_mano(self, p, yo):
-        return self._pedir("mano_inicial", [], {"titulo": "¿Te quedas esta mano?"}) == "quedarse"
+        # Desafío SkkvVn (18-11): «no sé si voy primero o no»: la mano se decide
+        # sabiendo quién empieza (el que empieza juega su Oro antes y ataca antes).
+        dado = p.dados[-1] if getattr(p, "dados", None) else None
+        tirada = f" (dado: tú {dado[yo]}, rival {dado[1 - yo]})" if dado else ""
+        quien = "Empiezas tú" if p.inicial == yo else "Empieza el rival"
+        return self._pedir("mano_inicial", [], {
+            "titulo": f"{quien}{tirada}. ¿Te quedas esta mano?"}) == "quedarse"
 
     def confirmar_fase(self, p, yo, titulo):
         """Sin jugadas posibles el turno sigue solo (antes abría una ventana
@@ -326,7 +337,11 @@ class HumanoRemoto:
     def elegir_objetivos(self, p, yo, candidatos, n, h):
         obj = (h or {}).get("objetivo") or {}
         barajar_todo = (h or {}).get("accion") == "barajar" and obj.get("zona") == "cementerio"             and obj.get("quien") in ("propio", None)  # Escudo Celestial: n o menos en el Cementerio
-        if candidatos and len(candidatos) <= n and (barajar_todo or not (h or {}).get("opcional"))                 and (h or {}).get("accion") not in ("descartar",):
+        # Desafío BibK T12: la Corona es opcional («¿Usar?» ya se preguntó) y
+        # su objetivo es el Aliado que acaba de entrar: no se vuelve a elegir.
+        obvio = obj.get("quien") in ("disparadora", "esta_carta")
+        if candidatos and len(candidatos) <= n and (barajar_todo or obvio or not (h or {}).get("opcional")) \
+                and (h or {}).get("accion") not in ("descartar",):
             # Corona Faraónica: el único objetivo posible (el Aliado que
             # entra) se toma solo, sin preguntar lo obvio.
             return list(candidatos)
@@ -341,6 +356,13 @@ class HumanoRemoto:
 
     def usar_opcional(self, p, yo, fuente, h):
         que = _texto_habilidad(h) if h.get("accion") else ""
+        if h.get("modo") == "puede_atacar_este_turno":
+            # Desafío BibK T12: decía «restringirCombate 1 en juego».
+            x = getattr(p, "ctx_disparadora", None)
+            que = f"que {x.nombre if x is not None else 'el Aliado'} pueda atacar este turno"
+        costo = describir_costo(h.get("costo") or {})
+        if que and costo != "Sin costo":
+            que += f" · {costo.lower()}"
         return self._pedir("confirmar", [], {
             "titulo": f"¿Usar {fuente.nombre}" + (f" ({que})" if que else "") + "?"}) == "si"
 
@@ -388,9 +410,13 @@ class HumanoRemoto:
         return int(r) if r not in (None, "", "pasar") else None
 
     def preferir_alternativo(self, p, yo, fuente, h):
-        return self._pedir("confirmar", [], {
-            "titulo": f"¿Pagar el costo alternativo de {fuente.nombre}?"
-        }) == "si"
+        # Desafío dJ00 T7: «no preguntes por costes alternativos, sé explícito
+        # entre las opciones»: Ptolomeo II → «Botar 3» o «Pagar 1 Oro».
+        r = self._pedir("opcion", [
+            {"id": "normal", "titulo": describir_costo(h.get("costo") or {})},
+            {"id": "alternativo", "titulo": describir_costo(h.get("costoAlternativo") or {})},
+        ], {"titulo": f"{fuente.nombre}: ¿cómo pagas?"})
+        return r == "alternativo"
 
     def redirigir(self, p, yo, objetivo, opciones):
         datos = [{"id": str(k), "titulo": x.nombre} for k, x in enumerate(opciones)]
@@ -408,21 +434,9 @@ class HumanoRemoto:
         hn = next((h for h in (fuente.habilidades if fuente else [])
                    if (h.get("objetivo") or {}).get("nombrarCarta")), None)
         objn = (hn or {}).get("objetivo") or {}
-        if objn.get("zona") == "mazo" and objn.get("quien") == "oponente":
-            # Desafío g9FE: Orfeo "busca en el Mazo Castillo oponente": ves su
-            # mazo (una carta por nombre) y eliges la que quieres desterrar.
-            unicas = {}
-            for x in p.j(1 - yo).mazo:
-                unicas.setdefault(x.nombre, x)
-            if unicas:
-                cartas = sorted(unicas.values(), key=lambda x: x.nombre)
-                ids = self._pedir("objetivos", [_carta(x, p) for x in cartas],
-                                  {"titulo": f"{fuente.nombre if fuente else 'Busca'}: elige una carta del mazo rival",
-                                   "cantidad": 1}) or []
-                por_uid = {str(x.uid): x.nombre for x in cartas}
-                elegida = next((por_uid[str(u)] for u in ids if str(u) in por_uid), None)
-                if elegida:
-                    return elegida
+        # Reporte A3SB T14: Orfeo "nombra una carta. Luego, busca en el Mazo
+        # Castillo oponente": primero se nombra a ciegas (puede fallar) y
+        # después se busca. Antes se mostraba el mazo rival para elegir.
         tipos = set(objn.get("tipos") or [])
         razas: set[str] = set()
         if ((hn or {}).get("objetivo") or {}).get("quien") == "oponente" and "Aliado" in tipos:
@@ -447,7 +461,14 @@ class HumanoRemoto:
     def elegir_opcion(self, p, yo, fuente, opciones):
         """Anand ("robas o barajas", reporte 4n5oe), Nuada, Loch Lein: el
         jugador elige cuál usar (antes el motor tomaba la primera)."""
-        datos = [{"id": str(k), "titulo": _texto_habilidad(h)} for k, h in enumerate(opciones)]
+        def titulo(h):
+            texto = _texto_habilidad(h)
+            if any(e.get("accion") == "subirMano" and (e.get("objetivo") or {}).get("quien") == "esta_carta"
+                   for e in h.get("luego") or [] if isinstance(e, dict)):
+                # Dario III: «puedes subirlo a tu Mano para desterrar… o robar».
+                texto = f"Subir {fuente.nombre} a la mano: {texto[:1].lower()}{texto[1:]}"
+            return texto
+        datos = [{"id": str(k), "titulo": titulo(h)} for k, h in enumerate(opciones)]
         if all(h.get("opcional") for h in opciones):
             datos.append({"id": "ninguna", "titulo": "No usar"})
         r = self._pedir("opcion", datos, {"titulo": f"{fuente.nombre}: elige una"})
@@ -555,7 +576,7 @@ def _texto_habilidad(h: dict) -> str:
     obj = h.get("objetivo") or {}
     if h.get("accion") == "modificarFuerza":
         # Bereber: «+1 de fuerza a esta carta» · «+2 de fuerza a otro Guerrero».
-        quien = "esta carta" if obj.get("quien") == "esta_carta" else             f"otro {obj.get('arquetipo') or obj.get('raza') or 'Aliado'}" if obj.get("excluirEstaCarta")             else (obj.get("arquetipo") or obj.get("raza") or "un Aliado")
+        quien = "esta carta" if obj.get("quien") == "esta_carta" else             f"otro {obj.get('arquetipo') or obj.get('raza') or 'Aliado'}" if (obj.get("excluirEstaCarta") or obj.get("excluirFuente"))             else (obj.get("arquetipo") or obj.get("raza") or "un Aliado")
         return f"{int(h.get('valor', 0) or 0):+d} de fuerza a {quien}"
     texto = f"{_VERBOS.get(h.get('accion'), str(h.get('accion')))} {h.get('cantidad', 1) or 1}"
     que = " ".join(x for x in ("/".join(obj.get("tipos") or []), obj.get("raza") or obj.get("arquetipo") or "") if x)
@@ -588,6 +609,26 @@ _ACCIONES_TEXTO = {
     "convertirEnAliado": "se vuelve Aliado", "cancelarAtaque": "cancela el ataque", "reducirDano": "reduce el daño",
     "mover": "mueve", "ganarControl": "toma el control", "descartar": "descarta", "prevenir": "previene",
 }
+
+
+def describir_costo(c: dict) -> str:
+    """«Pagar 1 Oro», «Botar 3», «Descartar 1 carta», «Destruir 1 Aliado tuyo»."""
+    def n(k):
+        return int(c.get(k) or 0)
+    partes = []
+    if n("oros"):
+        partes.append(f"Pagar {n('oros')} Oro{'s' if n('oros') != 1 else ''}")
+    if n("botar"):
+        partes.append(f"Botar {n('botar')}")
+    if n("descartar"):
+        partes.append(f"Descartar {n('descartar')} carta{'s' if n('descartar') != 1 else ''}")
+    if n("destruirAliados"):
+        partes.append(f"Destruir {n('destruirAliados')} Aliado{'s' if n('destruirAliados') != 1 else ''} tuyo")
+    if n("desterrarCementerio"):
+        partes.append(f"Desterrar {n('desterrarCementerio')} de tu Cementerio")
+    if c.get("desterrarEstaCarta"):
+        partes.append("Desterrar esta carta")
+    return " y ".join(partes) or "Sin costo"
 
 
 def describir_habilidad(h: dict) -> str:
@@ -765,16 +806,6 @@ class PoliticaDificultad:
         return attr
 
 
-def politica_ia_para(mazo_humano, mazo_ia, seed: int,
-                    registro_path: Path | None = None):
-    """Usa aprendizaje solo si las dos barajas coinciden con un cruce aprobado."""
-    ruta = registro_path or CACHE / "entrenamiento" / "modelos" / "djoser_registro_v2.json"
-    if not ruta.exists():
-        return Heuristico(seed)
-    registro = json.loads(ruta.read_text(encoding="utf-8"))
-    return jugador_para(registro, ruta.parent, mazo_ia, mazo_humano, seed)
-
-
 class _AnotarEnVivo:
     """Anota en el estado real y publica las acciones de la IA al momento.
 
@@ -815,7 +846,7 @@ class SesionDesafio:
         self.humano = HumanoRemoto(self.pedir)
         self.nivel = nivel if nivel in NIVELES else 4
         self.pausa = pausa
-        self.politica_base_ia = politica_ia_para(mazo_humano, mazo_ia, seed * 2 + 1)
+        self.politica_base_ia = Heuristico(seed * 2 + 1)
         self.politica_ia = self.politica_base_ia
         if self.nivel == 5:
             # La IA más fuerte medida en la arena (+100 Elo sobre la heurística;

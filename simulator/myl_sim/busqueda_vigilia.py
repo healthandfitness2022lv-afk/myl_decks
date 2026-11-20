@@ -343,7 +343,7 @@ def continuar_descarte(c: Partida, yo: int, uids: tuple, horizonte: int, seed: i
     a = c.e.activo
     try:
         for inst in [x for x in c.j(yo).mano if x.uid in uids]:
-            c.descartar(inst)
+            c.descartar(inst, por_habilidad=False)  # exceso de mano: regla
         c._cerrar_turno(a)
         for _ in range(horizonte):
             if c.e.terminada:

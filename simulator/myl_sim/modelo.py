@@ -145,6 +145,8 @@ class Instancia:
     arquetipo_extra: str | None = None
     # Aker: habilidades copiadas hasta la Fase Final.
     copia: tuple = ()
+    # Fiodhain: la copia no expira en la Fase Final (dura mientras siga en juego).
+    copia_permanente: bool = False
     # Nimue: copia exacta de otra carta hasta la Fase Final (carta original).
     carta_original: "Carta | None" = None
 

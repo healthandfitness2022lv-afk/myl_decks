@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import '../../models/deck.dart';
 import '../../models/ban_list_entry.dart';
 import '../../models/card_myl.dart';
+import 'mercenarios.dart';
+
+export 'mercenarios.dart';
 
 @immutable
 class CardData {
@@ -64,7 +67,19 @@ String _keyFor(DeckCardEntry e) {
   return normalizeBanListKey(name.isNotEmpty ? name : (e.cardId ?? ''));
 }
 
-int _copyLimitForEntry(DeckCardEntry entry, Map<String, int> copyLimitsByKey) {
+/// Carta Mercenario («Puedes tener más de 3 Draco Águila en tu Mazo
+/// Castillo»): por el texto de la carta del catálogo o, si la pantalla no
+/// trae el catálogo, por haberla visto antes (ver `mercenarios.dart`).
+bool cartaEsMercenario(dynamic card, {String? id, String nombre = ''}) =>
+    (card is CardMyL &&
+        textoEsMercenario('${card.habilidadTextoIA} ${card.habilidad}')) ||
+    esMercenario(id: id, nombre: nombre);
+
+int _copyLimitForEntry(
+  DeckCardEntry entry,
+  Map<String, int> copyLimitsByKey, {
+  bool sinLimite = false,
+}) {
   final cardId = entry.cardId?.trim();
   if (cardId != null && cardId.isNotEmpty) {
     final fromId = copyLimitsByKey[normalizeBanListKey(cardId)];
@@ -81,7 +96,8 @@ int _copyLimitForEntry(DeckCardEntry entry, Map<String, int> copyLimitsByKey) {
     }
   }
 
-  return entry.unica ? 1 : 3;
+  if (entry.unica) return 1;
+  return sinLimite ? copiasMercenario : copiasNormales;
 }
 
 ValidationResult validateDeck({
@@ -106,7 +122,20 @@ ValidationResult validateDeck({
     final key = _keyFor(entry);
     copyCounter[key] = (copyCounter[key] ?? 0) + entry.count;
     labelByKey[key] = entry.name;
-    limitByKey[key] = _copyLimitForEntry(entry, copyLimitsByKey);
+    final enCatalogo =
+        entry.cardId != null
+            ? catalogById[entry.cardId!]
+            : catalogByName[entry.name] ??
+                catalogByName[entry.name.trim().toLowerCase()];
+    limitByKey[key] = _copyLimitForEntry(
+      entry,
+      copyLimitsByKey,
+      sinLimite: cartaEsMercenario(
+        enCatalogo,
+        id: entry.cardId,
+        nombre: entry.name,
+      ),
+    );
   }
   for (final entry in deck.sideboardCards) {
     final key = _keyFor(entry);

@@ -125,10 +125,12 @@ def test_el_resto_mirado_en_privado_vuelve_al_mazo_sin_nombrarse():
     fuente = en_zona(p, 1, C("Látigo y Bastón"), Zona.RESERVA)  # su texto no muestra el Mazo
     h = next(x for x in C("Estrella De Belén").habilidades if x.get("accion") == "mirarTope")
     h = {**h, "muestra": False}  # un «mira» privado que baraja el resto
-    tope = {x.nombre for x in p.j(1).mazo[:3]}
+    tope = p.j(1).mazo[:3]
     hab._mirar_tope(p, 1, fuente, h, 3)
     vista = " ".join(texto_publico(x, humano=0) for x in p.e.log)
-    assert not any(n in vista for n in tope)
+    # La que toma con filtro se muestra (reporte dmwP); el resto no se nombra.
+    tomadas = {x.nombre for x in tope if x.zona != Zona.MAZO}
+    assert not any(x.nombre in vista for x in tope if x.zona == Zona.MAZO and x.nombre not in tomadas)
 
 
 def test_anillos_de_badbury_dice_que_el_cinturon_lo_impide():

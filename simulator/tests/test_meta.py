@@ -114,3 +114,52 @@ def test_trabajos_comandos_y_evaluador(tmp_path):
     assert "Evaluación de carta" in md_eval(r)
     res = trabajos.resumen("evaluar_carta", r)
     assert res["carta"] == "Oseye" and res["mazos"][0]["mazo"] == mazos[0].nombre
+
+
+def test_matriz_guarda_turnos_y_el_informe_trae_el_perfil_del_meta(tmp_path, monkeypatch):
+    monkeypatch.setattr(meta, "CRUCES", tmp_path)
+    mazos = [_mazo("A", 2), _mazo("B", 3), _mazo("C", 4)]
+    turnos = {}
+    cruces = meta.matriz(mazos, 4, procesos=1, turnos=turnos)
+    assert set(turnos) == set(cruces) and all(len(turnos[k]) == 4 and min(turnos[k]) > 0 for k in cruces)
+    # Lo ya jugado se reutiliza con su duración; solo se agregan las nuevas.
+    turnos2 = {}
+    meta.matriz(mazos, 6, procesos=1, turnos=turnos2)
+    assert all(turnos2[k][:4] == turnos[k] and len(turnos2[k]) == 6 for k in turnos)
+
+    vel = meta.velocidad(mazos, cruces, turnos)
+    assert len(vel) == 3 and sum(v["partidasMedidas"] for v in vel) == 2 * sum(
+        sum(c in "10" for c in r) for r in cruces.values())
+
+    r = meta.informe(mazos, [1.0, 1.0, 1.0], cruces, n=4, jugador="heuristico", nombre_meta="prueba", turnos=turnos)
+    for f in r["ranking"]:
+        assert f["perfil"] in meta.ESTILOS and 0 <= f["indice"] <= 100 and "turnoVictoria" in f
+    mp = r["metaPerfil"]
+    for clave in ("jugado", "evolutivo", "equilibrio"):
+        assert abs(sum(mp["reparto"][clave].values()) - 1) < 0.01
+        assert 0 <= mp["indiceMedio"][clave] <= 100
+    assert sum(mp["mazos"].values()) == 3
+    assert "Qué tan agro o control está el meta" in meta.informe_md(r)
+
+    from myl_sim import trabajos
+
+    res = trabajos.resumen("meta_matriz", r)
+    assert res["metaPerfil"] == mp and res["ranking"][0]["perfil"] in meta.ESTILOS
+
+
+def test_cruce_antiguo_sin_turnos_no_rompe(tmp_path, monkeypatch):
+    import json
+
+    monkeypatch.setattr(meta, "CRUCES", tmp_path)
+    mazos = [_mazo("A", 2), _mazo("B", 3)]
+    meta.matriz(mazos, 2, procesos=1)
+    ruta = next(tmp_path.glob("*.json"))
+    viejo = json.loads(ruta.read_text(encoding="utf-8"))
+    viejo.pop("turnos")
+    ruta.write_text(json.dumps(viejo), encoding="utf-8")
+    turnos = {}
+    cruces = meta.matriz(mazos, 4, procesos=1, turnos=turnos)
+    (par,) = cruces
+    assert turnos[par][:2] == [0, 0] and min(turnos[par][2:]) > 0
+    vel = meta.velocidad(mazos, cruces, turnos)
+    assert sum(v["partidasMedidas"] for v in vel) <= 2 * 2  # las antiguas no se cuentan

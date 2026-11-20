@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/card_myl.dart';
 import '../../services/drive_service.dart';
 import '../../widgets/card_image.dart';
+import 'oro_temporal.dart';
 
 const _boardGold = Color(0xFFF2D487);
 const _boardSurface = Color(0xFF132126);
@@ -94,6 +95,21 @@ Future<dynamic> elegirAccionConOros(
     ),
   );
 }
+
+/// Desafío vUsU T9: quién sube o baja la fuerza de un Aliado.
+/// «base 3 · +2 Guerrero Bereber · -1 Toro Apis». Null si no tiene cambios.
+String? desgloseFuerza(Map carta) {
+  final partes = (carta['fuerzaDesglose'] as List? ?? const []).whereType<Map>();
+  if (partes.isEmpty) return null;
+  return [
+    'base ${carta['fuerzaBase']}',
+    for (final p in partes) '${p['valor']} ${p['de']}',
+  ].join(' · ');
+}
+
+/// Fuerza total de los Aliados elegidos para atacar (contador del ataque).
+int fuerzaAtaque(Iterable<Map> atacantes) => atacantes.fold(
+    0, (s, c) => s + ((c['fuerza'] as num?)?.toInt() ?? 0));
 
 /// Mesa interactiva del desafío. Los gestos solo proponen una acción: el
 /// worker sigue siendo quien valida su legalidad y aplica las reglas.
@@ -265,10 +281,19 @@ class _TableroDesafioState extends State<TableroDesafio> {
   /// los botones y las cartas para elegir.
   Widget _campoTelefono(Map<String, dynamic> rival, Map<String, dynamic> yo) {
     Widget zona(String titulo, Map<String, dynamic> lado, String clave, String destino) =>
-        _zona(titulo, _cartas(lado, clave), destino, horizontal: false);
+        _zona(titulo, _cartas(lado, clave), destino, horizontal: false,
+            temporales: clave == 'reserva' ? _numVirtuales(lado) : 0);
+    // Reportes ANtc / HjND: con la letra del sistema agrandada (lo habitual en
+    // un celular) las fichas y las líneas vacías, de alto fijo, se desbordaban.
+    // Crecen con la letra.
+    // En pantallas bajas la letra agrandada no cabe: se limita (las cartas
+    // son imágenes; lo que crece es solo el texto de la mesa).
+    final altoPantalla = MediaQuery.sizeOf(context).height;
+    final tope = altoPantalla < 620 ? 1.0 : altoPantalla < 720 ? 1.15 : 1.3;
+    final letra = (MediaQuery.textScalerOf(context).scale(100) / 100).clamp(1.0, tope);
     // Una línea sin cartas queda angosta (solo su título); las demás se reparten el alto.
     Widget linea(Widget hijo, {required bool vacia, double angosta = 34}) =>
-        vacia ? SizedBox(height: angosta, child: hijo) : Expanded(flex: 3, child: hijo);
+        vacia ? SizedBox(height: angosta * letra, child: hijo) : Expanded(flex: 3, child: hijo);
     Widget fila(String titulo, Map<String, dynamic> lado, String clave, String destino,
         String destinoTotems, {double angosta = 34}) {
       final totems = _cartas(lado, 'apoyo');
@@ -280,11 +305,27 @@ class _TableroDesafioState extends State<TableroDesafio> {
       ]), vacia: _cartas(lado, clave).isEmpty && totems.isEmpty, angosta: angosta);
     }
     final hayFranja = _franjaCartas().isNotEmpty || _franjaTextos().isNotEmpty;
+    final altoFicha = 44.0 * letra;
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(letra)),
+      child: _mesaTelefono(rival, yo, altoFicha, linea, fila, zona, hayFranja),
+    );
+  }
+
+  Widget _mesaTelefono(
+    Map<String, dynamic> rival,
+    Map<String, dynamic> yo,
+    double altoFicha,
+    Widget Function(Widget, {required bool vacia, double angosta}) linea,
+    Widget Function(String, Map<String, dynamic>, String, String, String, {double angosta}) fila,
+    Widget Function(String, Map<String, dynamic>, String, String) zona,
+    bool hayFranja,
+  ) {
     return Stack(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
         child: Column(children: [
-          SizedBox(height: 44, child: _ficha(rival, activo: widget.estado['activo'] == 1)),
+          SizedBox(height: altoFicha, child: _ficha(rival, activo: widget.estado['activo'] == 1)),
           const SizedBox(height: 2),
           fila('Defensa rival', rival, 'defensa', 'defensa_rival', 'apoyo_rival'),
           linea(zona('Ataque rival', rival, 'ataque', 'ataque_rival'),
@@ -307,7 +348,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
             Expanded(flex: 2, child: zona('PAGADO · ${_cartas(yo, 'pagado').length}', yo, 'pagado', 'pagado')),
           ])),
           const SizedBox(height: 2),
-          SizedBox(height: 44, child: _ficha(yo, activo: widget.estado['activo'] == 0, tuyo: true)),
+          SizedBox(height: altoFicha, child: _ficha(yo, activo: widget.estado['activo'] == 0, tuyo: true)),
         ]),
       ),
       Positioned.fill(child: IgnorePointer(child: _flechas())),
@@ -479,7 +520,8 @@ class _TableroDesafioState extends State<TableroDesafio> {
     Widget zona(String titulo, Map<String, dynamic> lado, String clave,
             String destino, {int ocultas = 0}) =>
         _zona(titulo, _cartas(lado, clave), destino,
-            horizontal: horizontal, ocultas: ocultas);
+            horizontal: horizontal, ocultas: ocultas,
+            temporales: clave == 'reserva' ? _numVirtuales(lado) : 0);
     return LayoutBuilder(builder: (context, limits) => Center(
       child: FittedBox(
         fit: BoxFit.contain,
@@ -677,8 +719,30 @@ class _TableroDesafioState extends State<TableroDesafio> {
             }, pasar.isEmpty ? null : () => _mandar('${pasar.first['id']}')),
           ]);
         case 'atacantes':
+          // Desafío vUsU T9: contador animado de la fuerza del ataque y se
+          // puede bajar un atacante (tocarlo o arrastrarlo a la Defensa).
+          final total = fuerzaAtaque(
+              _opciones.where((o) => _seleccion.contains('${o['id']}')));
           hijos.addAll([
-            instruccion('Toca o arrastra los Aliados que atacan'),
+            TweenAnimationBuilder<double>(
+              tween: Tween(end: total.toDouble()),
+              duration: const Duration(milliseconds: 450),
+              curve: Curves.easeOutCubic,
+              builder: (context, v, _) => Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7A1F12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _boardGold, width: 2)),
+                child: Text('⚔ ${v.round()}', key: const ValueKey('fuerza-ataque'),
+                  style: const TextStyle(color: Colors.white, fontSize: 18,
+                    fontWeight: FontWeight.w900)),
+              ),
+            ),
+            instruccion(_seleccion.isEmpty
+                ? 'Toca o arrastra los Aliados que atacan'
+                : 'Toca un atacante para bajarlo'),
             boton(_seleccion.isEmpty ? 'Sin ataque' : 'Atacar con ${_seleccion.length}',
                 () => _mandar(_seleccion.toList())),
           ]);
@@ -913,6 +977,9 @@ class _TableroDesafioState extends State<TableroDesafio> {
     });
   }
 
+  int _numVirtuales(Map<String, dynamic> lado) =>
+      ((lado['orosVirtuales'] as num?)?.toInt() ?? 0).clamp(0, 12);
+
   /// Oros virtuales (Dragones): « + 2 virtuales» junto a la Reserva.
   String _virtuales(Map<String, dynamic> lado) {
     final v = (lado['orosVirtuales'] as num?)?.toInt() ?? 0;
@@ -930,6 +997,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
       return destino == 'pagado' && _opciones.any((x) => '${x['id']}' == uid);
     }
     if (_tipo == 'atacantes') {
+      if (destino == 'defensa') return _seleccion.contains(uid); // bajarlo
       return destino == 'ataque' && _opciones.any((x) => '${x['id']}' == uid);
     }
     if (_tipo == 'jugada' && destino != 'mano' && _talismanDe(uid) != null) {
@@ -968,7 +1036,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
       return;
     }
     if (_tipo == 'atacantes') {
-      setState(() => _seleccion.add(uid));
+      setState(() => destino == 'defensa' ? _seleccion.remove(uid) : _seleccion.add(uid));
       return;
     }
     final talisman = _tipo == 'jugada' ? _talismanDe(uid) : null;
@@ -1037,13 +1105,36 @@ class _TableroDesafioState extends State<TableroDesafio> {
     ]),
   );
 
+  /// Desafíos dJ00 T9 y BibK T12: cartas que se usan desde una pila
+  /// (Escudo Miliciano desde el Cementerio). La pila se marca y, al abrirla,
+  /// tocar la carta la juega o activa.
+  bool _usableEnPila(Map carta) =>
+      _tipo == 'jugada' &&
+      _opciones.any((o) => '${o['cartaUid']}' == '${carta['id']}');
+
+  String _etiquetaPila(Map carta) {
+    final o = _opciones.firstWhere((o) => '${o['cartaUid']}' == '${carta['id']}');
+    return '${o['tipoJugada']}' == 'activar' ? 'ACTIVAR' : 'JUGAR';
+  }
+
   Widget _pila(String titulo, List<Map> cartas, int cantidad,
       {bool castillo = false}) {
     final tope = cartas.isEmpty ? null : cartas.last;
+    final usable = !castillo && cartas.any(_usableEnPila);
     return InkWell(
       onTap: castillo ? null : () => _verPila(titulo, cartas),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Stack(alignment: Alignment.center, children: [
+          if (usable)
+            Container(width: 70, height: 94, decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(color: _boardGold, width: 3))),
+          if (usable)
+            Positioned(top: 2, child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              color: _boardGold,
+              child: const Text('USAR', style: TextStyle(color: Colors.black,
+                fontSize: 10, fontWeight: FontWeight.w900)))),
           SizedBox(width: 64, height: 88, child: ClipRRect(
             borderRadius: BorderRadius.circular(5),
             child: castillo
@@ -1069,7 +1160,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
         ]),
         const SizedBox(height: 3),
         Text(titulo, maxLines: 1, overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.white,
+          style: TextStyle(color: usable ? _boardGold : Colors.white,
             fontSize: 10, fontWeight: FontWeight.bold)),
       ]),
     );
@@ -1102,10 +1193,30 @@ class _TableroDesafioState extends State<TableroDesafio> {
                       mainAxisSpacing: 8, crossAxisSpacing: 8),
                     itemBuilder: (context, i) {
                       final carta = cartas[cartas.length - 1 - i];
+                      final usable = _usableEnPila(carta);
                       return GestureDetector(
-                        onTap: () => _ampliar(carta),
-                        child: _CaraCarta(cartaId: '${carta['cartaId']}',
-                          nombre: '${carta['nombre']}', width: 100, height: 140),
+                        onTap: () {
+                          if (!usable) {
+                            _ampliar(carta);
+                            return;
+                          }
+                          Navigator.pop(dialogContext);
+                          _tocarCarta(carta, 'pila');
+                        },
+                        child: Stack(children: [
+                          Positioned.fill(child: _CaraCarta(
+                            cartaId: '${carta['cartaId']}',
+                            nombre: '${carta['nombre']}', width: 100, height: 140)),
+                          if (usable)
+                            Positioned(left: 0, right: 0, bottom: 0, child: Container(
+                              color: _boardGold,
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Text(_etiquetaPila(carta),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.black,
+                                  fontSize: 12, fontWeight: FontWeight.w900)),
+                            )),
+                        ]),
                       );
                     },
                   )),
@@ -1116,7 +1227,7 @@ class _TableroDesafioState extends State<TableroDesafio> {
   );
 
   Widget _zona(String titulo, List<Map> cartas, String destino,
-      {required bool horizontal, int ocultas = 0}) =>
+      {required bool horizontal, int ocultas = 0, int temporales = 0}) =>
       DragTarget<String>(
         onWillAcceptWithDetails: (d) => _puedeSoltar(d.data, destino),
         onAcceptWithDetails: (d) => _soltar(d.data, destino),
@@ -1137,22 +1248,32 @@ class _TableroDesafioState extends State<TableroDesafio> {
                     : null,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Column(
+              child: LayoutBuilder(builder: (context, caja) {
+                final tituloZona = Text(
+                  titulo,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: destino.contains('reserva') || destino.contains('pagado')
+                        ? _boardGold : Colors.white70,
+                    fontSize: 13, fontWeight: FontWeight.w700, height: 1.1,
+                  ),
+                );
+                // Celular con la letra agrandada: si la línea quedó más baja
+                // que su título, se achica el título en vez de desbordar.
+                if (caja.maxHeight < MediaQuery.textScalerOf(context).scale(13) * 1.1 + 3) {
+                  return FittedBox(fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft, child: tituloZona);
+                }
+                return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    titulo,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: destino.contains('reserva') || destino.contains('pagado')
-                          ? _boardGold : Colors.white70,
-                      fontSize: 13, fontWeight: FontWeight.w700, height: 1.1,
-                    ),
-                  ),
+                  tituloZona,
                   const SizedBox(height: 2),
                   Expanded(child: LayoutBuilder(builder: (context, box) {
-                    final total = destino == 'mano_rival' ? ocultas : cartas.length;
+                    // Reporte g3hq: los Oros generados (Herrero, Saladino,
+                    // Dragones, Imhotep, Jano…) se ven en la Reserva.
+                    final total = destino == 'mano_rival' ? ocultas : cartas.length + temporales;
                     if (total == 0) {
                       return const Center(child: Text('—',
                           style: TextStyle(color: Colors.white30, fontSize: 20)));
@@ -1176,16 +1297,20 @@ class _TableroDesafioState extends State<TableroDesafio> {
                             alignment: Alignment.bottomCenter,
                             child: destino == 'mano_rival'
                               ? _dorso()
+                              : i >= cartas.length
+                              ? OroTemporal(ancho: cartaAncho, alto: cartaAlto)
                               : _carta(cartas[i],
                                   zona: destino,
                                   width: cartaAncho, height: cartaAlto,
-                                  draggable: destino == 'mano' || destino == 'defensa' || destino == 'reserva'),
+                                  draggable: destino == 'mano' || destino == 'defensa' || destino == 'reserva' ||
+                                      (destino == 'ataque' && _tipo == 'atacantes')),
                           ),
                         ),
                     ]);
                   })),
                 ],
-              ),
+              );
+              }),
             ),
       );
 
@@ -1617,7 +1742,9 @@ class _TableroDesafioState extends State<TableroDesafio> {
                   '${c['nombre']}',
                   if (c['fuerza'] != null) 'fuerza ${c['fuerza']}',
                   if (armas.isNotEmpty) 'porta ${armas.map((a) => a['nombre']).join(', ')}',
-                ].join(' · ') + (motivo == null ? '' : '\n$motivo'),
+                ].join(' · ') +
+                    (desgloseFuerza(c) == null ? '' : '\n${desgloseFuerza(c)}') +
+                    (motivo == null ? '' : '\n$motivo'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
               ),
@@ -1891,10 +2018,25 @@ class _CaraCarta extends StatelessWidget {
 /// Antes de mostrar la mesa: deja las URLs listas y descarga todas las
 /// imágenes de los dos mazos (con la dirección de respaldo si la primera
 /// falla). `progreso(hechas, total)` para la barra de carga.
+///
+/// Reporte 8px7 (18-11): «las cartas ya cargadas no se deben volver a cargar
+/// para otras simulaciones». Las que ya se descargaron en esta sesión no se
+/// piden de nuevo; `imagenesPorCargar` dice si hace falta mostrar la carga.
+final _imagenesYaCargadas = <String>{};
+
+/// Cuántas imágenes de `urls` faltan por descargar en esta sesión.
+int imagenesPorCargar(Map<String, String> urls) => urls.values
+    .where((u) => u.trim().isNotEmpty && !_imagenesYaCargadas.contains(u))
+    .toSet()
+    .length;
+
 Future<void> precargarImagenesDesafio(BuildContext context, Map<String, String> urls,
     void Function(int hechas, int total) progreso) async {
   _CaraCarta.sembrar(urls);
-  final lista = urls.values.where((u) => u.trim().isNotEmpty).toSet().toList();
+  final lista = urls.values
+      .where((u) => u.trim().isNotEmpty && !_imagenesYaCargadas.contains(u))
+      .toSet()
+      .toList();
   var hechas = 0;
   Future<void> una(String raw) async {
     for (final url in _CaraCarta.direcciones(raw, 320)) {
@@ -1903,7 +2045,10 @@ Future<void> precargarImagenesDesafio(BuildContext context, Map<String, String> 
       // del navegador sin compartir la imagen decodificada con el tablero
       // (compartirla en la web dejaba las cartas en negro).
       await precacheImage(NetworkImage(url), context, onError: (_, __) => ok = false);
-      if (ok) break;
+      if (ok) {
+        _imagenesYaCargadas.add(raw);
+        break;
+      }
     }
     hechas++;
     progreso(hechas, lista.length);

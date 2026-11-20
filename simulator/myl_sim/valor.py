@@ -97,6 +97,22 @@ def prob_ganar_v2(p, yo: int) -> float | None:
     return 1 / (1 + math.exp(-max(-30.0, min(30.0, z))))
 
 
+ARCHIVO_V3 = Path(__file__).with_name("valor_estado_v3.json")
+_modelo_v3: dict | None = None
+
+
+def prob_ganar_v3(p, yo: int) -> float | None:
+    """Esquema 2 entrenado con partidas jugadas por la búsqueda (no solo la heurística).
+    Sin archivo, cae en el v2."""
+    global _modelo_v3
+    if _modelo_v3 is None and ARCHIVO_V3.exists():
+        _modelo_v3 = json.loads(ARCHIVO_V3.read_text(encoding="utf-8"))
+    if _modelo_v3 is None:
+        return prob_ganar_v2(p, yo)
+    z = _modelo_v3["sesgo"] + sum(w * x for w, x in zip(_modelo_v3["pesos"], rasgos_v2(p, yo)))
+    return 1 / (1 + math.exp(-max(-30.0, min(30.0, z))))
+
+
 def cargar() -> dict | None:
     global _modelo
     if _modelo is None and ARCHIVO.exists():
@@ -126,8 +142,14 @@ def _jugar_registrando(args):
             super()._cerrar_turno(a)
             self.filas.append((extraer(self, 0), extraer(self, 1)))
 
-    p = Registrada((cartas_a, cartas_b), (Heuristico(seed * 2), Heuristico(seed * 2 + 1)),
-                   inicial=seed % 2, seed=seed)
+    motor = args[4] if len(args) > 4 else "heuristico"
+    if motor == "heuristico":
+        jugadores = (Heuristico(seed * 2), Heuristico(seed * 2 + 1))
+    else:
+        from .arena import crear
+
+        jugadores = (crear(motor, seed * 2), crear(motor, seed * 2 + 1))
+    p = Registrada((cartas_a, cartas_b), jugadores, inicial=seed % 2, seed=seed)
     p.filas = []
     r = p.jugar()
     if r.ganador not in (0, 1):
@@ -136,7 +158,7 @@ def _jugar_registrando(args):
 
 
 def generar(mazos: list, partidas: int, seed: int = 1, procesos: int | None = None,
-            esquema: int = 1) -> list[list]:
+            esquema: int = 1, jugador: str = "heuristico") -> list[list]:
     """Una lista por partida de (rasgos, ganó) desde ambos lados."""
     import os
     from concurrent.futures import ProcessPoolExecutor
@@ -145,10 +167,13 @@ def generar(mazos: list, partidas: int, seed: int = 1, procesos: int | None = No
     trabajos = []
     for k in range(partidas):
         a, b = rng.sample(mazos, 2)
-        trabajos.append((a.cartas, b.cartas, seed * 1_000_003 + k, esquema))
+        trabajos.append((a.cartas, b.cartas, seed * 1_000_003 + k, esquema, jugador))
     with ProcessPoolExecutor(procesos or os.cpu_count() or 1) as ex:
         out = []
-        for filas in ex.map(_jugar_registrando, trabajos, chunksize=8):
+        for n, filas in enumerate(ex.map(_jugar_registrando, trabajos,
+                                         chunksize=8 if jugador == "heuristico" else 1), 1):
+            if jugador != "heuristico" and n % 10 == 0:
+                print(f"{n}/{partidas} partidas de {jugador}", flush=True)
             juego = []
             for x0, y0, x1, y1 in filas:
                 juego += [(x0, y0), (x1, y1)]
@@ -202,6 +227,12 @@ def main(argv=None) -> int:
     e.add_argument("--esquema", type=int, choices=(1, 2), default=1,
                    help="2: rasgos ampliados, se guarda en valor_estado_v2.json")
     e.add_argument("--validos", action="store_true", help="solo mazos válidos (49 cartas y Ban List)")
+    e.add_argument("--jugador", default="heuristico",
+                   help="motor de la arena que juega las partidas (ej. busqueda_vigilia); "
+                        "con otro que la heurística se guarda en valor_estado_v3.json (esquema 2)")
+    e.add_argument("--base", type=int, default=0,
+                   help="con --jugador: partidas de heurística que se suman al entrenamiento")
+    e.add_argument("--procesos", type=int)
     args = ap.parse_args(argv)
 
     from .datos import CACHE, Mazo
@@ -218,10 +249,16 @@ def main(argv=None) -> int:
         from .datos import solo_validos
 
         mazos = solo_validos(mazos)
-    juegos = generar(mazos, args.partidas, seed=args.seed, esquema=args.esquema)
+    if args.jugador != "heuristico":
+        args.esquema = 2
+    juegos = generar(mazos, args.partidas, seed=args.seed, esquema=args.esquema, jugador=args.jugador,
+                     procesos=args.procesos)
     corte = int(len(juegos) * 0.8)
     train = [f for j in juegos[:corte] for f in j]
-    test = [f for j in juegos[corte:] for f in j]
+    test = [f for j in juegos[corte:] for f in j]  # la validación es solo con partidas de `--jugador`
+    if args.jugador != "heuristico" and args.base:
+        base = generar(mazos, args.base, seed=args.seed + 7919, esquema=2, procesos=args.procesos)
+        train += [f for j in base for f in j]
     modelo = entrenar(train, seed=args.seed)
     modelo["mazos"] = [m.nombre for m in mazos]
     modelo["partidas"] = len(juegos)
@@ -231,7 +268,12 @@ def main(argv=None) -> int:
         k1 = len(NOMBRES)
         m1 = entrenar([(x[:k1], y) for x, y in train], seed=args.seed)
         modelo["validacionEsquema1"] = evaluar(m1, [(x[:k1], y) for x, y in test], _prob_modelo)
-    destino = ARCHIVO_V2 if args.esquema == 2 else ARCHIVO
+    modelo["jugador"] = args.jugador
+    if args.jugador != "heuristico" and ARCHIVO_V2.exists():
+        # Referencia: el v2 de hoy (entrenado con heurística) sobre las mismas partidas de prueba.
+        modelo["validacionV2"] = evaluar(json.loads(ARCHIVO_V2.read_text(encoding="utf-8")), test, _prob_modelo)
+        print("v2 de hoy sobre estas partidas:", json.dumps(modelo["validacionV2"]))
+    destino = ARCHIVO_V3 if args.jugador != "heuristico" else ARCHIVO_V2 if args.esquema == 2 else ARCHIVO
     destino.write_text(json.dumps(modelo, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps(modelo["validacion"]), json.dumps(modelo.get("validacionEsquema1")),
           f"{len(train)} estados de entrenamiento en {destino}")

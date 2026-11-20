@@ -9,23 +9,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math' as math;
 import '../../utils/card_utils.dart';
 import '../../services/drive_service.dart';
-import '../../domain/perfil_habilidades.dart';
+import '../../domain/analisis_mazo/analisis_mazo.dart';
 
 final Map<String, String?> _firestoreUrlCache = {};
 
-/// CompareDecksScreen ahora recibe featureGroupMap: feature -> groupName
+/// Compara mazos por sus números y por lo que hacen sus habilidades
+/// programadas (roles de `domain/analisis_mazo`).
 class CompareDecksScreen extends StatelessWidget {
   final List<Deck> decks;
   final Map<String, CardMyL> cardsById;
   final Map<String, CardMyL> cardsByNameLower;
-  final Map<String, String> featureGroupMap; // <-- nuevo
 
   const CompareDecksScreen({
     super.key,
     required this.decks,
     required this.cardsById,
     required this.cardsByNameLower,
-    this.featureGroupMap = const {},
   });
 
   @override
@@ -37,94 +36,24 @@ class CompareDecksScreen extends StatelessWidget {
             )
             .toList();
 
-    // recolectamos todas las características
-    final allFeatures = <String>{};
-    for (final m in models) {
-      allFeatures.addAll(m.byFeatures.keys);
-    }
-    final featureList = allFeatures.toList()..sort();
-
-    // ---- agrupamos por group usando featureGroupMap; features sin grupo -> 'Otros' (robusto) ----
-    // Preparo un índice normalizado desde featureGroupMap para búsquedas rápidas
-    final Map<String, String> normIndex = {};
-    featureGroupMap.forEach((k, v) {
-      if (k.trim().isEmpty) return;
-      normIndex[k.toLowerCase()] = v;
-      normIndex[normalizeFeatureKey(k)] = v;
-    });
-
-    // Ahora mapeo cada feature intentando varias estrategias
+    // Roles agrupados por familia; solo los que algún mazo tiene.
+    const familias = <String, List<String>>{
+      'Presión': ['presion', 'dano_directo'],
+      'Manejo de mesa': ['remocion', 'control', 'respuesta'],
+      'Recursos': ['ventaja', 'economia', 'recursion'],
+      'Apoyo': ['proteccion', 'disrupcion'],
+    };
     final Map<String, List<String>> grouped = {};
-    int mapped = 0;
-    int unmapped = 0;
-
-    for (final f in featureList) {
-      String? foundGroup;
-
-      // 0) Categorías calculadas desde las habilidades programadas.
-      if (categoriasHabilidad.contains(f)) {
-        foundGroup = 'Qué hace (según sus habilidades)';
-      }
-
-      // 1) lookup exacto
-      if (foundGroup == null && featureGroupMap.containsKey(f)) {
-        foundGroup = featureGroupMap[f];
-      }
-
-      // 2) lowercase exact
-      if (foundGroup == null) foundGroup = featureGroupMap[f.toLowerCase()];
-
-      // 3) normalized exact via índice
-      if (foundGroup == null) foundGroup = normIndex[normalizeFeatureKey(f)];
-
-      // 4) partial / contains match (normalized) - útil si caller puso variantes
-      if (foundGroup == null) {
-        final fn = normalizeFeatureKey(f);
-        try {
-          final matchKey = normIndex.keys.firstWhere(
-            (k) => k.isNotEmpty && (fn.contains(k) || k.contains(fn)),
-          );
-          foundGroup = normIndex[matchKey];
-        } catch (_) {
-          // no match parcial
-        }
-      }
-
-      final groupName = (foundGroup ?? '').trim();
-      final finalGroup = groupName.isEmpty ? 'Otros' : groupName;
-
-      (grouped[finalGroup] ??= []).add(f);
-
-      if (finalGroup == 'Otros') {
-        unmapped++;
-      } else {
-        mapped++;
-      }
+    for (final familia in familias.entries) {
+      final presentes = [
+        for (final rol in familia.value)
+          if (models.any((m) => (m.byFeatures[nombresRol[rol]] ?? 0) > 0))
+            nombresRol[rol]!,
+      ];
+      if (presentes.isNotEmpty) grouped[familia.key] = presentes;
     }
-
-    // Ordenar características dentro de cada grupo (por defecto por total desc)
-    final Map<String, int> featureTotals = {};
-    for (final m in models) {
-      m.byFeatures.forEach((k, v) {
-        featureTotals[k] = (featureTotals[k] ?? 0) + v;
-      });
-    }
-    for (final k in grouped.keys) {
-      grouped[k]!.sort((a, b) {
-        final ta = featureTotals[a] ?? 0;
-        final tb = featureTotals[b] ?? 0;
-        if (ta != tb) return tb.compareTo(ta); // mayor primero
-        return a.compareTo(b);
-      });
-    }
-
-    // Ordenar grupos: alfabético, poniendo "Otros" al final
-    final groupNames =
-        grouped.keys.toList()..sort((a, b) {
-          if (a == 'Otros') return 1;
-          if (b == 'Otros') return -1;
-          return a.toLowerCase().compareTo(b.toLowerCase());
-        });
+    final featureList = [for (final g in grouped.values) ...g];
+    final groupNames = grouped.keys.toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFF0E1014),
@@ -169,9 +98,8 @@ class CompareDecksScreen extends StatelessWidget {
                     ),
                   ),
                   _metricPill('Mazos', '${models.length}'),
-                  _metricPill('Features', '${featureList.length}'),
-                  _metricPill('Grupos', '${groupNames.length}'),
-                ],
+                  _metricPill('Roles', '${featureList.length}'),
+                                  ],
               ),
             ),
             const SizedBox(height: 18),
@@ -495,7 +423,7 @@ class CompareDecksScreen extends StatelessWidget {
                                     vertical: 4,
                                   ),
                                   child: Text(
-                                    "Distribución de características por grupo",
+                                    "Qué hace cada mazo (cartas por rol)",
                                     style: Theme.of(
                                       context,
                                     ).textTheme.titleLarge?.copyWith(
@@ -970,7 +898,7 @@ class CompareDecksScreen extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  "Distribución de características por grupo",
+                                  "Qué hace cada mazo (cartas por rol)",
                                   style: Theme.of(
                                     context,
                                   ).textTheme.titleLarge?.copyWith(
@@ -1855,7 +1783,7 @@ class _FeatureVsDeckPanel extends StatelessWidget {
           const SizedBox(height: 10),
           if (names.isEmpty)
             const Text(
-              'No tiene cartas para esta característica.',
+              'No tiene cartas con este rol.',
               style: TextStyle(color: Colors.white38),
             )
           else
@@ -2217,26 +2145,25 @@ class _DeckCompareModel {
     final avgStrength =
         totalStrCopies == 0 ? double.nan : sumStr / totalStrCopies;
 
-    // características
+    // Cartas por rol, según las habilidades programadas.
+    final analisis = analizarMazo(
+      d,
+      resolver:
+          (e) =>
+              (e.cardId != null ? cardsById[e.cardId!] : null) ??
+              cardsByNameLower[e.name.toLowerCase()],
+    );
     final byFeatures = <String, int>{};
     final featureToCards = <String, List<String>>{};
-    for (final e in d.cards) {
-      CardMyL? card;
-      if (e.cardId != null) {
-        card = cardsById[e.cardId!];
-      }
-      card ??= cardsByNameLower[e.name.toLowerCase()];
-      // Con habilidades programadas, las categorías salen de ellas; si no,
-      // de las características antiguas cargadas a mano.
-      final feats =
-          (card?.habilidades.isNotEmpty ?? false)
-              ? categoriasDeCarta(card!).toList()
-              : card?.caracteristicasRaw ?? const <String>[];
-      for (final f in feats) {
-        byFeatures[f] = (byFeatures[f] ?? 0) + e.count;
-        featureToCards.putIfAbsent(f, () => []);
-        featureToCards[f]!.add("${e.name} (x${e.count})");
-      }
+    for (final rol in roles) {
+      final copias = analisis.copiasPorRol[rol] ?? 0;
+      if (copias == 0) continue;
+      final label = nombresRol[rol]!;
+      byFeatures[label] = copias;
+      featureToCards[label] = [
+        for (final x in analisis.aportes[rol] ?? const <AporteRol>[])
+          '${x.nombre} (x${x.copias})',
+      ];
     }
 
     return _DeckCompareModel(

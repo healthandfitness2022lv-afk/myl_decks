@@ -150,6 +150,10 @@ def _corregir(nombre: str, habs: list[dict]) -> list[dict]:
         # "Si controlas a Heka, puedes robar una carta adicional."
         out = []
         for h in habs:
+            if h.get("accion") == "perderHabilidad" and h.get("duracion", "instantaneo") == "instantaneo":
+                # Reporte NJO9 T13: "sin habilidad hasta la Fase Final", no
+                # por toda la partida (instantáneo = permanente en el motor).
+                h = {**h, "duracion": "hasta_fase_final"}
             if h.get("accion") == "perderHabilidad" and not any(
                     (e.get("condicion") or {}).get("tipo") == "controla_nombre" for e in h.get("luego") or []):
                 extra = {"relacion": "si_se_cumplio", "accion": "robar", "cantidad": 1, "opcional": True,
@@ -165,6 +169,25 @@ def _corregir(nombre: str, habs: list[dict]) -> list[dict]:
         # El texto no lo limita a tu Vigilia.
         return [{**h, "fase": "cualquiera", "turno": "cualquiera", "zonaActivacion": R}
                 if h.get("cuando") == "activada" else h for h in habs]
+    if n == "marmita druida":
+        # "Puedes mostrar una carta Druida de tu Mano para robar una carta"
+        # (reporte dmwP T1: robaba sin mostrar nada): mostrar y luego robar.
+        out = []
+        for h in habs:
+            if h.get("cuando") == "al_jugar" and h.get("accion") == "robar":
+                h = {**{k: v for k, v in h.items() if k != "condicion"}, "accion": "mostrar", "opcional": True,
+                     "cantidad": 1, "objetivo": {"seleccion": "elige", "zona": "mano", "arquetipo": "Druida",
+                                                 "quien": "propio"},
+                     "luego": [{"relacion": "si_se_cumplio", "accion": "robar", "cantidad": 1,
+                                "duracion": "instantaneo", "objetivo": {"quien": "propio"}}]}
+            out.append(h)
+        return out
+    if n == "magia amatista":
+        # "Luego, puedes destruir un Aliado en juego con el mismo nombre. Si
+        # lo haces, puedes robar": el robo depende de destruir, no del
+        # destierro (reportes dmwP T11 y P3Cy T18: robaba sin copia en juego).
+        return [{**h, "luego": [{**e, "relacion": "si_anterior"} if isinstance(e, dict) and e.get("accion") == "robar"
+                                else e for e in h.get("luego") or []]} if h.get("luego") else h for h in habs]
     if n == "nacer de la muerte":
         return [{**h, "fase": "vigilia", "turno": "propio"} if h.get("cuando") == "al_jugar" else h for h in habs]
     # Sin programar en Firestore: se programan acá desde el texto impreso.
@@ -195,6 +218,25 @@ def _corregir(nombre: str, habs: list[dict]) -> list[dict]:
                  "zonaActivacion": R, "costo": {"oros": 2, "desterrarEstaCarta": True}, "zonaDestino": "mano",
                  "objetivo": {"seleccion": "elige", "zona": "cementerio", "tipos": ["Talismán"], "quien": "propio",
                               "coste": {"valor": 3, "op": "<="}}}]
+    if n == "djoser":
+        # Desafío BibK T6: "puedes destruir un Aliado oponente": es opcional.
+        return [{**h, "opcional": True} if h.get("accion") == "destruir" and h.get("cuando") == "propia_entra"
+                else h for h in habs]
+    if n == "guerrero bereber":
+        # Desafío w3a6 T5: "otro Guerrero que controles" incluye a otro Bereber
+        # (excluirEstaCarta sacaba también las copias del mismo nombre).
+        out = []
+        for h in habs:
+            obj = h.get("objetivo") or {}
+            if h.get("accion") == "modificarFuerza" and obj.get("excluirEstaCarta"):
+                obj = {k: v for k, v in obj.items() if k != "excluirEstaCarta"}
+                h = {**h, "objetivo": {**obj, "excluirFuente": True}}
+            out.append(h)
+        return out
+    if n == "escudo miliciano":
+        # Desafíos BibK T12 y AkOg T13: "en respuesta a un Ataque" es cualquier
+        # ataque, también el tuyo (al declarar tus atacantes); era solo el rival.
+        return [{**h, "turno": "cualquiera"} if h.get("accion") == "jugarDesde" else h for h in habs]
     if n == "corona faraonica":
         # "si este Oro está en tu Reserva de Oros": pagado no dispara.
         return [{**h, "zonaActivacion": "reserva_oro"} if h.get("cuando") == "propia_entra" else h for h in habs]
@@ -208,7 +250,8 @@ CORRECCIONES_APAGADAS: set[str] = set()  # nombres normalizados (mediciones)
 
 
 # Fuerza impresa distinta de la cargada en el catálogo (desafío gXXd: Sir Erec es 2).
-FUERZA_CORREGIDA = {"sir erec": 2}
+# Enialio está cargado con fuerza 22 (error de tipeo: coste 2, fuerza 2).
+FUERZA_CORREGIDA = {"sir erec": 2, "enialio": 2}
 # Coste impreso distinto del catálogo (desafío 1bXc T15: Saqqara es 2).
 COSTE_CORREGIDO = {"saqqara": 2}
 
@@ -373,6 +416,11 @@ def _mazo_desde_doc(deck_id: str, d: dict, docs: dict | None = None) -> Mazo:
 
 
 def cargar_mazo(owner_uid: str, deck_id: str, *, usar_cache: bool = False) -> Mazo:
+    # Rival del modo Entrenamiento: su lista está en el caché local del worker.
+    if deck_id.startswith("escalera:"):
+        from .escalera import cargar_mazo_rival
+
+        return cargar_mazo_rival(deck_id)
     # Las listas notables son snapshots globales: se pueden enfrentar contra
     # cualquier mazo propio sin pertenecer a users/{uid}/decks.
     if deck_id.startswith("notable:"):
@@ -458,6 +506,19 @@ TAMANO_MAZO = 49  # cartas del Mazo Castillo (sin el Oro inicial)
 _ban_cache: dict[str, dict[str, int]] = {}
 
 
+SIN_LIMITE_DE_COPIAS = re.compile(r"puedes\s+tener\s+m[áa]s\s+de\s+(?:3|tres)\b", re.IGNORECASE)
+
+
+COPIAS_MERCENARIO = 6  # Héctor 18-11: hasta 6 copias de una carta Mercenario
+
+
+def copias_maximas(carta: Carta) -> int:
+    """Copias permitidas si la Ban List no dice otra cosa: 3, o 6 si es una
+    carta Mercenario ("Puedes tener más de 3 … en tu Mazo Castillo": Draco
+    Águila). Mismo criterio que `lib/domain/validation/mercenarios.dart`."""
+    return COPIAS_MERCENARIO if SIN_LIMITE_DE_COPIAS.search(carta.texto or "") else 3
+
+
 def problemas_mazo(mazo: "Mazo", ban: dict[str, int] | None = None) -> list[str]:
     """Por qué un mazo no se puede simular: debe tener 49 cartas y respetar la
     Ban List de su formato. Lista vacía si cumple. Sin `ban` se usa la del
@@ -475,7 +536,7 @@ def problemas_mazo(mazo: "Mazo", ban: dict[str, int] | None = None) -> list[str]
     for c in mazo.cartas:
         conteo[c.id] = conteo.get(c.id, 0) + 1
     for cid, k in sorted(conteo.items(), key=lambda x: nombres[x[0]]):
-        maximo = ban.get(cid, 3)
+        maximo = ban.get(cid, copias_maximas(next(c for c in mazo.cartas if c.id == cid)))
         if cid != ORO_INICIAL_ID and k > maximo:
             out.append(f"{nombres[cid]} ×{k} (prohibida)" if maximo == 0 else f"{nombres[cid]} ×{k} (máximo {maximo})")
     return out

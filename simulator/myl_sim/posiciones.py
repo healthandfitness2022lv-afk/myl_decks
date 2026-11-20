@@ -112,7 +112,10 @@ def fijar(base: dict, *, debe: str | None, no_debe: str | None, nombre: str | No
     k = r["paso"]
     if debe is None and no_debe is None:
         # Error: basta con no repetirlo (puede haber más de una opción buena).
-        # Acierto: debe seguir eligiendo lo mismo.
+        # Acierto: debe seguir eligiendo lo mismo. Si todas las opciones
+        # daban el mismo final (0% o 100%), no hubo acierto que fijar.
+        if not r["error"] and r.get("indiferente"):
+            raise ValueError("todas las opciones daban el mismo final: no es un acierto que fijar")
         no_debe, debe = (r["elegida"], None) if r["error"] else (None, r["elegida"])
     pos = {
         "nombre": nombre or f"{base.get('origen', 'leccion')} T{r.get('turno')} {r['tipo']}: {r['mejor']}",

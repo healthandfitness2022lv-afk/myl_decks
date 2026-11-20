@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../domain/perfil_habilidades.dart';
+import '../domain/analisis_mazo/analisis_mazo.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -19,8 +19,6 @@ import '../services/inventory_service.dart';
 import '../services/wishlist_service.dart';
 import '../widgets/card_image.dart';
 import 'create_deck_screen.dart';
-import 'simulador/simulador_screen.dart';
-import '../utils/app_constants.dart';
 
 class MyDecksScreen extends StatefulWidget {
   // Se conserva para no romper rutas antiguas. En v2 siempre hay una lista.
@@ -301,16 +299,6 @@ class _MyDecksScreenState extends State<MyDecksScreen> {
             onPressed: () => context.push('/inventario'),
             icon: const Icon(Icons.folder_copy_outlined),
           ),
-          if ((FirebaseAuth.instance.currentUser?.email ?? '').toLowerCase() ==
-              AppConstants.ownerEmail)
-            IconButton(
-              tooltip: 'Simulador de partidas',
-              onPressed:
-                  () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SimuladorScreen()),
-                  ),
-              icon: const Icon(Icons.sports_esports_outlined),
-            ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -657,9 +645,9 @@ class _MyDecksScreenState extends State<MyDecksScreen> {
   }
 
   /// Perfil del mazo según las habilidades programadas de sus cartas.
-  PerfilHabilidades? _perfil(Deck deck) {
+  AnalisisMazo? _perfil(Deck deck) {
     if (_catalogById.isEmpty && _catalogByName.isEmpty) return null;
-    final perfil = calcularPerfilHabilidades(
+    final perfil = analizarMazo(
       deck,
       resolver: (entry) {
         final id = (entry.cardId ?? '').trim();
@@ -668,7 +656,7 @@ class _MyDecksScreenState extends State<MyDecksScreen> {
             _catalogByName[entry.name];
       },
     );
-    return perfil.vacio ? null : perfil;
+    return perfil.sinRoles ? null : perfil;
   }
 
   bool? _legal(Deck deck) {
@@ -1336,7 +1324,7 @@ class _DeckConfigurationCard extends StatelessWidget {
   final DeckCoverage coverage;
   final String? coverUrl;
   final bool? legal;
-  final PerfilHabilidades? perfil;
+  final AnalisisMazo? perfil;
   final bool sharedStock;
   final VoidCallback onOpen;
   final VoidCallback onEdit;
@@ -1487,9 +1475,9 @@ class _DeckConfigurationCard extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Tooltip(
-                          message: perfil!.motivoPerfil,
+                          message: perfil!.motivo,
                           child: Text(
-                            _resumenPerfil(perfil!),
+                            perfil!.resumen,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
@@ -2031,16 +2019,4 @@ class _MigrationDialogState extends State<_MigrationDialog> {
       ],
     );
   }
-}
-
-
-/// "Control · Robo 16 · Recursión 15 · Remoción 15" (las 3 categorías más altas).
-String _resumenPerfil(PerfilHabilidades perfil) {
-  final top =
-      perfil.porCategoria.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-  final partes = [
-    for (final e in top.take(3)) '${e.key.split(' (').first} ${e.value}',
-  ];
-  return [perfil.perfil, ...partes].join(' · ');
 }

@@ -16,11 +16,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .autopsia import REVISABLES, _clave, _decodificar, _Desvio, alternativas, describir, reproducir
+from .autopsia import (EXTREMO, REVISABLES, _clave, _decodificar, _Desvio, alternativas, describir,
+                       diferencia_clara, reproducir)
 from .jugadores import Heuristico
 from .motor import FinPartida, Partida
 
 MUESTRAS = 12
+EXTRA = 2  # si una parece mejor pero no es firme: hasta EXTRA×MUESTRAS más (pareadas)
 MAX_COMPARAR = 8
 MARGEN = 0.2  # la opción debe ganar al menos 20 puntos más para ser "mejor"
 
@@ -77,7 +79,7 @@ def que_haria_la_ia(cartas, nombres, seed: int, registro: list, k: int, metodos=
 
 
 def comparar(cartas, nombres, seed: int, registro: list, k: int, metodos=None,
-             muestras: int = MUESTRAS) -> dict | None:
+             muestras: int = MUESTRAS, desde: int = 0) -> dict | None:
     """Tasa de victoria de la persona jugando su opción y la de la IA en k."""
     entrada = registro[k]
     lado = entrada["lado"]
@@ -89,17 +91,19 @@ def comparar(cartas, nombres, seed: int, registro: list, k: int, metodos=None,
             return _decodificar(p, entrada["v"], args)
         return opcion
 
-    tasas = []
+    # La muestra m usa los mismos robos y barajados para las dos opciones.
+    res = []
     for de_la_ia in (False, True):
-        puntos = 0.0
-        for m in range(muestras):
+        fila = []
+        for m in range(desde, desde + muestras):
             g = reproducir(cartas, nombres, seed, registro, rama=k, opcion=con(de_la_ia), muestra=m,
                            metodos=metodos)
             if g is None:
                 return None
-            puntos += 1 if g == lado else 0.5 if g == -1 else 0
-        tasas.append(puntos / muestras)
-    return {"ganaHumano": round(tasas[0], 2), "ganaIa": round(tasas[1], 2)}
+            fila.append(1.0 if g == lado else 0.5 if g == -1 else 0.0)
+        res.append(fila)
+    tasas = [sum(r) / len(r) for r in res]
+    return {"ganaHumano": round(tasas[0], 2), "ganaIa": round(tasas[1], 2), "_h": res[0], "_ia": res[1]}
 
 
 TURNOS_HORIZONTE = 2
@@ -159,9 +163,9 @@ def comparar_ritmo(cartas, nombres, seed: int, registro: list, k: int, metodos=N
             return _decodificar(p, entrada["v"], args)
         return opcion
 
-    out = []
+    out, porm = [], []
     for de_la_ia in (False, True):
-        gana, pierde = [], []
+        gana, pierde, fila = [], [], []
         for m in range(muestras):
             g = reproducir(cartas, nombres, seed, registro, rama=k, opcion=con(de_la_ia), muestra=m,
                            metodos=metodos)
@@ -169,9 +173,14 @@ def comparar_ritmo(cartas, nombres, seed: int, registro: list, k: int, metodos=N
                 return None
             t = ULTIMA_PARTIDA[0].e.turno - t0
             (gana if g == lado else pierde).append(t)
+            fila.append((g == lado, t))
+        porm.append(fila)
         out.append((sum(gana) / len(gana) if gana else None, sum(pierde) / len(pierde) if pierde else None))
+    # Pares (misma muestra) en que las dos ganan: turnos de cada una.
+    pares = [(a[1], b[1]) for a, b in zip(*porm) if a[0] and b[0]]
     return {"turnosGanaHumano": out[0][0], "turnosGanaIa": out[1][0],
-            "turnosPierdeHumano": out[0][1], "turnosPierdeIa": out[1][1]}
+            "turnosPierdeHumano": out[0][1], "turnosPierdeIa": out[1][1],
+            "_th": [a for a, _ in pares], "_tia": [b for _, b in pares]}
 
 
 MARGEN_TURNOS = 0.75  # cerrar la partida casi un turno antes ya es mejor
@@ -237,30 +246,32 @@ def informe(cartas, nombres, seed: int, registro: list, metodos, ganador: int | 
         c = comparar(cartas, nombres, seed, registro, k, metodos, muestras)
         if c is None:
             continue
-        delta = c["ganaHumano"] - c["ganaIa"]
-        veredicto = "humano" if delta >= MARGEN else "ia" if -delta >= MARGEN else "parejo"
-        if veredicto == "parejo" and min(c["ganaHumano"], c["ganaIa"]) >= 0.9:
+        veredicto = _veredicto(c, MARGEN)
+        if veredicto == "parejo" and abs(c["ganaHumano"] - c["ganaIa"]) >= MARGEN:
+            # Parece mejor pero puede ser suerte: más muestras, mismas semillas para las dos.
+            mas = comparar(cartas, nombres, seed, registro, k, metodos, muestras * EXTRA, desde=muestras)
+            if mas is not None:
+                c["_h"] += mas["_h"]
+                c["_ia"] += mas["_ia"]
+                c["ganaHumano"] = round(sum(c["_h"]) / len(c["_h"]), 2)
+                c["ganaIa"] = round(sum(c["_ia"]) / len(c["_ia"]), 2)
+                veredicto = _veredicto(c, MARGEN)
+        c["muestras"] = len(c["_h"])
+        if max(c["ganaHumano"], c["ganaIa"]) <= EXTREMO:
+            # Héctor: si las dos pierden siempre, el resultado es el mismo: no hay
+            # mejor ni peor (tampoco "la IA acierta").
+            veredicto = "parejo"
+        elif veredicto == "parejo" and min(c["ganaHumano"], c["ganaIa"]) >= 1 - EXTREMO:
             # Las dos ganan: ¿cuál cierra antes la partida? (Héctor: "con esta
-            # pegas 10 y con la otra 18").
+            # pegas 10 y con la otra 18"). Solo con diferencia firme.
             r = comparar_ritmo(cartas, nombres, seed, registro, k, metodos, muestras)
             if r is not None and r["turnosGanaHumano"] is not None and r["turnosGanaIa"] is not None:
+                th, tia = r.pop("_th"), r.pop("_tia")
                 c.update(r)
-                dt = r["turnosGanaIa"] - r["turnosGanaHumano"]
-                veredicto = "humano" if dt >= MARGEN_TURNOS else "ia" if -dt >= MARGEN_TURNOS else "parejo"
-        elif veredicto == "parejo" and max(c["ganaHumano"], c["ganaIa"]) <= 0.1:
-            # Las dos pierden: resistir más turnos da más chances de remontar.
-            r = comparar_ritmo(cartas, nombres, seed, registro, k, metodos, muestras)
-            if r is not None and r["turnosPierdeHumano"] is not None and r["turnosPierdeIa"] is not None:
-                c.update(r)
-                dt = r["turnosPierdeHumano"] - r["turnosPierdeIa"]
-                veredicto = "humano" if dt >= MARGEN_TURNOS else "ia" if -dt >= MARGEN_TURNOS else "parejo"
-        if veredicto == "parejo" and "turnosGanaHumano" not in c and "turnosPierdeHumano" not in c                 and (max(c["ganaHumano"], c["ganaIa"]) <= 0.1 or min(c["ganaHumano"], c["ganaIa"]) >= 0.9):
-            hz = comparar_a_horizonte(cartas, nombres, seed, registro, k, metodos, muestras)
-            if hz is not None:
-                c.update(hz)
-                d_hz = hz["estimaHumano"] - hz["estimaIa"]
-                veredicto = "humano" if d_hz >= MARGEN_ESTIMACION else "ia" if -d_hz >= MARGEN_ESTIMACION \
-                    else "parejo"
+                veredicto = ("humano" if diferencia_clara(th, tia, MARGEN_TURNOS)
+                             else "ia" if diferencia_clara(tia, th, MARGEN_TURNOS) else "parejo")
+        for clave in ("_h", "_ia"):
+            c.pop(clave, None)
         e = registro[k]
         x = {
             "paso": k, "lado": 0, "turno": e.get("turno"), "fase": e.get("fase"),
@@ -286,6 +297,15 @@ def informe(cartas, nombres, seed: int, registro: list, metodos, ganador: int | 
     return {"reproduccionOk": True, "comparadas": len(diferencias) + parejas, "parejas": parejas,
             "distintas": len(distintas),
             "decisiones": len(ks), "diferencias": diferencias, "resumen": resumen}
+
+
+def _veredicto(c: dict, margen: float) -> str:
+    """Mejor solo si la diferencia es firme con muestras pareadas (no suerte)."""
+    if diferencia_clara(c["_ia"], c["_h"], margen):
+        return "humano"
+    if diferencia_clara(c["_h"], c["_ia"], margen):
+        return "ia"
+    return "parejo"
 
 
 def explicar(x: dict) -> str:

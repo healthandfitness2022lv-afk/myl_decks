@@ -859,6 +859,17 @@ def _sacrificio_sin_combo(p, yo, inst: Instancia) -> bool:
     return not (_en_peligro(p, yo) or len(p.j(yo).mano) <= 1)
 
 
+def _bota_el_coste_de_lo_que_trae(h: dict) -> bool:
+    """Men: juega un Aliado y después bota tantas cartas como su coste."""
+    return h.get("accion") == "jugarDesde" and any(
+        e.get("accion") == "botar" and e.get("cantidadSegun") == "coste_afectada"
+        and (e.get("objetivo") or {}).get("quien") == "propio" for e in h.get("luego") or [])
+
+
+def _coste_me_deja_sin_castillo(p, yo, c: Instancia) -> bool:
+    return len(p.j(yo).mazo) - c.carta.coste <= max(3, _alcance_rival(p, yo))
+
+
 def _aliado_temporal(h: dict) -> bool:
     """Cruz Templaria: el Aliado que trae se destierra en la Fase Final."""
     return h.get("accion") == "jugarDesde" and any(
@@ -4243,6 +4254,23 @@ class Heuristico:
         accion = h.get("accion")
         obj = h.get("objetivo") or {}
         quien = obj.get("quien", "oponente")
+        if accion == "desterrar" and quien == "propio" and "cementerio" in hab.zonas_de(obj) and any(
+                e.get("accion") == "modificarFuerza" and int(e.get("valor", 0) or 0) > 0
+                and (e.get("objetivo") or {}).get("quien") in ("esta_carta", "propio") for e in h.get("luego") or []):
+            # Goblin Berserker: desterrar Goblins de mi Cementerio le da fuerza
+            # para el ataque de este turno.
+            return p.e.activo == yo and bool(hab.candidatos_validos(p, yo, fuente, h))
+        if accion == "mover" and h.get("zonaDestino") == "linea_defensa" and quien == "oponente":
+            # Enialio: sacar a un rival de su Línea de Ataque solo sirve mientras
+            # me ataca (deja de pegar); en mi turno le devolvería un bloqueador.
+            return p.e.activo != yo and any(
+                c in p.atacantes and c.zona == Zona.ATAQUE for c in hab.candidatos_validos(p, yo, fuente, h))
+        if accion in ("destruir", "desterrar", "barajar") and quien == "cualquiera" and h.get("opcional") \
+                and h.get("cuando") == "al_jugar" and not h.get("luego") and hab._necesita_objetivo(h) \
+                and "en_juego" in hab.zonas_de(obj):
+            # Oberón: "puedes barajar una carta en juego": nunca una mía si el
+            # rival no tiene ninguna que sacar.
+            return any(c.controlador != yo for c in hab.candidatos_validos(p, yo, fuente, h))
         if accion in _DANINO:
             # No usar removal sobre lo propio, salvo que sea su intención.
             if quien == "propio" and accion not in ("barajar", "subirMano"):
@@ -4344,6 +4372,11 @@ class Heuristico:
         utiles = self._utiles_jugar_desde(p, yo, fuente, h, pagando)
         if not utiles:
             return False
+        if any(e.get("modo") == "entra_atacando" for e in h.get("luego") or []):
+            return True  # Nathair-Teine: un atacante más, gratis, en este mismo ataque
+        if _bota_el_coste_de_lo_que_trae(h):
+            # Men: "luego, bota tantas cartas como coste tenga ese Aliado".
+            return any(not _coste_me_deja_sin_castillo(p, yo, c) for c in utiles)
         if gratis and fuente.tipo == Tipo.TALISMAN and fuente.carta.coste >= 4 \
                 and "mazo" in hab.zonas_de(h.get("objetivo") or {}, ""):
             # UBsS #2: La Llama Fría (5) es para Lady o Killgharrah: traer a
@@ -4978,6 +5011,27 @@ class Heuristico:
                 return sorted(candidatos, key=lambda c: (_vale_en_cementerio(c),
                                                          self._valor_descarte(p, yo, c)))[:n]
             return sorted(candidatos, key=lambda c: self._valor_descarte(p, yo, c))[:n]
+        if accion == "desterrar" and candidatos and (h.get("objetivo") or {}).get("quien") == "propio" \
+                and all(c.dueno == yo and c.zona == Zona.CEMENTERIO for c in candidatos):
+            # Sir Tor / Goblin Berserker: de mi Cementerio se destierra lo que
+            # menos vale (mismo criterio que al pagar un costo).
+            return self.elegir_destierro_costo(p, yo, fuente_contexto or candidatos[0], candidatos, n)
+        if accion == "desterrar" and fuente_contexto is not None and candidatos \
+                and all(c.zona == Zona.CEMENTERIO for c in candidatos):
+            filtros = [f for x in fuente_contexto.habilidades if x.get("valorPorCada") == "destierro_propio"
+                       for f in (x.get("porCadaFiltros") or [])]
+            if filtros:
+                # Martillo de Galehaut: de mi Cementerio, solo lo que le suma
+                # fuerza (Armas y Aliados Sir); del rival, lo que más vale.
+                mias = [c for c in candidatos if c.dueno == yo
+                        and any(hab.coincide(p, c, {**f, "quien": None}) for f in filtros)]
+                suyas = sorted((c for c in candidatos if c.dueno != yo), key=lambda c: -_valor_carta(p, c))
+                return (mias + suyas)[:n]
+        if accion == "mover" and h.get("zonaDestino") == "linea_defensa" and candidatos \
+                and all(c.controlador != yo for c in candidatos):
+            # Enialio: el atacante sin bloquear que más daño hace.
+            atacando = [c for c in candidatos if c in p.atacantes] or candidatos
+            return sorted(atacando, key=lambda c: (c.uid in p.bloqueos, -hab.fuerza(p, c)))[:n]
         if accion == "mover" and h.get("zonaDestino") == "mazo_tope" and p.e.activo == yo \
                 and p.e.fase == "vigilia" and all(c.controlador != yo for c in candidatos):
             # FqvR #1: Focea saca al bloqueador para que mi Aliado ataque (y en
@@ -5039,6 +5093,14 @@ class Heuristico:
             oros = [c for c in candidatos if c.tipo == Tipo.ORO]
             if oros:
                 return sorted(oros, key=lambda c: -_valor_carta(p, c))[:n]
+        if fuente_contexto is not None and fuente_contexto.nombre.casefold() == "eros" \
+                and accion == "buscar":
+            # Desafío vUsU T3 (Héctor): «por lo general el Olímpico se busca
+            # las 2 Coronas del Día y si no, una Corona y una Ofrenda a los
+            # Dioses». La IA tomaba Olímpicos + 1 Corona.
+            orden = {"corona del día": 0, "ofrenda a los dioses": 1}
+            return sorted(candidatos, key=lambda c: (
+                orden.get(c.nombre.casefold(), 2), -_valor_carta(p, c)))[:n]
         def ya_jugable(c):
             return c.controlador == yo and (
                 _zona_de(c) in _se_juega_desde(c) or _recupera_desde_cementerio(c)
@@ -5229,12 +5291,16 @@ class Heuristico:
             # #49: primero a quien el cambio le da vuelta su pelea (Jentakus
             # bloqueado por Djedefhor), después el resto de los combatientes.
             cambio = int(h.get("valor", 0))
-            enemigo = cambio < 0
+            # Tea / Jueces del Maat: "tiene fuerza 0" es un castigo (valor 0 no
+            # es un bono): va al rival, y cuenta como perder toda su fuerza.
+            a_cero = h.get("modoFuerza") == "fijar" and cambio == 0
+            enemigo = cambio < 0 or a_cero
             pelean = _combatientes(p)
             return sorted(
                 candidatos,
                 key=lambda c: (
-                    (c.controlador == yo) == enemigo, not _decisivo(p, c, cambio), c.uid not in pelean,
+                    (c.controlador == yo) == enemigo,
+                    not _decisivo(p, c, -hab.fuerza(p, c) if a_cero else cambio), c.uid not in pelean,
                     -_valor_carta(p, c),
                 ),
             )[:n]
@@ -5253,9 +5319,15 @@ class Heuristico:
                 return (baraja if corto else bota), c.carta.coste
 
             return sorted(candidatos, key=arma, reverse=True)[:n]
+        if accion == "jugarDesde" and any(e.get("modo") == "entra_atacando" for e in h.get("luego") or []):
+            # Nathair-Teine: entra atacando y se destruye al final: el que más pega.
+            return sorted(candidatos, key=lambda c: -c.carta.fuerza)[:n]
         if accion == "jugarDesde":
             from .motor import Jugada
 
+            if _bota_el_coste_de_lo_que_trae(h):
+                # Men: no traer un Aliado cuyo coste me deje sin castillo.
+                candidatos = [c for c in candidatos if not _coste_me_deja_sin_castillo(p, yo, c)] or candidatos
             # #77: la que más rinde al jugarse ahora (Haquika sobre Djedefhor).
             if _aliado_temporal(h):
                 # Cruz Templaria: el Aliado se destierra en la Fase Final; vale
@@ -5351,7 +5423,9 @@ class Heuristico:
                 return sum(2 if int(x.get("limitePorTurno", 0) or 0) >= 1 else 1
                            for x in c.habilidades if _habilidad_repetible(x))
             return sorted(candidatos, key=lambda c: (c.nombre in en_juego, -repetible(c)))[:n]
-        if accion in _BENEFICIO_PROPIO or (accion == "modificarFuerza" and int(h.get("valor", 0)) >= 0):
+        if accion in _BENEFICIO_PROPIO or (accion == "modificarFuerza" and int(h.get("valor", 0)) >= 0
+                                           and not (h.get("modoFuerza") == "fijar"
+                                                    and int(h.get("valor", 0)) == 0)):
             peligro = accion == "buscar" and _en_peligro(p, yo)
 
             def bota(c):  # #87: Jinetes de Fuego o Mercado Egipcio, que hacen daño
@@ -5706,6 +5780,13 @@ class Heuristico:
                 cands = [c for c in hab.candidatos_validos(p, yo, fuente, x) if c is not fuente] or                     hab.candidatos_validos(p, yo, fuente, x)
                 return min((_valor_vivo(p, c) for c in cands), default=99)
             return 5.0
+        if opciones and all(x.get("accion") == "modificarFuerza" for x in opciones):
+            # Ascenso Draco: "los rivales pierden 1 por cada Draco" o "tus
+            # Dragones ganan 1": la que mueve más fuerza en la mesa.
+            def impacto(x):
+                return abs(int(x.get("valor", 0) or 0) * hab.por_cada(p, fuente, x)) \
+                    * len(hab.candidatos_validos(p, yo, fuente, x))
+            return max(range(len(opciones)), key=lambda k: impacto(opciones[k]))
         return min(range(len(opciones)), key=lambda k: costo(opciones[k]))
 
     def cancelar_habilidad(self, p, yo, fuente, h, opciones):

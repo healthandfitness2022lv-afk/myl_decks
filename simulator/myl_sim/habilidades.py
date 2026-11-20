@@ -190,6 +190,8 @@ def condicion_ok(p: "Partida", i: int, h: dict) -> bool:
         # León de Nemea: "si en tu Cementerio tienes 3 o más Aliados de raza Titán".
         "cementerio_raza": lambda: sum(1 for x in p.j(i).cementerio
                                        if x.tipo == Tipo.ALIADO and _raza_ok(x, c.get("raza", ""))),
+        # Atalanta la Amazona: "si controlas 1 o más Armas" (portadas por quien sea).
+        "armas_propias": lambda: armas_propias(p, i),
     }
     if tipo in especiales:
         return cumple(c.get("op", ">="), especiales[tipo](), int(c.get("valor", 1)))
@@ -203,9 +205,14 @@ def condicion_ok(p: "Partida", i: int, h: dict) -> bool:
         "cartas_cementerio": len(yo.cementerio),
         # "Si controlas un Aliado Faraón" se mira sin contar al que está
         # entrando y dispara la habilidad (Corona Faraónica con Jentakus I).
+        # Al entrar en juego tampoco cuenta la propia fuente (reporte IQVB:
+        # Sir Agravain "si controlas otro Aliado Caballero" robaba estando
+        # solo). Las continuas sí se cuentan (Pelope: "2 o más Héroe").
         "aliados_raza": sum(
             1 for a in yo.aliados
             if _raza_ok(a, c.get("raza", "")) and a is not getattr(p, "ctx_disparadora", None)
+            and not (h.get("cuando") == "al_jugar" and fuente is not None and a is fuente
+                     and not c.get("incluyeFuente"))
         ),
         "oros_en_juego": oros_en_juego(p, i),
         "oros_vs_oponente": oros_en_juego(p, i) - oros_en_juego(p, 1 - i),
@@ -214,9 +221,13 @@ def condicion_ok(p: "Partida", i: int, h: dict) -> bool:
     if tipo == "aliados_arquetipo":  # Averix / Guerrero Escorpión.
         # En disparos de fase no hay ``ctx_disparadora``: la fuente debe
         # excluirse igual, pues Escorpión pide *otro* Guerrero en mesa.
+        # ``incluyeFuente``: cuenta a todos, también a esta carta (Minotauro
+        # del Hades: "si controlas otro Minotauro" = 2 o más contándolo; así
+        # no depende de qué habilidad se esté resolviendo en ese momento).
+        todos = bool(c.get("incluyeFuente"))
         valor = sum(
             1 for a in yo.aliados
-            if _arquetipo_ok(a, c.get("arquetipo", "")) and a is not entrando and a is not fuente
+            if _arquetipo_ok(a, c.get("arquetipo", "")) and (todos or (a is not entrando and a is not fuente))
         )
     elif tipo == "aliados_no_raza":  # Menhir: "si todos tus Aliados son Defensor" (== 0)
         valor = sum(1 for a in yo.aliados if not _raza_ok(a, c.get("raza", "")))
@@ -327,8 +338,14 @@ def _raza_ok(inst: Instancia, raza: str) -> bool:
 
 def _arquetipo_ok(inst: Instancia, arquetipo: str) -> bool:
     """Arquetipo (Druida, Goblin, Minotauro…): va en el nombre, no en la raza."""
-    return not arquetipo or arquetipo.lower() in inst.nombre.lower() \
-        or arquetipo.lower() in (inst.arquetipo_extra or "").lower()  # Acólitos de Drácula
+    if not arquetipo:
+        return True
+    a = arquetipo.lower()
+    if len(a) <= 3:
+        # "Sir" es un título: palabra completa (Osiris y Siroco no son Aliados Sir).
+        return a in re.findall(r"\w+", inst.nombre.lower()) \
+            or a in re.findall(r"\w+", (inst.arquetipo_extra or "").lower())
+    return a in inst.nombre.lower() or a in (inst.arquetipo_extra or "").lower()  # Acólitos de Drácula
 
 
 def coincide(p: "Partida", inst: Instancia, obj: dict) -> bool:
@@ -525,7 +542,20 @@ def _comparacion_dinamica(p: "Partida", i: int, obj: dict, fuente: Instancia | N
         elif isinstance(comp, dict) and comp.get("segun") == "totems_propios":
             n = sum(1 for x in p.e.instancias_en_juego(i) if x.tipo == Tipo.TOTEM)
             obj = {**obj, campo: {**comp, "valor": n}}
+        elif isinstance(comp, dict) and comp.get("segun") == "armas_propias":
+            # Sir Bleoberis: "de coste igual o menor a la cantidad de Armas que controles".
+            obj = {**obj, campo: {**comp, "valor": armas_propias(p, i)}}
+        elif isinstance(comp, dict) and comp.get("segun") == "coste_disparadora":
+            # Jared el Mago: "de coste igual o menor al Talismán jugado".
+            x = getattr(p, "ctx_disparadora", None)
+            n = x.carta.coste if x is not None and x.tipo != Tipo.ORO else -1
+            obj = {**obj, campo: {**comp, "valor": n}}
     return obj
+
+
+def armas_propias(p: "Partida", i: int) -> int:
+    """Armas que controla el jugador (las porte un Aliado suyo o del rival)."""
+    return sum(1 for x in p.e.instancias_en_juego(i) if x.tipo == Tipo.ARMA)
 
 
 def candidatos_validos(p: "Partida", i: int, fuente: Instancia, h: dict, **kw) -> list[Instancia]:
@@ -658,9 +688,11 @@ def _puede_pagar(p: "Partida", i: int, fuente: Instancia, h: dict) -> bool:
         return False  # Anhur / Hera: desterrar cartas de tu mano
     if c.get("subirEstaCarta") and not (fuente.en_juego or fuente.zona == Zona.PORTADA):
         return False  # Daga de Bote: sube a tu mano
-    propias = [x for x in p.e.instancias_en_juego(i) if x is not fuente]
-    if len(propias) < int(c.get("destruirPropias", 0)):
-        return False  # Nemty: destruir una carta que controles
+    if c.get("destruirPropias"):
+        # Nemty: destruir una carta que controles; Lady Rachel: "un Arma" (filtro).
+        propias = [x for x in p.e.instancias_en_juego(i) if x is not fuente and _filtro_costo(p, x, c)]
+        if len(propias) < int(c["destruirPropias"]):
+            return False
     if c.get("barajarPropias"):  # Escudo de la Tormenta: baraja un Arma que controles
         if prohibido(p, "barajar", i) or len([x for x in p.e.instancias_en_juego(i)
                                               if _filtro_costo(p, x, c)]) < int(c["barajarPropias"]):
@@ -686,7 +718,9 @@ def _puede_pagar(p: "Partida", i: int, fuente: Instancia, h: dict) -> bool:
             return False
         if fuente.zona == Zona.RESERVA and jug.oro_disponible - 1 < int(c.get("oros", 0)):
             return False  # este Oro no sirve para pagarse a sí mismo
-    otros = [a for a in jug.aliados if a is not fuente and _filtro_costo(p, a, c) and not no_puede_salir(p, a)]
+    # Oberón: "destruir este u otro Aliado que controles" (incluyeEstaCarta).
+    otros = [a for a in jug.aliados if (a is not fuente or c.get("incluyeEstaCarta"))
+             and _filtro_costo(p, a, c) and not no_puede_salir(p, a)]
     if len(otros) < int(c.get("desterrarAliados", 0)) + int(c.get("destruirAliados", 0)):
         return False
     if (c.get("destruirEstaCarta") or c.get("desterrarEstaCarta")) and no_puede_salir(p, fuente):
@@ -776,7 +810,7 @@ def pagar_costo(p: "Partida", i: int, fuente: Instancia, h: dict, *, narrar: boo
             p.sale_del_juego(x, Zona.MAZO)
     n = int(c.get("destruirPropias", 0))
     if n:
-        propias = [x for x in p.e.instancias_en_juego(i) if x is not fuente]
+        propias = [x for x in p.e.instancias_en_juego(i) if x is not fuente and _filtro_costo(p, x, c)]
         for x in p.decide(i).elegir_descartes(p, i, propias, n):
             p.anotar(f"J{i} destruye {x.nombre} para pagar {fuente.nombre}")
             if x.tipo == Tipo.ALIADO:
@@ -833,8 +867,8 @@ def pagar_costo(p: "Partida", i: int, fuente: Instancia, h: dict, *, narrar: boo
     for clave, zona in (("desterrarAliados", Zona.DESTIERRO), ("destruirAliados", Zona.CEMENTERIO)):
         n = int(c.get(clave, 0))
         if n:
-            otros = [a for a in p.j(i).aliados if a is not fuente and _filtro_costo(p, a, c)
-                     and not no_puede_salir(p, a)]
+            otros = [a for a in p.j(i).aliados if (a is not fuente or c.get("incluyeEstaCarta"))
+                     and _filtro_costo(p, a, c) and not no_puede_salir(p, a)]
             for a in p.decide(i).elegir_descartes(p, i, otros, n):
                 verbo = "destierra" if zona == Zona.DESTIERRO else "destruye"
                 p.anotar(f"J{i} {verbo} {a.nombre} para pagar {fuente.nombre}")
@@ -911,6 +945,36 @@ def fuerza(p: "Partida", inst: Instancia) -> int:
     return max(0, valor * 2 ** duplicar)
 
 
+def desglose_fuerza(p: "Partida", inst: Instancia) -> list[tuple[str, str]]:
+    """Desafío vUsU T9: «al tocar un Aliado debe mostrar quién lo bonifica o
+    perjudica». [(carta, «+2» / «-1» / «= 0» / «×2»)], en el orden de `fuerza`."""
+    if inst.tipo != Tipo.ALIADO:
+        return []
+    out: list[tuple[str, str]] = []
+
+    def texto(modo: str, valor: int) -> str:
+        return {"fijar": f"= {valor}", "duplicar": "×2", "base": "sin bonos"}.get(modo, f"{valor:+d}")
+
+    def nombre(uid):
+        # Forma de Lince ya está en el Cementerio: se busca en todas las zonas.
+        for j in p.e.jugadores:
+            for x in [*p.e.instancias_en_juego(j.indice), *j.cementerio, *j.destierro, *j.mano, *j.pagado]:
+                if x.uid == uid:
+                    return x.nombre
+        return "efecto"
+
+    for m in inst.mods:
+        if m.modo != "sumar" or m.valor:
+            out.append((nombre(m.fuente), texto(m.modo, m.valor)))
+    for s, h in _continuas(p, "modificarFuerza"):
+        if _afecta_continua(p, s, h, inst):
+            v = int(h.get("valor", 0)) * por_cada(p, s, h)
+            modo = h.get("modoFuerza", "sumar")
+            if modo != "sumar" or v:
+                out.append((s.nombre, texto(modo, v)))
+    return out
+
+
 def _afecta_continua(p: "Partida", s: Instancia, h: dict, inst: Instancia) -> bool:
     """¿La fuerza continua `h` de `s` alcanza a `inst`?"""
     if inmune(p, inst, s):
@@ -984,6 +1048,12 @@ def _habilidades_al_jugar(inst: Instancia) -> list[dict]:
 def _objetivos_suficientes(p: "Partida", i: int, inst: Instancia, h: dict) -> bool:
     if not _necesita_objetivo(h):
         return True
+    obj = h.get("objetivo") or {}
+    if NOMBRAR_SOLO_AL_ACTIVAR and obj.get("nombrarCarta") and h.get("cuando") in ("activada", "al_hacer_dano"):
+        # Desafío vUsU T5 (y g9FE «ya no me deja activar el Orfeo»): Orfeo
+        # nombra al activarse; antes se buscaban copias de un nombre que aún no
+        # existía y nunca se ofrecía. Basta con que haya dónde buscar.
+        h = {**h, "objetivo": {**obj, "nombrarCarta": False}}
     minimo = int(h.get("cantidad", 1)) if h.get("cantidadExacta") else 1
     return len(candidatos_validos(p, i, inst, h)) >= minimo
 
@@ -1120,6 +1190,8 @@ def disparar(
     for h in habs:
         if h.get("cuando") != cuando or h.get("accion") in ("anular", "prevenir") or es_permiso_jugar(h):
             continue
+        if h.get("soloPorHabilidad") and not getattr(p, "ctx_descarte_por_habilidad", True):
+            continue  # Fear Sidhe: "descartado por una habilidad" (no por exceso de mano)
         if not fase_ok(p, h) and inst.tipo != Tipo.TALISMAN:
             continue
         if declaracion is not None and (h.get("fase") == "declaracion_ataque") != declaracion:
@@ -1156,8 +1228,14 @@ def _elegir_del_grupo(p: "Partida", i: int, inst: Instancia, opciones: list[dict
     """Opciones excluyentes y opcionales ("puedes X o Y"): quien puede decir
     "ninguna" (la persona) elige una por su nombre. La elegida ya no vuelve a
     preguntar "¿usar?". None = no usa ninguna."""
-    posibles = [x for x in opciones if condicion_ok(p, i, x) and puede_pagar_costo(p, i, inst, x)
-                and _objetivos_suficientes(p, i, inst, x)]
+    # Dario III (Héctor 18-11: «cuando ataca, en la Fase Final no me pregunta»):
+    # «si este Aliado atacó» se mide sobre esta carta; sin fuente nunca se cumplía.
+    anterior, p.ctx_fuente_habilidad = getattr(p, "ctx_fuente_habilidad", None), inst
+    try:
+        posibles = [x for x in opciones if condicion_ok(p, i, x) and puede_pagar_costo(p, i, inst, x)
+                    and _objetivos_suficientes(p, i, inst, x)]
+    finally:
+        p.ctx_fuente_habilidad = anterior
     if not posibles:
         return None
     k = p.decide(i).elegir_opcion(p, i, inst, posibles)
@@ -1410,7 +1488,7 @@ def expirar(p: "Partida", duracion: str, *, controlador: int | None = None) -> N
     if duracion == "hasta_fase_final":
         for j in p.e.jugadores:
             for inst in j.mano + j.cementerio + j.mazo + j.destierro + list(p.e.instancias_en_juego(j.indice)):
-                if inst.copia:
+                if inst.copia and not getattr(inst, "copia_permanente", False):
                     inst.copia = ()
                 if inst.carta_original is not None:
                     inst.carta = inst.carta_original
@@ -1694,6 +1772,8 @@ def resolver(p: "Partida", i: int, fuente: Instancia, h: dict) -> None:
 def aplicar_luego(p: "Partida", i: int, fuente: Instancia, h: dict, cumplido: bool, afectadas: list[Instancia]) -> None:
     elegidos: set[str] = set()
     decididos: dict[str, dict | None] = {}
+    # "Si lo haces" del paso anterior (Magia Amatista: robar solo si destruyó).
+    hecho_anterior = cumplido
     for e in h.get("luego") or []:
         if not isinstance(e, dict):
             continue
@@ -1702,6 +1782,9 @@ def aplicar_luego(p: "Partida", i: int, fuente: Instancia, h: dict, cumplido: bo
         relacion = e.get("relacion", "si_se_cumplio")
         if relacion == "si_se_cumplio" and not cumplido:
             break
+        if relacion == "si_anterior" and not hecho_anterior:
+            continue
+        hecho_anterior = False  # si este paso no se resuelve, el siguiente "si_anterior" no va
         if relacion == "si_no_se_cumplio" and cumplido:
             continue  # Idmon: "si no es un Héroe, envíala al Cementerio"
         if e.get("momento") == "fase_final":
@@ -1753,6 +1836,7 @@ def aplicar_luego(p: "Partida", i: int, fuente: Instancia, h: dict, cumplido: bo
             continue
         p.ctx_previas = afectadas
         cumplido, nuevas = _resolver_efecto(p, i, fuente, e, previas=afectadas)
+        hecho_anterior = cumplido
         if cumplido and e.get("grupoElegir"):
             elegidos.add(e["grupoElegir"])
         if nuevas:
@@ -2043,7 +2127,15 @@ def _resolver_efecto(
             return False, []
         t = _seleccionar(p, i, fuente, h, cands)[0]
         fuente.copia = tuple(x for x in t.carta.habilidades if x.get("accion") != "copiarHabilidad")
-        p.anotar(f"{fuente.nombre}: copia la habilidad de {t.nombre} hasta la Fase Final")
+        if h.get("duracion") == "permanente":
+            # Fiodhain: "tiene todas las habilidades de ese Aliado por el resto
+            # del juego" (mientras siga en juego: al salir vuelve a ser ella).
+            fuente.copia_permanente = True
+            if fuente.tipo == Tipo.ALIADO and fuente.en_juego and tiene_prop(p, fuente, "furia"):
+                fuente.listo = True  # copió "puede atacar cuando entra en juego"
+            p.anotar(f"{fuente.nombre}: tiene las habilidades de {t.nombre} por el resto del juego")
+        else:
+            p.anotar(f"{fuente.nombre}: copia la habilidad de {t.nombre} hasta la Fase Final")
         return True, [t]
     if accion == "copiarEfecto":
         cands = candidatos_validos(p, i, fuente, h)
@@ -2107,6 +2199,9 @@ def _resolver_efecto(
         tope = len([x for x in p.j(i).cementerio if x is not fuente])
         cands = [x for x in cands if x.tipo != Tipo.ORO and x.carta.coste <= tope]
     if not cands:
+        motivo = _motivo_sin_objetivos(p, i, h)
+        if motivo:
+            p.anotar(f"✗ {fuente.nombre}: {motivo}")
         return False, []
     objetivos = _seleccionar(p, i, fuente, h, cands)
     if h.get("cantidadExacta") and len(objetivos) != n:
@@ -2259,6 +2354,17 @@ def _resolver_efecto(
             ok = t.en_juego and t.tipo == Tipo.ALIADO
             if ok:
                 t.listo = True
+        elif accion == "restringirCombate" and h.get("modo") == "entra_atacando":
+            # Nathair-Teine: "…y jugarlo en tu Línea de Ataque como un Aliado
+            # declarado atacante". Se suma al ataque en curso de su controlador.
+            ok = t.en_juego and t.tipo == Tipo.ALIADO and bool(p.atacantes) and p.e.activo == t.controlador \
+                and not p.ataque_cancelado
+            if ok:
+                if t.zona != Zona.ATAQUE:
+                    p._mover(t, Zona.ATAQUE)
+                if t not in p.atacantes:
+                    p.atacantes.append(t)
+                p.ataco_este_turno.add(t.uid)
         elif accion in ("restringirCombate", "reducirDano"):
             ok = t.en_juego
             if ok:
@@ -2318,7 +2424,37 @@ def _buscar(p: "Partida", i: int, fuente: Instancia, h: dict, accion: str) -> li
         destino = "mazo_tope"
     if destino not in ("mano", "cementerio", "destierro"):
         cands = [c for c in cands if not c.carta.solo_desde_mano]  # Dragones
-    elegidas = _seleccionar(p, i, fuente, h, cands) if cands else []
+    if obj.get("distintoNombre") and cands:
+        # Caminar las Estrellas: "busca 2 cartas con distinto nombre".
+        elegidas, quedan = [], list(cands)
+        while quedan and len(elegidas) < max(1, int(h.get("cantidad", 1))):
+            t = _seleccionar(p, i, fuente, {**h, "cantidad": 1}, quedan)[0]
+            elegidas.append(t)
+            quedan = [x for x in quedan if x.nombre != t.nombre]
+    else:
+        elegidas = _seleccionar(p, i, fuente, h, cands) if cands else []
+    if h.get("oponenteEligeMano") and elegidas:
+        # "…y muéstralas a tu oponente. Tu oponente elige una de ellas y la
+        # pone en tu Mano, y la otra ponla en tu Cementerio."
+        q = 1 - i
+        nombres = " y ".join(t.nombre for t in elegidas)
+        p.anotar(f"{fuente.nombre}: J{i} muestra {nombres}; J{q} elige cuál va a la mano de J{i}")
+        mostrar_a(p, q, f"{fuente.nombre}: elige cuál va a la mano de tu oponente", elegidas)
+        a_mano = elegidas[0]
+        if len(elegidas) > 1:
+            if getattr(p.decide(q), "elige_ninguna", False):  # la persona elige
+                a_mano = p.decide(q).elegir_objetivos(
+                    p, q, list(elegidas), 1, {"accion": "repartir", "zonaDestino": "mano", "opcional": True})[0]
+            else:
+                # La IA le deja al rival la que menos le sirve (la más barata).
+                a_mano = min(elegidas, key=lambda x: (x.carta.coste or 0, x.carta.fuerza or 0))
+        for t in elegidas:
+            p._mover(t, Zona.MANO if t is a_mano else Zona.CEMENTERIO)
+        a_mano.revelada = True
+        p.e.rng.shuffle(p.j(i).mazo)
+        resto = [t.nombre for t in elegidas if t is not a_mano]
+        p.anotar(f"{fuente.nombre}: {a_mano.nombre} → mano" + (f"; {', '.join(resto)} → Cementerio" if resto else ""))
+        return elegidas
     for t in elegidas:
         if destino == "mazo_tope":
             p._mover(t, Zona.MAZO)
@@ -2399,6 +2535,11 @@ def prohibido(p: "Partida", modo: str, jugador: int, carta: Instancia | None = N
                 return True
         if carta.tipo == Tipo.ALIADO and getattr(p.j(jugador), "veto_aliados_turno", None) == p.e.turno:
             return True  # Meleagro: este turno no puede poner Aliados en juego
+    return quien_prohibe(p, modo, jugador, carta) is not None
+
+
+def quien_prohibe(p: "Partida", modo: str, jugador: int, carta: Instancia | None = None) -> Instancia | None:
+    """La carta en juego cuya Restricción impide esta acción a `jugador`."""
     for s in p.e.instancias_en_juego():
         for h in s.habilidades:
             if h.get("accion") != "restriccion" or h.get("modo") != modo:
@@ -2418,8 +2559,27 @@ def prohibido(p: "Partida", modo: str, jugador: int, carta: Instancia | None = N
                 continue  # Carmix: "los Oros en juego no pueden ser desterrados"
             if obj.get("cementerioPropio"):
                 continue  # Cerbero: se filtra por dueño en _protegidas_cerbero
-            return True
-    return False
+            return s
+    return None
+
+
+def _motivo_sin_objetivos(p: "Partida", i: int, h: dict) -> str:
+    """Desafío SkkvVn (18-11): el Milano Negro hizo daño y no desterró nada,
+    sin decir por qué (había un Cinturón de Lady Ann en la Reserva). Si el
+    efecto se queda sin objetivos por una Restricción en juego, se dice cuál."""
+    accion = h.get("accion")
+    zonas = zonas_de(h.get("objetivo") or {})
+    modos = {
+        "desterrar": ["desterrar_cementerio"] if "cementerio" in zonas else [],
+        "barajar": ["barajar"] + (["barajar_cementerio"] if "cementerio" in zonas else []),
+        "destruir": ["destruir"],
+    }.get(accion, [])
+    verbo = {"desterrar": "desterrar del Cementerio", "barajar": "barajar", "destruir": "destruir"}.get(accion, "")
+    for modo in modos:
+        s = quien_prohibe(p, modo, i)
+        if s is not None:
+            return f"no se puede {verbo}: lo impide {s.nombre} (J{s.controlador})"
+    return ""
 
 
 def no_puede_salir(p: "Partida", x: Instancia) -> bool:
@@ -2677,6 +2837,10 @@ def _destino_zona(destino: str) -> Zona | None:
         "destierro": Zona.DESTIERRO,
         "linea_ataque": Zona.ATAQUE,
         "linea_defensa": Zona.DEFENSA,
+        # Brian Boru y Asaltar la Caravana guardan "ataque" (sin "linea_"):
+        # el destino no se reconocía y no movían nada.
+        "ataque": Zona.ATAQUE,
+        "defensa": Zona.DEFENSA,
         "reserva_oro": Zona.RESERVA,
         "mazo_tope": Zona.MAZO,
         "mazo_fondo": Zona.MAZO,
@@ -2784,7 +2948,9 @@ def _mirar_tope(p: "Partida", i: int, fuente: Instancia, h: dict, n: int) -> tup
         obj = {**obj, "tipos": [nombrado]}
         h = {**h, "objetivo": obj}
     # Afrodita/Idmon la muestran al jugarla; Estrella de Belén "muestra" (ZTSY).
-    publica = h.get("zonaDestino") == "en_juego" or bool(h.get("muestra")) \
+    # Anfiarao ("puedes mirar… y jugar un Aliado de ahí"): con ``privado`` las
+    # que no juega no se muestran al rival.
+    publica = (h.get("zonaDestino") == "en_juego" and not h.get("privado")) or bool(h.get("muestra")) \
         or _dice_mostrar(fuente)
     nombres_vistas = ", ".join(x.nombre for x in vistas)
     p.anotar(f"{fuente.nombre}: mira {'la primera carta' if len(vistas) == 1 else f'las {len(vistas)} primeras'} "
@@ -2850,14 +3016,21 @@ def _mirar_tope(p: "Partida", i: int, fuente: Instancia, h: dict, n: int) -> tup
         pedido = nombrado or "/".join(obj.get("tipos") or []) or "válida"
         if obj.get("raza"):
             pedido += f" {obj['raza']}"
-        p.anotar(f"✗ {fuente.nombre} falla: sale {', '.join(x.nombre for x in vistas)}, no es {pedido}")
+        salen = ", ".join(x.nombre for x in vistas)
+        p.anotar(f"✗ {fuente.nombre} falla: sale {salen if publica else privado(i, salen)}, no es {pedido}")
     for t in elegidas:
         if destino == "en_juego":
             p.ejecutar_jugada(i, Jugada("jugar_gratis", t))  # Idmon: jugarlo sin pagar
         else:
             p._mover(t, destinos.get(destino, Zona.MANO))
-        # Reporte 4NtK: lo que toma el rival con Renpet solo lo sabe él.
-        p.anotar(f"{fuente.nombre}: toma {t.nombre if destino == 'en_juego' or publica else privado(i, t.nombre)}")
+        # Reporte 4NtK: lo que toma el rival con Renpet (cualquier carta) solo
+        # lo sabe él. Reporte dmwP T3: si solo puede tomar ciertas cartas (Tadg:
+        # "un Oro o un Aliado Druida"), la muestra para probar que cumple.
+        con_filtro = bool(obj.get("tipos") or obj.get("arquetipo") or obj.get("raza") or nombrado)
+        if con_filtro and destino != "en_juego" and not publica:
+            t.revelada = True
+        p.anotar(f"{fuente.nombre}: toma "
+                 f"{t.nombre if destino == 'en_juego' or publica or con_filtro else privado(i, t.nombre)}")
     resto = [x for x in vistas if x not in elegidas and x.zona == Zona.MAZO]
     resto_a = h.get("restoA") or "mazo_tope"
     if resto_a == "elegir_tope_fondo":
@@ -3195,6 +3368,15 @@ def por_cada(p: "Partida", fuente: Instancia, h: dict) -> int:
         minimo = int(h.get("porCadaCosteMin", 0))
         return sum(1 for x in p.e.instancias_en_juego(fuente.controlador)
                    if x.tipo == Tipo.TOTEM and x.carta.coste >= minimo)
+    if segun == "carta_afectada":
+        # Goblin Berserker: "por cada carta desterrada" por el efecto anterior.
+        return len(getattr(p, "ctx_previas", None) or [])
+    if segun == "destierro_propio":
+        # Martillo de Galehaut: "por cada Arma y Aliado Sir en tu destierro".
+        # ``porCadaFiltros``: cuenta la carta que cumpla alguno (sin filtros, todas).
+        filtros = h.get("porCadaFiltros") or [{}]
+        return sum(1 for x in p.j(fuente.controlador).destierro
+                   if any(coincide(p, x, {**f, "quien": None}) for f in filtros))
     return 1
 
 
@@ -3206,7 +3388,7 @@ def recargo(p: "Partida", t: Instancia, fuente: Instancia) -> int:
         return 0
     total = 0
     for h in t.habilidades:
-        if h.get("accion") != "encarecer":
+        if h.get("accion") != "encarecer" or h.get("protege"):
             continue
         obj = h.get("objetivo") or {}
         tipos = obj.get("tipos") or []
@@ -3214,6 +3396,24 @@ def recargo(p: "Partida", t: Instancia, fuente: Instancia) -> int:
             continue
         if fuente.controlador in _lados(t.controlador, obj.get("quien", "oponente")):
             total += int(h.get("valor", 0))
+    # Las Musas: "los Talismanes oponentes que hagan objetivo a tus Aliados
+    # Musa cuestan 1 Oro adicional": el recargo lo da otra carta (``protege``
+    # dice a cuáles de las tuyas cubre; puede incluirse a sí misma).
+    for s in p.e.instancias_en_juego(t.controlador):
+        for h in s.habilidades:
+            protege = h.get("protege")
+            if h.get("accion") != "encarecer" or not protege:
+                continue
+            if protege.get("excluirEstaCarta") and t is s:
+                continue
+            if not coincide(p, t, {**protege, "quien": None}):
+                continue
+            obj = h.get("objetivo") or {}
+            tipos = obj.get("tipos") or []
+            if tipos and fuente.tipo.value not in tipos:
+                continue
+            if fuente.controlador in _lados(s.controlador, obj.get("quien", "oponente")):
+                total += int(h.get("valor", 0))
     return total
 
 
@@ -3336,7 +3536,32 @@ def _dispara_por(carta: Instancia, h: dict) -> bool:
         return False
     if h.get("disparoCosteMin") and (carta.tipo == Tipo.ORO or carta.carta.coste < int(h["disparoCosteMin"])):
         return False  # Monte Killgharrah: "un Aliado de coste 3 o más"
+    if not _arquetipo_ok(carta, h.get("disparoArquetipo") or ""):
+        return False  # Musa Calíope: "cuando una carta Musa entre o salga del juego"
     return _raza_ok(carta, h.get("disparoRaza") or "")
+
+
+def disparar_jugada(p: "Partida", i: int, jugada: Instancia) -> None:
+    """"Cuando juegues un Talismán…" (Fruto Fiodhain, Jared el Mago): se
+    dispara al jugar la carta, entre o no en juego (un Talismán nunca entra).
+    Las cartas que entran en juego además disparan ``propia_entra``."""
+    for s in list(p.e.instancias_en_juego(i)) + list(p.j(i).pagado):
+        if s is jugada:
+            continue
+        for k, h in enumerate(s.habilidades):
+            if h.get("cuando") != "propia_juega" or not _dispara_por(jugada, h):
+                continue
+            if s.zona == Zona.PAGADO and h.get("zonaActivacion") in ("reserva_oro", "reserva"):
+                continue
+            limite = int(h.get("limitePorTurno", 0))
+            if limite and usos(p, i, s, h, k) >= limite:
+                continue
+            p.ctx_disparadora = jugada
+            try:
+                if _intentar(p, i, s, h):
+                    sumar_uso(p, i, s, h, k)
+            finally:
+                p.ctx_disparadora = None
 
 
 def _disparar_rival_pierde_fuerza(p: "Partida", i: int, t: Instancia) -> None:

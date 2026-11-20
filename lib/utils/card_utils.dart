@@ -22,24 +22,6 @@ String? thumb120x170(String? url) {
   );
 }
 
-/// Normaliza una clave de característica/feature:
-/// elimina acentos, guiones, guiones bajos y espacios múltiples.
-String normalizeFeatureKey(String text) {
-  return text
-      .trim()
-      .toLowerCase()
-      .replaceAll(RegExp(r'[áàä]'), 'a')
-      .replaceAll(RegExp(r'[éèë]'), 'e')
-      .replaceAll(RegExp(r'[íìï]'), 'i')
-      .replaceAll(RegExp(r'[óòö]'), 'o')
-      .replaceAll(RegExp(r'[úùü]'), 'u')
-      .replaceAll('ñ', 'n')
-      .replaceAll('_', ' ')
-      .replaceAll('-', ' ')
-      .replaceAll(RegExp(r'[^a-z0-9\s]'), '')
-      .replaceAll(RegExp(r'\s+'), ' ');
-}
-
 /// Normalización difusa del tipo de carta (coincidencia parcial):
 /// tolera encoding roto y variantes ("gran aliado", "armadura", "oros"…).
 /// Devuelve una de: aliado / talisman / arma / totem / oro / descendiente,

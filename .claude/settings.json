@@ -9,7 +9,6 @@
       "Bash(gh pr merge*)",
       "Bash(gh repo delete*)",
       "Bash(gh secret*)",
-      "Bash(firebase deploy*)",
       "Bash(vercel --prod*)",
       "Bash(npm publish*)",
       "Bash(terraform apply*)",

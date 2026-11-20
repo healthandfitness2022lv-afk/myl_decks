@@ -29,6 +29,9 @@ from .motor import FinPartida, Partida
 def _copia(p: Partida, yo: int, seed: int) -> Partida:
     memo = {id(j): None for j in p.jugadores}
     memo[id(p.pasos)] = []
+    estilo_ = getattr(p, "estilo", None)
+    if estilo_ is not None:
+        memo[id(estilo_)] = None
     if p.e.log is not None:
         memo[id(p.e.log)] = None
     listas = getattr(p, "meta_listas", None)
@@ -51,7 +54,13 @@ def _copia(p: Partida, yo: int, seed: int) -> Partida:
     propio.mazo.sort(key=lambda x: (x.carta.id, x.uid))
     rng.shuffle(propio.mazo)
     creencias.reemplazar_ocultas(c, 1 - yo, rng)
-    c.jugadores = (Heuristico(seed * 2 + 1), Heuristico(seed * 2 + 2))
+    jugadores = [Heuristico(seed * 2 + 1), Heuristico(seed * 2 + 2)]
+    corrige = estilo_.corrige(1 - yo) if estilo_ is not None else None
+    if corrige:
+        from .estilo import rival
+
+        jugadores[1 - yo] = rival(seed * 2 + 2 - yo, corrige)
+    c.jugadores = tuple(jugadores)
     return c
 
 
@@ -72,14 +81,16 @@ class _Forzado(Heuristico):
 
 def valor_estado(p: Partida, yo: int, aprendido: bool = True) -> float:
     """0–1: estimación de victoria para `yo` cuando la simulación se corta.
-    Usa la valoración entrenada (`valor.py`) si existe."""
+    Usa la valoración entrenada (`valor.py`) si existe.
+    `aprendido`: 1, 2 o 3 según el modelo de `valor.py`."""
     if p.e.terminada:
         g = p.e.ganador
         return 1.0 if g == yo else 0.5 if g == -1 else 0.0
     if aprendido:
-        from .valor import prob_ganar, prob_ganar_v2
+        from .valor import prob_ganar, prob_ganar_v2, prob_ganar_v3
 
-        q = prob_ganar_v2(p, yo) if aprendido == 2 else prob_ganar(p, yo)
+        q = (prob_ganar_v3(p, yo) if aprendido == 3 else prob_ganar_v2(p, yo) if aprendido == 2
+             else prob_ganar(p, yo))
         if q is not None:
             return q
     mio, suyo = p.j(yo), p.j(1 - yo)

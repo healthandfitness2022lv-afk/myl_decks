@@ -28,10 +28,9 @@ import '../../services/deck_poster_share_service.dart';
 import '../../services/ban_list_service.dart';
 import '../../domain/validation/deck_validator.dart';
 import '../../domain/deck_coverage.dart';
-import '../../domain/perfil_habilidades.dart';
+import '../../domain/analisis_mazo/analisis_mazo.dart';
 import '../../domain/deck_stock_groups.dart';
 import '../../domain/inventory_planner.dart';
-import '../../domain/deck_statistics.dart';
 import '../../models/inventory.dart';
 import '../../models/ban_list_entry.dart' show normalizeBanListKey;
 import '../../services/inventory_service.dart';
@@ -60,7 +59,6 @@ class _DeckDetailsScreenState extends State<DeckDetailsScreen> {
   Map<String, String?> _imgById = {};
   Map<String, CardMyL> _cardsById = {};
   Map<String, CardMyL> _cardsByNameLower = {};
-  Map<String, String> _featureGroupMap = {};
   // variantId → imageFrontUrl (cargado lazy para variantes asignadas al mazo)
   Map<String, String> _variantImgById = {};
   // cardId -> imagen de la variante oficial (cache para el póster).
@@ -90,7 +88,6 @@ class _DeckDetailsScreenState extends State<DeckDetailsScreen> {
     super.initState();
     _baseDeck = widget.deck;
     _loadImgIndex();
-    _loadFeatureGroupMap();
     _loadLinkedDeckContext();
     _loadBanList();
     _loadVariantImages(_baseDeck);
@@ -286,55 +283,6 @@ class _DeckDetailsScreenState extends State<DeckDetailsScreen> {
     }
     if (mounted && urls.isNotEmpty) {
       setState(() => _variantImgById = {..._variantImgById, ...urls});
-    }
-  }
-
-  Future<void> _loadFeatureGroupMap() async {
-    try {
-      final snap =
-          await FirebaseFirestore.instance
-              .collection('card_custom_features')
-              .get();
-      final featureGroupMap = <String, String>{};
-
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final rawName =
-            (data['name'] ?? data['nombre'] ?? '').toString().trim();
-        if (rawName.isEmpty) continue;
-
-        final rawGroup =
-            (data['group'] ??
-                    data['groupName'] ??
-                    data['grupo'] ??
-                    data['group_name'] ??
-                    '')
-                .toString()
-                .trim();
-        if (rawGroup.isEmpty) continue;
-
-        featureGroupMap[rawName] = rawGroup;
-        featureGroupMap[rawName.toLowerCase()] = rawGroup;
-
-        final normalized =
-            (data['normalized'] ?? data['name_normalized'] ?? '')
-                .toString()
-                .trim();
-        if (normalized.isNotEmpty) {
-          featureGroupMap[normalized] = rawGroup;
-          featureGroupMap[normalized.toLowerCase()] = rawGroup;
-        }
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _featureGroupMap = featureGroupMap;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _featureGroupMap = {};
-      });
     }
   }
 
@@ -1768,7 +1716,6 @@ class _DeckDetailsScreenState extends State<DeckDetailsScreen> {
       _activeDeck,
       cardsById: _cardsById,
       cardsByNameLower: _cardsByNameLower,
-      featureGroupMap: _featureGroupMap,
       imgById: _imgById,
     );
     showDialog<void>(
@@ -1818,7 +1765,6 @@ class _DeckDetailsScreenState extends State<DeckDetailsScreen> {
       deck,
       cardsById: _cardsById,
       cardsByNameLower: _cardsByNameLower,
-      featureGroupMap: _featureGroupMap,
       imgById: _imgById,
     );
     final isWide = MediaQuery.of(context).size.width >= 1180;

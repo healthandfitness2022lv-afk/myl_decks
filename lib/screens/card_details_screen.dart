@@ -847,7 +847,7 @@ class _VariantsRow extends StatelessWidget {
   }
 }
 
-// ===== Panel de información (detalles + características) =====
+// ===== Panel de información =====
 class _CardInfoPanel extends StatelessWidget {
   final CardMyL card;
   final CardVariant? variant;
@@ -879,9 +879,6 @@ class _CardInfoPanel extends StatelessWidget {
     this.readingAbility = false,
     this.aiAbilityText = '',
   });
-
-  List<String> _getFeatures(CardMyL c) =>
-      c.caracteristicasRaw.where((s) => s.trim().isNotEmpty).toList();
 
   Widget _infoTile(
     IconData icon,
@@ -917,82 +914,6 @@ class _CardInfoPanel extends StatelessWidget {
                     color: highlight ? Colors.cyanAccent : Colors.white,
                     fontWeight: FontWeight.w700,
                   ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Bloque ancho para características, ahora con "chips" (burbujas)
-  /// Bloque de características con "burbujas" oscuras y texto claro
-  Widget _featuresBlock(BuildContext context, List<String> features) {
-    final theme = Theme.of(context);
-    final chipTextStyle =
-        theme.textTheme.bodyMedium?.copyWith(color: Colors.white) ??
-        const TextStyle(color: Colors.white, fontSize: 14);
-
-    // Colores pensados para fondo oscuro: chip oscuro, texto claro, borde sutil
-    const chipBg = Color(0xFF0B2B2A); // oscuro, mantiene la paleta verdosa
-    const chipBorder = Color(
-      0x1FFFFFFF,
-    ); // borde muy sutil (blanco transparente)
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1C1E),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white10),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.bolt, size: 18, color: Colors.white70),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Características Legacy',
-                  style: TextStyle(fontSize: 11, color: Colors.white60),
-                ),
-                const SizedBox(height: 8),
-                LayoutBuilder(
-                  builder:
-                      (context, constraints) => Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children:
-                            features.map((f) {
-                              final txt = f.trim();
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: chipBg,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: chipBorder),
-                                ),
-                                constraints: BoxConstraints(
-                                  minHeight: 28,
-                                  maxWidth: constraints.maxWidth,
-                                ),
-                                child: Text(
-                                  txt,
-                                  style: chipTextStyle.copyWith(fontSize: 13),
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              );
-                            }).toList(),
-                      ),
                 ),
               ],
             ),
@@ -1081,9 +1002,6 @@ class _CardInfoPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final fuerza = card.fuerza;
     final coste = card.coste;
-    final feats = _getFeatures(card);
-
-    // sacamos features de la grilla para que ocupen todo el ancho
     final items = <Widget>[
       _infoTile(Icons.category, 'Tipo', card.tipo),
       if (card.esAliado && fuerza != null)
@@ -1101,7 +1019,6 @@ class _CardInfoPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // grilla de detalles (sin características)
           LayoutBuilder(
             builder: (context, c) {
               final colCount = c.maxWidth >= 620 ? 2 : 1;
@@ -1121,11 +1038,6 @@ class _CardInfoPanel extends StatelessWidget {
           ),
 
           const SizedBox(height: 12),
-
-          // bloque ancho con chips
-          if (feats.isNotEmpty) _featuresBlock(context, feats),
-
-          if (feats.isNotEmpty) const SizedBox(height: 12),
 
           // Siempre visible, incluso si la carta aún no está en un mazo.
           _abilityBlock(),

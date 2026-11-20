@@ -116,11 +116,11 @@ En la pestaña "Meta de mazos" de cada fecha podrás revisar:
 
 - Rendimiento y popularidad por raza.
 - Enfrentamientos directos entre razas registradas.
-- Arquetipos detectados según las características dominantes de cada lista.
+- Estilo de cada lista (Agro, Medio, Control o Combo) según las habilidades programadas de sus cartas.
 
 Todas las barajas asignadas entran en los cálculos, incluso cuando su jugador
 todavía no termina sus duelos. En ese caso se consideran sus resultados
-parciales, raza, composición y características, pero en el desglose aparece
+parciales, raza, composición y roles de sus cartas, pero en el desglose aparece
 como "Mazo oculto" y nunca se muestra el nombre del jugador ni se permite abrir
 la lista.
 
@@ -146,7 +146,7 @@ datos con otras fechas de la liga. Allí podrás revisar:
   listas de la misma raza.
 - Tamaño y nivel de confianza de cada muestra.
 
-Las barajas bloqueadas también cuentan en adopción, copias, características y
+Las barajas bloqueadas también cuentan en adopción, copias, roles y
 resultados parciales, pero el análisis agregado no revela a qué jugador
 pertenecen.
 

@@ -1,12 +1,12 @@
 // lib/screens/habilidades/habilidad_editor.dart
 //
 // Editor de una habilidad parametrizada. Los campos visibles dependen de la
-// acción de la característica elegida (ver Accion en card_habilidad.dart).
+// acción elegida (ver Accion en card_habilidad.dart).
 
 import 'package:flutter/material.dart';
 
 import '../../models/card_habilidad.dart';
-import '../../services/feature_catalog_service.dart';
+import '../../domain/catalogo_acciones.dart';
 import 'luego_editor.dart';
 
 const _bg = Color(0xFF132126);
@@ -15,7 +15,7 @@ const _gold = Color(0xFFF2D487);
 
 Future<CardHabilidad?> showHabilidadEditor(
   BuildContext context, {
-  required List<FeatureDef> features,
+  required List<AccionDef> features,
   CardHabilidad? inicial,
   String textoCarta = '',
   String tipoCarta = '',
@@ -38,7 +38,7 @@ Future<CardHabilidad?> showHabilidadEditor(
 }
 
 class _HabilidadEditor extends StatefulWidget {
-  final List<FeatureDef> features;
+  final List<AccionDef> features;
   final CardHabilidad? inicial;
   final String textoCarta;
   final String tipoCarta;
@@ -189,15 +189,16 @@ class _HabilidadEditorState extends State<_HabilidadEditor> {
     ],
   ];
 
-  void _elegirFeature(FeatureDef f) {
+  void _elegirFeature(AccionDef f) {
     setState(() {
       final base =
           _h ??
           CardHabilidad(featureId: f.id, featureName: f.name, accion: f.accion);
       final cambiaAccion = base.accion != f.accion || _h == null;
       _h = base.copyWith(
-        featureId: f.id,
-        featureName: f.name,
+        // Si la acción no cambia se conserva el nombre que ya tenía.
+        featureId: cambiaAccion ? f.id : base.featureId,
+        featureName: cambiaAccion ? f.name : base.featureName,
         accion: f.accion,
         modo: cambiaAccion ? (kModos[f.accion]?.first.id ?? '') : base.modo,
         cuando: _preguntasDe(f.accion).pasiva ? 'continua' : null,
@@ -313,7 +314,7 @@ class _HabilidadEditorState extends State<_HabilidadEditor> {
                       ),
                     ),
                   ),
-                _label('Característica'),
+                _label('Acción'),
                 // Solo las que tienen sentido para este tipo de carta.
                 _FeaturePicker(
                   features:
@@ -322,7 +323,7 @@ class _HabilidadEditorState extends State<_HabilidadEditor> {
                             (f) => accionPermitida(f.accion, widget.tipoCarta),
                           )
                           .toList(),
-                  selectedId: h?.featureId,
+                  selectedId: h == null ? null : idDeAccion(h.accion),
                   onPick: _elegirFeature,
                 ),
                 if (h != null) ...[
@@ -459,7 +460,9 @@ class _HabilidadEditorState extends State<_HabilidadEditor> {
           permitidos: const ['Aliado', 'Arma', 'Talismán', 'Tótem', 'Oro'],
         ),
       ],
-      if (h.cuando == 'propia_entra' || h.cuando == 'propia_sale') ...[
+      if (h.cuando == 'propia_entra' ||
+          h.cuando == 'propia_sale' ||
+          h.cuando == 'propia_juega') ...[
         const SizedBox(height: 8),
         const Text(
           '¿Qué tipo de carta tuya? (vacío = cualquiera; no cuenta esta misma)',
@@ -1181,6 +1184,9 @@ class _HabilidadEditorState extends State<_HabilidadEditor> {
     valor: valor ?? c.valor,
     raza: raza ?? c.raza,
     arquetipo: arquetipo ?? c.arquetipo,
+    // Los campos del simulador pertenecen a ese tipo de condición: si se
+    // cambia el tipo, ya no aplican.
+    extra: tipo != null && tipo != c.tipo ? const {} : c.extra,
   );
 
   Widget _check(String label, bool value, ValueChanged<bool> onChanged) =>
@@ -1425,9 +1431,9 @@ class _HabilidadEditorState extends State<_HabilidadEditor> {
 }
 
 class _FeaturePicker extends StatelessWidget {
-  final List<FeatureDef> features;
+  final List<AccionDef> features;
   final String? selectedId;
-  final ValueChanged<FeatureDef> onPick;
+  final ValueChanged<AccionDef> onPick;
 
   const _FeaturePicker({
     required this.features,
@@ -1437,7 +1443,7 @@ class _FeaturePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Autocomplete<FeatureDef>(
+    return Autocomplete<AccionDef>(
       initialValue: TextEditingValue(
         text: features.where((f) => f.id == selectedId).firstOrNull?.name ?? '',
       ),
@@ -1455,7 +1461,7 @@ class _FeaturePicker extends StatelessWidget {
             focusNode: focus,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              hintText: 'Busca una característica…',
+              hintText: 'Busca una acción…',
               hintStyle: const TextStyle(color: Colors.white38),
               prefixIcon: const Icon(Icons.search, color: Colors.white54),
               filled: true,
@@ -1490,7 +1496,7 @@ class _FeaturePicker extends StatelessWidget {
                           style: const TextStyle(color: Colors.white),
                         ),
                         subtitle: Text(
-                          '${f.accion.label}${f.definida ? '' : ' (sugerida)'}',
+                          f.descripcion,
                           style: const TextStyle(color: Colors.white54),
                         ),
                         onTap: () => onSelected(f),

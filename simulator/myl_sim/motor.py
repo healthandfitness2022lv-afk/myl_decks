@@ -36,6 +36,9 @@ FIN_SIN_CASTILLO = True
 # 2026-11-15: pagar a mano también dispara el Broche de Tara (apagar para
 # reproducir partidas grabadas antes).
 PAGO_MANUAL_DISPARA = True
+# 2026-11-17: el Oro jugado en la Vigilia dispara "cuando una carta tuya entra
+# en juego" (Rey Midas, Musa Calíope). Apagar para reproducir partidas grabadas antes.
+ORO_JUGADO_DISPARA_ENTRADA = True
 
 
 class FinPartida(Exception):
@@ -98,6 +101,12 @@ def _compactar(grupo: list[str]) -> list[str]:
         if " pasa a control de " in t and t.split(" pasa a control de ")[0] in controlados:
             continue
         limpio.append(t)
+    # Reporte g3hq T11: una destrucción en masa sale primero en una sola
+    # lista y después lo que dispara cada carta.
+    en_combate = [t[: -len(" es destruido en combate")] for t in limpio if t.endswith(" es destruido en combate")]
+    if len(en_combate) > 1:
+        limpio = [f"Destruidos en combate: {', '.join(en_combate)}"] + [
+            t for t in limpio if not t.endswith(" es destruido en combate")]
     out, prefijo = [], None
     for t in limpio:
         pre, sep, resto = t.partition(": ")
@@ -145,6 +154,7 @@ class Partida:
         self.sin_programar: tuple[set, set] = (set(), set())
         self.ultimo_dano: dict[int, str] = {0: "", 1: ""}
         self.pasos: list[dict] = []  # fotos de la mesa (partida narrada)
+        self.estilo = None  # estilo.Estilo: cómo ataca y bloquea cada lado (lo activa la búsqueda)
         self.mulligans = [0, 0]
         self.turnos_propios = [0, 0]
         self.oros_turno4: list[int | None] = [None, None]
@@ -240,7 +250,8 @@ class Partida:
                 "dl": [x.carta.id for x in j.destierro],
                 "r": [x.carta.id for x in j.reserva],
                 "p": [x.carta.id for x in j.pagado],
-                "v": j.oros_virtuales,
+                # Oros generados (libres y los que solo pagan ciertas cartas, Saladino).
+                "v": j.oros_virtuales + sum(max(0, r[0]) for r in j.oros_restringidos),
                 "def": [aliado(a) for a in j.defensa],
                 "atk": [aliado(a) for a in j.ataque],
                 "ap": [x.carta.id for x in j.apoyo],
@@ -432,7 +443,7 @@ class Partida:
         if exceso > 0:
             sobran = self.decide(a).elegir_descartes(self, a, list(jug.mano), exceso)
             for inst in sobran:
-                self.descartar(inst)
+                self.descartar(inst, por_habilidad=False)  # regla de mano máxima
             self.anotar(f"J{a} descarta por exceso de mano: {', '.join(x.nombre for x in sobran)}")
 
     def _vigilia(self, a: int) -> None:
@@ -453,6 +464,10 @@ class Partida:
                 self.anotar(f"J{a} juega oro {elegida.carta.nombre}")
                 hab.errante(self, elegida.carta)
                 hab.disparar(self, elegida.carta, "al_jugar")
+                if ORO_JUGADO_DISPARA_ENTRADA:
+                    # Musa Calíope / Rey Midas: "cuando un Oro entre en juego
+                    # bajo tu control" también vale para el Oro del turno.
+                    hab.disparar_entrada(self, elegida.carta)
             else:
                 self.ejecutar_jugada(a, elegida)
             # El Oro solo se juega como primera acción de la Vigilia.
@@ -609,6 +624,7 @@ class Partida:
             inst.listo = False  # #118: sin habilidad (Cleopatra) no tiene Furia para atacar
         hab.disparar(self, inst, "al_jugar")
         hab.disparar_entrada(self, inst)
+        hab.disparar_jugada(self, i, inst)  # "cuando juegues un Talismán" (Fruto Fiodhain, Jared)
         if self.e.fase == "vigilia" and self.e.activo == inst.controlador and inst.en_juego:
             # GdWO: "En tu fase de Vigilia, Saladino genera 2 Oros": jugado en
             # la Vigilia, genera ya en esa misma Vigilia.
@@ -616,7 +632,13 @@ class Partida:
                 if h.get("cuando") == "al_inicio_fase" and h.get("fase") == "vigilia" \
                         and h.get("accion") == "generarOro":
                     hab._intentar(self, inst.controlador, inst, h)
-        if inst.tipo == Tipo.TALISMAN and inst.zona in (Zona.MANO, Zona.CEMENTERIO, Zona.MAZO, Zona.DESTIERRO):
+        # Absalon: "en respuesta a que juegues un Talismán… barájalo en tu Mazo":
+        # si una habilidad ya lo puso en una zona (está en esa lista), se queda ahí.
+        ya_colocado = inst.tipo == Tipo.TALISMAN and any(
+            x is inst for x in self.j(inst.dueno).lista(inst.zona)) if inst.zona in (
+                Zona.MANO, Zona.CEMENTERIO, Zona.MAZO, Zona.DESTIERRO) else False
+        if inst.tipo == Tipo.TALISMAN and not ya_colocado \
+                and inst.zona in (Zona.MANO, Zona.CEMENTERIO, Zona.MAZO, Zona.DESTIERRO):
             # Jugado desde otra zona puede terminar desterrado (Jinetes de Fuego).
             self._mover(
                 inst, Zona.DESTIERRO if jugada.destino == "destierro" else hab.zona_final_talisman(inst)
@@ -752,6 +774,8 @@ class Partida:
         if not candidatos or hab.prohibido(self, "declarar_ataque", a):
             return  # Pwyll: mientras esté en juego no se puede declarar ataque
         atacantes = self.decide(a).elegir_atacantes(self, a, candidatos)
+        if self.estilo is not None:
+            self.estilo.observar_ataque(self, a, candidatos, atacantes)
         # Hathor: "este Aliado debe ser declarado atacante este turno si puede".
         atacantes += [x for x in candidatos if hab.tiene_estado(self, x, "debe_atacar") and x not in atacantes]
         if not atacantes and hab.prohibido(self, "ataque_obligatorio", a):
@@ -786,7 +810,7 @@ class Partida:
             # bloquear y le quita la habilidad a Djoser) va antes de que se
             # jueguen las demás cartas: el Escudo Miliciano ya no le hace
             # destruir a Djoser.
-            for x in atacantes:
+            for x in list(atacantes):
                 if x.en_juego:
                     hab.disparar_con_armas(self, x, "al_atacar", declaracion=True)
             # Canceladores de ataque: se juegan en este paso (D.A.R. 5.3.1).
@@ -798,7 +822,9 @@ class Partida:
                 if x.zona == Zona.ATAQUE:
                     self._mover(x, Zona.DEFENSA)
             return
-        for x in atacantes:
+        # Copia de la lista: Nathair-Teine suma un atacante que no fue
+        # "declarado" (no dispara su propio "al ser declarado atacante").
+        for x in list(atacantes):
             if x.en_juego:
                 hab.disparar_con_armas(self, x, "al_atacar", declaracion=False)
         hab.disparar_ataque_propio(self, a)  # Coliseo: roba por cada atacante
@@ -830,6 +856,8 @@ class Partida:
         self.bloqueos = dict(bloqueos)
         if bloqueables and libres:
             elegidos = self.decide(d).elegir_bloqueos(self, d, bloqueables, libres)
+            if self.estilo is not None:
+                self.estilo.observar_bloqueo(self, d, bloqueables, libres, elegidos)
             for atk_uid, blk in elegidos.items():
                 atk = next((x for x in bloqueables if x.uid == atk_uid), None)
                 if atk is not None and blk in libres and self.puede_bloquear(atk, blk) and blk not in bloqueos.values():
@@ -1034,22 +1062,29 @@ class Partida:
             inst.estados.clear()
             inst.sin_habilidad_hasta = None
             inst.listo = False
+            if getattr(inst, "copia_permanente", False):  # Fiodhain: fuera del juego vuelve a ser ella
+                inst.copia, inst.copia_permanente = (), False
             # Las Armas portadas siguen a su portador (4.2.2).
             for arma in [a for a in self.e.portadas if a.portador == inst.uid]:
                 self._mover(arma, zona if zona != Zona.MAZO else Zona.CEMENTERIO)
 
-    def descartar(self, inst: Instancia) -> None:
-        """Descarta desde la mano y dispara habilidades de descarte."""
+    def descartar(self, inst: Instancia, *, por_habilidad: bool = True) -> None:
+        """Descarta desde la mano y dispara habilidades de descarte.
+        `por_habilidad=False`: descarte por regla (exceso de mano al final del
+        turno); no dispara lo que pide "descartado por una habilidad" (Fear Sidhe)."""
         era_mano = inst.zona == Zona.MANO
         dueno = inst.dueno
         self._mover(inst, Zona.CEMENTERIO)
         if era_mano:
             self.descartadas_turno[dueno] += 1
             costo_anterior = getattr(self, "ctx_costo", None)
+            anterior = getattr(self, "ctx_descarte_por_habilidad", True)
+            self.ctx_descarte_por_habilidad = por_habilidad
             try:
                 hab.disparar(self, inst, "al_descartarse", forzar=True)
             finally:
                 self.ctx_costo = costo_anterior
+                self.ctx_descarte_por_habilidad = anterior
 
     def sale_del_juego(self, inst: Instancia, zona: Zona) -> None:
         """Saca una carta del juego y dispara 'al salir del juego'."""

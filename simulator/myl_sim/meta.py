@@ -14,6 +14,10 @@ Uso (desde simulator/):
   .venv/Scripts/python -m myl_sim.meta crear "BL 2026-11" ID1 ID2 ... --peso ID1=3
   .venv/Scripts/python -m myl_sim.meta matriz "BL 2026-11" -n 40
   .venv/Scripts/python -m myl_sim.meta matriz -n 40          (todos los raciales del caché)
+  .venv/Scripts/python -m myl_sim.meta matriz --app -n 40 --publicar   (y lo muestra en la app)
+
+El informe incluye qué tan agro o control está el meta: el estilo de cada mazo
+sale de `myl_sim.perfil` y se contrasta con la duración medida de sus partidas.
 """
 
 from __future__ import annotations
@@ -54,12 +58,17 @@ def seed_cruce(ha: str, hb: str, base: int = SEED_BASE) -> int:
 def _jugar(args) -> list[str]:
     """Partidas [desde, hasta) de un cruce. Resultado por partida desde A:
     "1" gana, "0" pierde, "e" empate, "x" anómala."""
+    return _jugar_con_turnos(args)[0]
+
+
+def _jugar_con_turnos(args) -> tuple[list[str], list[int]]:
+    """Como `_jugar`, más las rondas completas que duró cada partida."""
     from .jugadores import JUGADORES
     from .motor import Partida
 
     cartas_a, cartas_b, seed, desde, hasta, jugador, listas = args
     clase = JUGADORES[jugador]
-    out = []
+    out, turnos = [], []
     for k in range(desde, hasta):
         s = seed + k
         p = Partida((cartas_a, cartas_b), (clase(s * 2), clase(s * 2 + 1)), inicial=k % 2, seed=s)
@@ -67,7 +76,8 @@ def _jugar(args) -> list[str]:
             p.meta_listas = listas
         r = p.jugar()
         out.append("x" if r.ganador == -2 else "1" if r.ganador == 0 else "0" if r.ganador == 1 else "e")
-    return out
+        turnos.append((r.turnos + 1) // 2)
+    return out, turnos
 
 
 def _archivo_cruce(ha, hb, motor, jugador, base) -> Path:
@@ -81,6 +91,16 @@ def _leer(path: Path) -> str:
         return ""
 
 
+def _leer_turnos(path: Path, n: int) -> list[int]:
+    """Turnos guardados de un cruce, alineados con sus resultados. Las partidas
+    jugadas antes de que se midiera la duración quedan en 0 (sin dato)."""
+    try:
+        t = [int(x) for x in json.loads(path.read_text(encoding="utf-8")).get("turnos") or []]
+    except (OSError, ValueError, TypeError):
+        t = []
+    return (t + [0] * n)[:n]
+
+
 def resumen_cruce(resultados: str) -> dict:
     validos = [c for c in resultados if c != "x"]
     n = len(validos)
@@ -92,9 +112,10 @@ def resumen_cruce(resultados: str) -> dict:
 
 
 def matriz(mazos: list[Mazo], n: int, *, jugador: str = "heuristico", procesos: int | None = None,
-           base: int = SEED_BASE, usar_cache: bool = True, progreso=None) -> dict:
+           base: int = SEED_BASE, usar_cache: bool = True, progreso=None, turnos: dict | None = None) -> dict:
     """Juega (o reutiliza) n partidas por cada par distinto. Devuelve
-    {(i, j): resultados desde i} para i < j."""
+    {(i, j): resultados desde i} para i < j. Si se pasa `turnos` (un dict
+    vacío), queda con {(i, j): [turnos de cada partida]} (0 = sin dato)."""
     from concurrent.futures import ProcessPoolExecutor
 
     motor = huella_motor()
@@ -120,21 +141,99 @@ def matriz(mazos: list[Mazo], n: int, *, jugador: str = "heuristico", procesos: 
     nuevos: dict = {par: {} for par in pares}
     if trabajos:
         with ProcessPoolExecutor(procesos or os.cpu_count() or 1) as ex:
-            for k, ((par, args), res) in enumerate(zip(trabajos, ex.map(_jugar, [t[1] for t in trabajos]))):
+            for k, ((par, args), res) in enumerate(zip(trabajos, ex.map(_jugar_con_turnos, [t[1] for t in trabajos]))):
                 nuevos[par][args[3]] = res
                 if progreso:
                     progreso(k + 1, len(trabajos))
     out = {}
     for a, b in pares:
-        res = previos[(a, b)][:n] + "".join("".join(nuevos[(a, b)][d]) for d in sorted(nuevos[(a, b)]))
-        if len(res) > len(previos[(a, b)]):
-            _archivo_cruce(huellas[a], huellas[b], motor, jugador, base).write_text(json.dumps({
+        ruta = _archivo_cruce(huellas[a], huellas[b], motor, jugador, base)
+        hechos = previos[(a, b)]
+        bloques = [nuevos[(a, b)][d] for d in sorted(nuevos[(a, b)])]
+        res = hechos[:n] + "".join("".join(r) for r, _ in bloques)
+        dur = _leer_turnos(ruta, len(hechos)) + [t for _, ts in bloques for t in ts]
+        if len(res) > len(hechos):
+            ruta.write_text(json.dumps({
                 "a": {"id": mazos[a].id, "nombre": mazos[a].nombre, "huella": huellas[a]},
                 "b": {"id": mazos[b].id, "nombre": mazos[b].nombre, "huella": huellas[b]},
-                "motor": motor, "jugador": jugador, "seedBase": base, "resultados": res,
+                "motor": motor, "jugador": jugador, "seedBase": base, "resultados": res, "turnos": dur,
             }, ensure_ascii=False), encoding="utf-8")
         out[(a, b)] = res
+        if turnos is not None:
+            turnos[(a, b)] = dur[:len(res)]
     return out
+
+
+def velocidad(mazos: list[Mazo], cruces: dict, turnos: dict) -> list[dict]:
+    """Por mazo: turno mediano en que gana y en que pierde (None sin datos)."""
+    gana: list[list[int]] = [[] for _ in mazos]
+    pierde: list[list[int]] = [[] for _ in mazos]
+    for (a, b), res in cruces.items():
+        for c, t in zip(res, turnos.get((a, b)) or []):
+            if t <= 0 or c not in "10":
+                continue
+            ganador, perdedor = (a, b) if c == "1" else (b, a)
+            gana[ganador].append(t)
+            pierde[perdedor].append(t)
+
+    def mediana(xs: list[int]):
+        xs = sorted(xs)
+        return None if not xs else (xs[len(xs) // 2] + xs[(len(xs) - 1) // 2]) / 2
+
+    return [{"turnoVictoria": mediana(g), "turnoDerrota": mediana(p), "partidasMedidas": len(g) + len(p)}
+            for g, p in zip(gana, pierde)]
+
+
+ESTILOS = ("Agro", "Medio", "Control", "Combo")
+
+
+def _correlacion(xs: list[float], ys: list[float]):
+    if len(xs) < 5:
+        return None
+    mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+    sx = sum((x - mx) ** 2 for x in xs)
+    sy = sum((y - my) ** 2 for y in ys)
+    return None if not sx or not sy else sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / math.sqrt(sx * sy)
+
+
+def meta_perfil(filas: list[dict], t: list[list[dict | None]]) -> dict:
+    """Qué tan agro o control está el meta. `filas` en el mismo orden que la
+    tabla `t`, cada una con su `perfil`, `indice`, pesos y `turnoVictoria`."""
+    def reparto(clave: str) -> dict:
+        total = sum(f[clave] for f in filas) or 1.0
+        return {e: round(sum(f[clave] for f in filas if f["perfil"] == e) / total, 4) for e in ESTILOS}
+
+    def indice(clave: str) -> float:
+        total = sum(f[clave] for f in filas) or 1.0
+        return round(sum(f[clave] * f["indice"] for f in filas) / total, 1)
+
+    entre: dict = {}
+    for i, fi in enumerate(filas):
+        for j, fj in enumerate(filas):
+            c = t[i][j]
+            if c is None or i == j:
+                continue
+            d = entre.setdefault(fi["perfil"], {}).setdefault(fj["perfil"], [0.0, 0])
+            d[0] += c["winrate"] * c["partidas"]
+            d[1] += c["partidas"]
+    medidos = [f for f in filas if f.get("turnoVictoria") is not None]
+    r = _correlacion([f["indice"] for f in medidos], [f["turnoVictoria"] for f in medidos])
+    # Qué estilo rinde más contra el meta actual (score medio de sus mazos).
+    rinde = {e: round(sum(f["score"] for f in filas if f["perfil"] == e)
+                      / max(1, sum(1 for f in filas if f["perfil"] == e)), 4)
+             for e in ESTILOS if any(f["perfil"] == e for f in filas)}
+    return {
+        "mazos": {e: sum(1 for f in filas if f["perfil"] == e) for e in ESTILOS},
+        "reparto": {"jugado": reparto("peso"), "evolutivo": reparto("pesoEvolutivo"),
+                    "equilibrio": reparto("equilibrio")},
+        "indiceMedio": {"jugado": indice("peso"), "evolutivo": indice("pesoEvolutivo"),
+                        "equilibrio": indice("equilibrio")},
+        "scorePorEstilo": rinde,
+        "entreEstilos": {a: {b: {"winrate": round(w / n, 4), "partidas": n} for b, (w, n) in fila.items() if n}
+                         for a, fila in entre.items()},
+        "correlacionIndiceTurno": None if r is None else round(r, 3),
+        "mazosMedidos": len(medidos),
+    }
 
 
 def winrates(mazos: list[Mazo], cruces: dict) -> list[list[dict | None]]:
@@ -229,9 +328,11 @@ def equilibrio(w: list[list[float]], iteraciones: int = 20000) -> list[float]:
 
 # ── Informe ───────────────────────────────────────────────────────────────────
 def informe(mazos: list[Mazo], pesos: list[float], cruces: dict, *, n: int, jugador: str,
-            nombre_meta: str) -> dict:
+            nombre_meta: str, turnos: dict | None = None) -> dict:
     # Nombres repetidos ("Faraon", "Druida") o vacíos: se distinguen con el id.
     from collections import Counter
+
+    from .perfil import analizar_mazo
 
     repetidos = Counter(m.nombre for m in mazos)
     for m in mazos:
@@ -241,20 +342,24 @@ def informe(mazos: list[Mazo], pesos: list[float], cruces: dict, *, n: int, juga
     w = _tabla(t)
     evol = pesos_evolutivos(w, base=[p / (sum(pesos) or 1) for p in pesos])
     eq = equilibrio(w)
+    vel = velocidad(mazos, cruces, turnos or {})
     filas = []
     for i, m in enumerate(mazos):
         s = score_meta(t[i], pesos, i)
         s_evol = score_meta(t[i], evol, i)
         rivales = [(mazos[j].nombre, t[i][j]["winrate"]) for j in range(len(mazos)) if t[i][j]]
         rivales.sort(key=lambda x: x[1])
+        estilo = analizar_mazo(m)
         filas.append({"id": m.id, "nombre": m.nombre, "raza": m.raza, "huella": huella_mazo(m),
                       "peso": pesos[i], **s, "pesoEvolutivo": evol[i], "scoreEvolutivo": s_evol["score"],
                       "equilibrio": eq[i],
+                      "perfil": estilo["perfil"], "indice": estilo["indice"], **vel[i],
                       "peores": rivales[:3], "mejores": rivales[::-1][:3]})
     orden = sorted(range(len(mazos)), key=lambda i: -filas[i]["score"])
     return {
-        "esquema": 2, "creado": datetime.now(timezone.utc).isoformat(), "meta": nombre_meta,
+        "esquema": 3, "creado": datetime.now(timezone.utc).isoformat(), "meta": nombre_meta,
         "motor": huella_motor(), "jugador": jugador, "partidasPorCruce": n,
+        "metaPerfil": meta_perfil(filas, t),
         "ranking": [filas[i] for i in orden],
         "matriz": {"mazos": [mazos[i].nombre for i in orden],
                    "winrate": [[None if t[i][j] is None else round(t[i][j]["winrate"], 3) for j in orden]
@@ -280,6 +385,39 @@ def informe_md(r: dict) -> str:
     eq = sorted((f for f in r["ranking"] if f["equilibrio"] >= 0.01), key=lambda f: -f["equilibrio"])
     out += ["", "## Equilibrio (la mezcla que nadie de la lista le gana)", "",
             ", ".join(f"{f['nombre']} {f['equilibrio'] * 100:.0f}%" for f in eq)]
+    mp = r.get("metaPerfil")
+    if mp:
+        def pct(d: dict) -> str:
+            return " · ".join(f"{e} {d[e] * 100:.0f}%" for e in ESTILOS if d.get(e))
+
+        out += ["", "## Qué tan agro o control está el meta", "",
+                "Estilo de cada mazo según sus habilidades programadas (`myl_sim.perfil`). "
+                "Índice: 0 = control, 100 = agro.", "",
+                "| | Reparto | Índice medio |", "|---|---|---|",
+                f"| Lo que se juega (pesos del meta) | {pct(mp['reparto']['jugado'])} | {mp['indiceMedio']['jugado']} |",
+                f"| Si todos se pasan a lo que gana | {pct(mp['reparto']['evolutivo'])} | "
+                f"{mp['indiceMedio']['evolutivo']} |",
+                f"| Equilibrio | {pct(mp['reparto']['equilibrio'])} | {mp['indiceMedio']['equilibrio']} |", "",
+                "Winrate esperado contra el meta por estilo: "
+                + " · ".join(f"{e} {v * 100:.1f}%" for e, v in mp["scorePorEstilo"].items()), ""]
+        estilos = [e for e in ESTILOS if e in mp["entreEstilos"]]
+        out += ["Winrate de la fila contra la columna:", "",
+                "| | " + " | ".join(estilos) + " |", "|---" * (len(estilos) + 1) + "|"]
+        for a in estilos:
+            celdas = [mp["entreEstilos"][a].get(b) for b in estilos]
+            out.append(f"| {a} | " + " | ".join("—" if c is None else f"{c['winrate'] * 100:.0f}% ({c['partidas']})"
+                                               for c in celdas) + " |")
+        if mp.get("correlacionIndiceTurno") is not None:
+            out += ["", f"Correlación entre el índice y el turno mediano de victoria medido "
+                        f"({mp['mazosMedidos']} mazos): {mp['correlacionIndiceTurno']}. "
+                        "Debe ser claramente negativa (más agro, gana antes); si se acerca a 0, "
+                        "recalibrar los pesos de `myl_sim/perfil.py`."]
+        out += ["", "| Mazo | Estilo | Índice | Gana en el turno | Pierde en el turno |", "|---|---|---|---|---|"]
+        for f in sorted(r["ranking"], key=lambda f: -f["indice"]):
+            def turno(v):
+                return "—" if v is None else f"{v:g}"
+            out.append(f"| {f['nombre']} | {f['perfil']} | {f['indice']} | {turno(f.get('turnoVictoria'))} | "
+                       f"{turno(f.get('turnoDerrota'))} |")
     m = r["matriz"]
     corto = [n[:10] for n in m["mazos"]]
     out += ["", "## Matriz (winrate de la fila contra la columna)", "",
@@ -287,6 +425,18 @@ def informe_md(r: dict) -> str:
     for nombre, fila in zip(m["mazos"], m["winrate"]):
         out.append(f"| {nombre} | " + " | ".join("—" if x is None else f"{x * 100:.0f}" for x in fila) + " |")
     return "\n".join(out) + "\n"
+
+
+def publicar(r: dict) -> None:
+    """Deja el resumen del informe en `config/meta_simulador`, que la app
+    muestra a todos en «Meta y tendencias → Lo que gana». Escribe en Firestore."""
+    from firebase_admin import firestore
+
+    from .datos import db
+    from .trabajos import resumen
+
+    db().collection("config").document("meta_simulador").set(
+        {**resumen("meta_matriz", r), "publicado": firestore.SERVER_TIMESTAMP})
 
 
 def pendientes_md(mazos: list[Mazo], formato: str) -> str:
@@ -339,6 +489,8 @@ def main(argv=None) -> int:
                    help="sin meta: todos los mazos completos de la app + notables (en vez del caché)")
     m.add_argument("--formato", default="racial", help="formato para --app")
     m.add_argument("--salida", type=Path)
+    m.add_argument("--publicar", action="store_true",
+                   help="publica el resumen en la app (config/meta_simulador); escribe en Firestore")
     pe = sub.add_parser("pendientes", help="cartas sin programar en los mazos de la app")
     pe.add_argument("--formato", default="racial")
     a = ap.parse_args(argv)
@@ -386,8 +538,9 @@ def main(argv=None) -> int:
         if k % 25 == 0 or k == total:
             print(f"{k}/{total} bloques", flush=True)
 
-    cruces = matriz(mazos, a.n, jugador=a.jugador, procesos=a.procesos, progreso=prog)
-    r = informe(mazos, pesos, cruces, n=a.n, jugador=a.jugador, nombre_meta=nombre)
+    turnos: dict = {}
+    cruces = matriz(mazos, a.n, jugador=a.jugador, procesos=a.procesos, progreso=prog, turnos=turnos)
+    r = informe(mazos, pesos, cruces, n=a.n, jugador=a.jugador, nombre_meta=nombre, turnos=turnos)
     salida = a.salida or CARPETA / "informes" / f"matriz_{datetime.now():%Y%m%d_%H%M}"
     salida.parent.mkdir(parents=True, exist_ok=True)
     salida.with_suffix(".json").write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -395,6 +548,9 @@ def main(argv=None) -> int:
     for k, f in enumerate(r["ranking"][:10], 1):
         print(f"{k:2}. {f['nombre']:<30} {f['score'] * 100:5.1f}%")
     print(f"Informe: {salida.with_suffix('.md')}")
+    if a.publicar:
+        publicar(r)
+        print("Publicado en la app: Meta y tendencias → Lo que gana")
     return 0
 
 

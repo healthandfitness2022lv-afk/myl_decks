@@ -6,8 +6,13 @@ Exit 2 = acción bloqueada (Claude Code muestra stderr al modelo). Exit 0 = perm
 Se ejecuta antes de cada Bash/Edit/Write/Read. Sin dependencias externas.
 """
 import json
+import os
 import re
 import sys
+
+# El dueño habilita los despliegues en SU equipo con NEXUS_ALLOW_DEPLOY=1.
+# Las ejecuciones programadas en la nube no la definen: ahí sigue bloqueado.
+DEPLOY_OK = os.environ.get("NEXUS_ALLOW_DEPLOY") == "1"
 
 PROTECTED_BRANCHES = r"(main|master|production|prod|release)"
 
@@ -26,7 +31,7 @@ BASH_RULES = [
     (r"\bgh\s+(repo\s+delete|release\s+(create|delete)|secret|variable)\b", "operación administrativa de GitHub"),
     (r"\bgh\s+api\b.*(-X|--method)\s*(DELETE|PUT|PATCH)", "escritura directa a la API de GitHub"),
     (r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)\s+(/|~|\$HOME|\.\s*$|\*|\.\.)", "borrado recursivo peligroso"),
-    (r"\b(firebase\s+deploy|vercel\b.*--prod|netlify\s+deploy\b.*--prod|fly\s+deploy|heroku\b|gcloud\s+(app|run|functions)\s+deploy|aws\s+\S+\s+(deploy|delete|terminate)|eas\s+(submit|update)|fastlane)", "despliegue a producción prohibido"),
+    (r"\b(firebase\s+deploy|vercel\b.*--prod|netlify\s+deploy\b.*--prod|fly\s+deploy|heroku\b|gcloud\s+(app|run|functions)\s+deploy|aws\s+\S+\s+(deploy|delete|terminate)|eas\s+(submit|update)|fastlane)", "__DEPLOY__"),
     (r"\b(npm|pnpm|yarn)\s+run\s+[\w:.-]*(deploy|prod|migrate|seed|clear|reset|drop)\b|\bnetlify\s+deploy\b|\bprisma\s+(migrate\s+(deploy|reset)|db\s+(push|seed))|\bsupabase\s+db\s+(push|reset)", "despliegue o cambio de base de datos prohibido"),
     (r"\b(npm|pnpm|yarn)\s+publish\b|\bflutter\s+pub\s+publish\b|\bdart\s+pub\s+publish\b|\btwine\s+upload\b", "publicación de paquetes prohibida"),
     (r"\b(terraform\s+(apply|destroy)|kubectl|helm\s+(install|upgrade|uninstall)|pulumi\s+up)\b", "cambios de infraestructura prohibidos"),
@@ -59,6 +64,11 @@ def check_bash(cmd: str) -> None:
                 if WRITE_OPS.search(norm):
                     block("modificar controles de seguridad/CI requiere aprobación humana")
                 continue
+            if reason == "__DEPLOY__":
+                # Permitido solo si el dueño lo habilitó en su equipo.
+                if DEPLOY_OK:
+                    continue
+                block("despliegue a producción prohibido (habilítalo con NEXUS_ALLOW_DEPLOY=1)")
             block(reason)
 
 
